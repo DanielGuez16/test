@@ -1,0 +1,360 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steering ALM Metrics - Analyse LCR</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Styles personnalisés -->
+    <style>
+        :root {
+            --natixis-blue: #003366;
+            --natixis-light-blue: #0066cc;
+            --natixis-green: #00a651;
+            --natixis-orange: #ff6600;
+            --natixis-gray: #f5f5f5;
+            --success-green: #28a745;
+            --danger-red: #dc3545;
+        }
+        
+        body { 
+            background: linear-gradient(135deg, var(--natixis-blue) 0%, var(--natixis-light-blue) 100%); 
+            min-height: 100vh; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container { 
+            background: white; 
+            border-radius: 20px; 
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3); 
+            margin: 30px auto; 
+            backdrop-filter: blur(10px);
+        }
+        
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            margin: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .upload-area { 
+            border: 3px dashed var(--natixis-light-blue); 
+            padding: 2.5rem; 
+            text-align: center; 
+            margin: 20px 0; 
+            cursor: pointer; 
+            border-radius: 15px; 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(145deg, #ffffff, #f8f9ff);
+        }
+        
+        .upload-area:hover { 
+            background: linear-gradient(145deg, #f0f8ff, #e3f2fd);
+            border-color: var(--natixis-green);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,102,204,0.15);
+        }
+        
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--natixis-light-blue);
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover i {
+            color: var(--natixis-green);
+            transform: scale(1.1);
+        }
+        
+        /* Styles du tableau croisé dynamique */
+        .pivot-table, .consumption-table { 
+            font-size: 13px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .pivot-table th, .consumption-table th { 
+            background: linear-gradient(135deg, var(--natixis-blue) 0%, var(--natixis-light-blue) 100%);
+            color: white; 
+            font-weight: 600; 
+            text-align: center; 
+            padding: 12px 8px; 
+            border: none;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .pivot-table td, .consumption-table td { 
+            padding: 8px; 
+            border: 1px solid #e0e6ed; 
+            vertical-align: middle;
+        }
+        
+        .pivot-table tbody tr:hover, .consumption-table tbody tr:hover {
+            background-color: rgba(0, 102, 204, 0.05);
+            transition: background-color 0.2s ease;
+        }
+        
+        /* Styles des lignes spéciales */
+        .total-row { 
+            background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+            font-weight: bold; 
+            border-top: 2px solid var(--natixis-light-blue);
+        }
+        
+        .total-row td {
+            font-weight: 700;
+            border-top: 2px solid var(--natixis-light-blue);
+        }
+        
+        /* Styles des variations */
+        .variation-positive { 
+            color: var(--success-green); 
+            font-weight: bold;
+            position: relative;
+        }
+        
+        .variation-positive::before {
+            content: "▲";
+            margin-right: 3px;
+            font-size: 0.8em;
+        }
+        
+        .variation-negative { 
+            color: var(--danger-red); 
+            font-weight: bold;
+            position: relative;
+        }
+        
+        .variation-negative::before {
+            content: "▼";
+            margin-right: 3px;
+            font-size: 0.8em;
+        }
+        
+        /* En-têtes de colonnes spécialisés */
+        .header-j-minus-1 {
+            background: linear-gradient(135deg, #6c757d, #495057) !important;
+        }
+        
+        .header-j {
+            background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+        }
+        
+        .header-variation {
+            background: linear-gradient(135deg, var(--natixis-orange), #ff8c00) !important;
+        }
+        
+        /* Cartes de métriques */
+        .metric-card { 
+            background: linear-gradient(135deg, var(--natixis-blue) 0%, var(--natixis-light-blue) 100%); 
+            color: white; 
+            border-radius: 15px; 
+            padding: 2rem; 
+            margin: 15px 0; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            transition: transform 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .metric-card h2 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin: 10px 0;
+        }
+        
+        /* Boutons */
+        .btn-analyze {
+            background: linear-gradient(45deg, var(--natixis-blue), var(--natixis-green)); 
+            border: none; 
+            color: white; 
+            padding: 15px 40px; 
+            font-size: 18px; 
+            font-weight: 600;
+            border-radius: 50px; 
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,102,204,0.3);
+        }
+        
+        .btn-analyze:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,102,204,0.4);
+            color: white;
+        }
+        
+        .btn-analyze:disabled {
+            background: #6c757d;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* Alertes et statuts */
+        .alert {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .analysis-section { 
+            margin: 40px 0; 
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .pivot-table {
+                font-size: 11px;
+            }
+            
+            .pivot-table th,
+            .pivot-table td {
+                padding: 6px 4px;
+            }
+            
+            .metric-card {
+                padding: 1.5rem;
+            }
+        }
+        
+        /* Table responsive avec scroll horizontal */
+        .table-container {
+            max-width: 100%;
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        /* Styles pour les valeurs numériques */
+        .numeric-value {
+            font-family: 'Courier New', monospace;
+            text-align: right;
+        }
+        
+        /* Légende */
+        .table-legend {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid var(--natixis-light-blue);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <div class="navbar-custom">
+        <div class="container d-flex justify-content-between align-items-center py-3">
+            <h3 class="mb-0 text-primary fw-bold">
+                📊 Steering ALM Metrics
+            </h3>
+            <span class="badge bg-primary">Analyse LCR</span>
+        </div>
+    </div>
+    
+    <!-- Contenu principal -->
+    <div class="container">
+        <div class="main-container p-4">
+            <div class="text-center mb-5 fade-in-up">
+                <h1 class="display-5 text-primary fw-bold mb-3">
+                    Tableau Croisé Dynamique - Balance Sheet
+                </h1>
+                <p class="lead text-muted">
+                    Analyse comparative ACTIF/PASSIF par Groupe de Produit
+                </p>
+                <small class="text-muted">
+                    Filtres: Top Conso = "O" • Réaffectation ∈ {ACTIF, PASSIF}
+                </small>
+            </div>
+            
+            <!-- Section Upload -->
+            <div class="row mb-4">
+                <div class="col-lg-6 mb-3">
+                    <div class="card h-100 border-0 fade-in-up">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">📅 Fichier J (Aujourd'hui)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="upload-area" onclick="document.getElementById('fileJ').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h5>Sélectionner le fichier J</h5>
+                                <p class="text-muted mb-0">Format Excel (.xlsx, .xls)</p>
+                            </div>
+                            <input type="file" id="fileJ" accept=".xlsx,.xls" style="display:none">
+                            <div id="statusJ"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 mb-3">
+                    <div class="card h-100 border-0 fade-in-up" style="animation-delay: 0.2s;">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">📅 Fichier J-1 (Hier)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="upload-area" onclick="document.getElementById('fileJ1').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h5>Sélectionner le fichier J-1</h5>
+                                <p class="text-muted mb-0">Format Excel (.xlsx, .xls)</p>
+                            </div>
+                            <input type="file" id="fileJ1" accept=".xlsx,.xls" style="display:none">
+                            <div id="statusJ1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bouton d'analyse -->
+            <div class="text-center mb-4 fade-in-up" style="animation-delay: 0.4s;">
+                <button id="analyzeBtn" class="btn btn-analyze btn-lg" onclick="analyze()" disabled>
+                    🚀 GÉNÉRER BALANCE SHEET + CONSUMPTION
+                </button>
+            </div>
+            
+            <!-- Section Résultats -->
+            <div id="results" class="fade-in-up" style="animation-delay: 0.6s;"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
