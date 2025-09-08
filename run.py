@@ -570,13 +570,32 @@ def create_consumption_analysis_grouped_only(dataframes):
         variations = calculate_consumption_grouped_variations(totals_by_group)
         
         # Génération de l'analyse textuelle
-        analysis_text = generate_consumption_grouped_analysis_text(variations, totals_by_group)
+        analysis_text, significant_groups = generate_consumption_grouped_analysis_text(variations, totals_by_group)
         
+        # Préparer les données détaillées par métier pour les groupes significatifs
+        metier_details = {}
+        for file_type, df in dataframes.items():
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            if "Métier" in df_filtered.columns:
+                print(significant_groups)
+                if len(significant_groups) != 0:
+                    # Filtrer pour les groupes significatifs seulement
+                    df_significant = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(significant_groups)]
+                    
+                    # Grouper par groupe métier et métier
+                    grouped = df_significant.groupby(["LCR_ECO_GROUPE_METIERS", "Métier"])["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+                    grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
+                    
+                    # CONVERTIR EN DICTIONNAIRE SÉRIALISABLE
+                    metier_details[file_type] = grouped.to_dict(orient='records')
+
         return {
             "title": "LCR Consumption Analysis by Business Group (Summary)",
             "consumption_table_html": consumption_html,
             "variations": variations,
             "analysis_text": analysis_text,
+            "significant_groups": significant_groups,
+            "metier_details": metier_details,
             "metadata": {
                 "analysis_date": datetime.now().isoformat(),
                 "filter_applied": "Top Conso = 'O'",
@@ -585,7 +604,7 @@ def create_consumption_analysis_grouped_only(dataframes):
                 "view_type": "grouped_summary"
             }
         }
-        
+    
     except Exception as e:
         logger.error(f"❌ Erreur création analyse Consumption groupée: {e}")
         return {
@@ -739,19 +758,21 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group):
     analysis = f"Summary view: on {date_str}, business groups have total consumption of {total_j:.2f} Bn, representing a {direction} of {abs(variation):.2f} Bn compared to yesterday."
     
     # Identification des principales variations par groupe (top 3)
+    significant_groups = []  # Liste pour stocker les groupes significatifs
     if "by_groupe_metiers" in variations:
-        significant_variations = []
         sorted_variations = sorted(
             variations["by_groupe_metiers"].items(), 
             key=lambda x: abs(x[1]["variation"]), 
             reverse=True
         )
         
+        significant_variations = []
         for group, data in sorted_variations[:3]:  # Top 3 variations
             group_var = data["variation"]
             if abs(group_var) >= 0.05:  # Variations >= 50M
                 sign = "-" if group_var < 0 else "+"
                 significant_variations.append(f"{group} ({sign}{abs(group_var):.2f} Bn)")
+                significant_groups.append(group)
         
         if significant_variations:
             if variation < 0:
@@ -759,7 +780,7 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group):
             else:
                 analysis += f" Main drivers of this increase: {', '.join(significant_variations)}."
     
-    return analysis
+    return analysis, significant_groups
 
 
 if __name__ == "__main__":
