@@ -274,7 +274,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                 <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-1">📊 ${balanceSheetData.title || 'Balance Sheet Analysis'}</h3>
+                            <h3 class="mb-1"> ${balanceSheetData.title || 'Balance Sheet Analysis'}</h3>
                         </div>
                         <span class="badge bg-light text-primary">Balance Sheet</span>
                     </div>
@@ -292,7 +292,7 @@ function generateBalanceSheetSection(balanceSheetData) {
     if (balanceSheetData.variations) {
         html += `
             <div class="analysis-section fade-in-up">
-                <h4 class="text-center mb-4">📈 Balance Sheet Variations (D vs D-1)</h4>
+                <h4 class="text-center mb-4">Balance Sheet Variations (D vs D-1)</h4>
                 <div class="row">
         `;
         
@@ -304,22 +304,22 @@ function generateBalanceSheetSection(balanceSheetData) {
             const isPositive = actif.variation >= 0;
             
             html += `
-                <div class="col-md-6 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="metric-card">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">ACTIF</h5>
+                                <h5 class="mb-0">ASSET</h5>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                     ${isPositive ? '📈' : '📉'}
                                 </span>
                             </div>
                             <div class="row text-center">
                                 <div class="col-6">
-                                    <small class="opacity-75">J-1</small>
+                                    <small class="opacity-75">D-1</small>
                                     <h3>${actif.j_minus_1} Bn €</h3>
                                 </div>
                                 <div class="col-6">
-                                    <small class="opacity-75">J</small>
+                                    <small class="opacity-75">D</small>
                                     <h3>${actif.j} Bn €</h3>
                                 </div>
                             </div>
@@ -340,22 +340,22 @@ function generateBalanceSheetSection(balanceSheetData) {
             const isPositive = passif.variation >= 0;
             
             html += `
-                <div class="col-md-6 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">PASSIF</h5>
+                                <h5 class="mb-0">LIABILITY</h5>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                     ${isPositive ? '📈' : '📉'}
                                 </span>
                             </div>
                             <div class="row text-center">
                                 <div class="col-6">
-                                    <small class="opacity-75">J-1</small>
+                                    <small class="opacity-75">D-1</small>
                                     <h3>${passif.j_minus_1} Bn €</h3>
                                 </div>
                                 <div class="col-6">
-                                    <small class="opacity-75">J</small>
+                                    <small class="opacity-75">D</small>
                                     <h3>${passif.j} Bn €</h3>
                                 </div>
                             </div>
@@ -415,9 +415,9 @@ function generateConsumptionSection(consumptionData) {
                 <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-1">🏢 ${consumptionData.title || 'LCR Consumption Analysis'}</h3>
+                            <h3 class="mb-1"> ${consumptionData.title || 'LCR Consumption Analysis'}</h3>
                         </div>
-                        <span class="badge bg-light text-success">Consumption</span>
+                        <span class="badge bg-light text-primary">Consumption</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -436,7 +436,7 @@ function generateConsumptionSection(consumptionData) {
         
         html += `
             <div class="analysis-section fade-in-up">
-                <h4 class="text-center mb-4">📊 Consumption Analysis</h4>
+                <h4 class="text-center mb-4">Consumption Variations (D vs D-1)</h4>
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
@@ -449,11 +449,11 @@ function generateConsumptionSection(consumptionData) {
                                 </div>
                                 <div class="row text-center">
                                     <div class="col-4">
-                                        <small class="opacity-75">J-1</small>
+                                        <small class="opacity-75">D-1</small>
                                         <h3>${globalVar.j_minus_1} Bn</h3>
                                     </div>
                                     <div class="col-4">
-                                        <small class="opacity-75">J</small>
+                                        <small class="opacity-75">D</small>
                                         <h3>${globalVar.j} Bn</h3>
                                     </div>
                                     <div class="col-4">
@@ -692,7 +692,7 @@ function prepareMetierChartData(groupe, metierDetails) {
             labels: metiers,
             datasets: [
                 {
-                    label: 'Variation (J - J-1)',
+                    label: 'Variation (D - D-1)',
                     data: variations,
                     backgroundColor: variations.map(v => v >= 0 ? 'rgba(40, 167, 69, 0.7)' : 'rgba(220, 53, 69, 0.7)'),
                     borderColor: variations.map(v => v >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)'),

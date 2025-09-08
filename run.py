@@ -392,9 +392,9 @@ def generate_pivot_table_html(pivot_tables):
         <thead>
             <tr>
                 <th rowspan="2" class="align-middle">Groupe De Produit</th>
-                <th colspan="2" class="text-center header-j-minus-1">J-1 (Hier)</th>
-                <th colspan="2" class="text-center header-j">J (Aujourd'hui)</th>
-                <th colspan="2" class="text-center header-variation">Variation (J - J-1)</th>
+                <th colspan="2" class="text-center header-j-minus-1">D-1 (Yesterday)</th>
+                <th colspan="2" class="text-center header-j">D (Today)</th>
+                <th colspan="2" class="text-center header-variation">Variation (D - D-1)</th>
             </tr>
             <tr>
                 <th class="text-center header-j-minus-1">ACTIF</th>
@@ -492,7 +492,7 @@ def generate_executive_summary(variations):
             summary_parts.append(f"{category}: {direction} de {abs(variation):.2f} Md€")
     
     if summary_parts:
-        return f"Balance Sheet au {date_str} - Principales variations: {', '.join(summary_parts)}."
+        return f"On {date_str} Natixis' balance sheet presents some variations: {', '.join(summary_parts)}."
     else:
         return f"Balance Sheet au {date_str} - Variations mineures observées (< 100M€)."
 
@@ -642,8 +642,8 @@ def generate_consumption_grouped_table_html(consumption_grouped):
         <thead>
             <tr>
                 <th rowspan="2" class="align-middle">LCR Groupe Métiers</th>
-                <th colspan="2" class="text-center header-j-minus-1">J-1 (Hier)</th>
-                <th colspan="2" class="text-center header-j">J (Aujourd'hui)</th>
+                <th colspan="2" class="text-center header-j-minus-1">D-1 (Yesterday)</th>
+                <th colspan="2" class="text-center header-j">D (Today)</th>
                 <th rowspan="2" class="text-center header-variation align-middle">Variation<br>(Bn €)</th>
             </tr>
             <tr>
