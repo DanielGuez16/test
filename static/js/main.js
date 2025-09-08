@@ -58,7 +58,7 @@ async function uploadFile(file, type) {
                 <div class="d-flex align-items-center">
                     <div class="spinner-border spinner-border-sm me-3"></div>
                     <div>
-                        <strong>Upload en cours...</strong><br>
+                        <strong>Uploading...</strong><br>
                         <small>${file.name} (${formatFileSize(file.size)})</small>
                     </div>
                 </div>
@@ -90,8 +90,8 @@ async function uploadFile(file, type) {
                                 <strong>${file.name}</strong>
                             </div>
                             <small class="text-muted">
-                                📊 ${result.rows?.toLocaleString()} lignes • 
-                                ${result.columns} colonnes • 
+                                ${result.rows?.toLocaleString()} rows • 
+                                ${result.columns} columns • 
                                 ${formatFileSize(file.size)}
                             </small>
                         </div>
@@ -139,14 +139,14 @@ function checkAnalyzeButtonState() {
     
     if (filesReady.j && filesReady.j1) {
         analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = '🎯 PRÊT - GÉNÉRER LE TCD';
+        analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.add('pulse');
         
         // Notification visuelle
         showNotification('Les deux fichiers sont prêts ! Vous pouvez lancer l\'analyse.', 'success');
     } else {
         analyzeBtn.disabled = true;
-        analyzeBtn.innerHTML = '🚀 GÉNÉRER LE TCD BALANCE SHEET';
+        analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.remove('pulse');
     }
 }
@@ -275,7 +275,6 @@ function generateBalanceSheetSection(balanceSheetData) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h3 class="mb-1">📊 ${balanceSheetData.title || 'Balance Sheet Analysis'}</h3>
-                            <small>Analyse ACTIF/PASSIF par Groupe de Produit</small>
                         </div>
                         <span class="badge bg-light text-primary">Balance Sheet</span>
                     </div>
@@ -293,7 +292,7 @@ function generateBalanceSheetSection(balanceSheetData) {
     if (balanceSheetData.variations) {
         html += `
             <div class="analysis-section fade-in-up">
-                <h4 class="text-center mb-4">📈 Variations Balance Sheet (J vs J-1)</h4>
+                <h4 class="text-center mb-4">📈 Balance Sheet Variations (D vs D-1)</h4>
                 <div class="row">
         `;
         
@@ -309,7 +308,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                     <div class="metric-card">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">💰 ACTIF</h5>
+                                <h5 class="mb-0">ACTIF</h5>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                     ${isPositive ? '📈' : '📉'}
                                 </span>
@@ -342,10 +341,10 @@ function generateBalanceSheetSection(balanceSheetData) {
             
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="metric-card" style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%);">
+                    <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">💳 PASSIF</h5>
+                                <h5 class="mb-0">PASSIF</h5>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                     ${isPositive ? '📈' : '📉'}
                                 </span>
@@ -382,7 +381,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                     <div class="d-flex align-items-start">
                         <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">📝 Résumé Balance Sheet</h5>
+                            <h5 class="mb-2">📝 Balance Sheet Summary</h5>
                             <p class="mb-0">${balanceSheetData.summary}</p>
                         </div>
                     </div>
@@ -416,7 +415,6 @@ function generateConsumptionSection(consumptionData) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h3 class="mb-1">🏢 ${consumptionData.title || 'LCR Consumption Analysis'}</h3>
-                            <small>Analyse par Groupe Métiers et Métier</small>
                         </div>
                         <span class="badge bg-light text-success">Consumption</span>
                     </div>
@@ -437,15 +435,15 @@ function generateConsumptionSection(consumptionData) {
         
         html += `
             <div class="analysis-section fade-in-up">
-                <h4 class="text-center mb-4">📊 Variation Globale Consumption</h4>
+                <h4 class="text-center mb-4">📊 Consumption Analysis</h4>
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <div class="metric-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                        <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
                             <div class="text-center">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h5 class="mb-0">🏢 CONSUMPTION TOTALE</h5>
+                                    <h5 class="mb-0">CONSUMPTION</h5>
                                     <span class="badge ${isPositive ? 'bg-warning text-dark' : 'bg-danger'}">
-                                        ${isPositive ? '📈 Hausse' : '📉 Baisse'}
+                                        ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                     </span>
                                 </div>
                                 <div class="row text-center">

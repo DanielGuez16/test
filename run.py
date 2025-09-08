@@ -48,6 +48,14 @@ templates = Jinja2Templates(directory="templates")
 # Variables globales pour la session (en production: utiliser une base de données)
 file_session = {"files": {}}
 
+
+#######################################################################################################################################
+
+#                           API
+
+#######################################################################################################################################
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """
@@ -215,7 +223,7 @@ async def analyze_files():
         balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
         
         # Génération de l'analyse Consumption
-        consumption_results = create_consumption_analysis(dataframes)
+        consumption_results = create_consumption_analysis_grouped_only(dataframes)
         
         logger.info("✅ Analyses Balance Sheet et Consumption terminées avec succès")
         
@@ -235,303 +243,11 @@ async def analyze_files():
         logger.error(f"❌ Erreur lors de l'analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
 
-def create_consumption_analysis(dataframes):
-    """
-    Crée l'analyse Consumption par métier
-    
-    Args:
-        dataframes: Dict contenant les DataFrames 'j' et 'jMinus1'
-    
-    Returns:
-        Dict contenant les résultats de l'analyse Consumption
-    """
-    try:
-        logger.info("💼 Création de l'analyse Consumption")
-        
-        consumption_tables = {}
-        totals_by_metier = {}
-        
-        # Traitement de chaque fichier
-        for file_type, df in dataframes.items():
-            logger.info(f"🔄 Traitement Consumption pour {file_type}")
-            
-            # Vérification des colonnes requises
-            required_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "Métier", "LCR_ECO_IMPACT_LCR"]
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            
-            if missing_cols:
-                logger.warning(f"⚠️ Colonnes manquantes pour Consumption {file_type}: {missing_cols}")
-                continue
-            
-            # Filtrage des données (Top Conso = "O")
-            df_filtered = df[df["Top Conso"] == "O"].copy()
-            logger.info(f"📋 Après filtrage Top Conso='O': {len(df_filtered)} lignes")
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"⚠️ Aucune donnée avec Top Conso='O' pour Consumption {file_type}")
-                continue
-            
-            # Préparation des données
-            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
-                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
-            ).fillna(0)
-            
-            # Nettoyage des champs texte
-            df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
-            df_filtered["Métier"] = df_filtered["Métier"].astype(str).str.strip()
-            
-            # Création du TCD avec groupement hiérarchique
-            grouped = df_filtered.groupby([
-                "LCR_ECO_GROUPE_METIERS", 
-                "Métier"
-            ])["LCR_ECO_IMPACT_LCR"].sum().reset_index()
-            
-            # Conversion en milliards
-            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
-            
-            consumption_tables[file_type] = grouped
-            
-            # Calcul des totaux par LCR_ECO_GROUPE_METIERS
-            totals_by_group = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum()
-            totals_by_group_bn = (totals_by_group / 1_000_000_000).round(3)
-            
-            totals_by_metier[file_type] = {
-                "total_global": (df_filtered["LCR_ECO_IMPACT_LCR"].sum() / 1_000_000_000).round(3),
-                "by_groupe_metiers": totals_by_group_bn.to_dict(),
-                "detailed_data": grouped
-            }
-            
-            logger.info(f"✅ Consumption {file_type}: Total global = {totals_by_metier[file_type]['total_global']:.3f} Bn")
-        
-        # Génération du HTML du tableau
-        consumption_html = generate_consumption_table_html(consumption_tables)
-        
-        # Calcul des variations
-        variations = calculate_consumption_variations(totals_by_metier)
-        
-        # Génération de l'analyse textuelle
-        analysis_text = generate_consumption_analysis_text(variations, totals_by_metier)
-        
-        return {
-            "title": "LCR Consumption Analysis by Business Line",
-            "consumption_table_html": consumption_html,
-            "variations": variations,
-            "analysis_text": analysis_text,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filter_applied": "Top Conso = 'O'",
-                "grouping": ["LCR_ECO_GROUPE_METIERS", "Métier"],
-                "measure": "LCR_ECO_IMPACT_LCR (Bn €)"
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur création analyse Consumption: {e}")
-        return {
-            "title": "Consumption Analysis - Erreur",
-            "error": str(e),
-            "consumption_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse Consumption</p>"
-        }
+#######################################################################################################################################
 
-def generate_consumption_table_html(consumption_tables):
-    """Génère le HTML du tableau d'analyse Consumption"""
-    if len(consumption_tables) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse Consumption</div>"
-    
-    grouped_j = consumption_tables.get("j")
-    grouped_j1 = consumption_tables.get("jMinus1")
-    
-    if grouped_j is None or grouped_j1 is None:
-        return "<div class='alert alert-danger'>Erreur: données Consumption manquantes</div>"
-    
-    # Fusion des données pour avoir toutes les combinaisons
-    all_combinations = set()
-    all_combinations.update([(row["LCR_ECO_GROUPE_METIERS"], row["Métier"]) for _, row in grouped_j.iterrows()])
-    all_combinations.update([(row["LCR_ECO_GROUPE_METIERS"], row["Métier"]) for _, row in grouped_j1.iterrows()])
-    
-    # Création des dictionnaires de lookup
-    lookup_j = {(row["LCR_ECO_GROUPE_METIERS"], row["Métier"]): row["LCR_ECO_IMPACT_LCR_Bn"] 
-                for _, row in grouped_j.iterrows()}
-    lookup_j1 = {(row["LCR_ECO_GROUPE_METIERS"], row["Métier"]): row["LCR_ECO_IMPACT_LCR_Bn"] 
-                 for _, row in grouped_j1.iterrows()}
-    
-    # Organisation par groupe métiers
-    grouped_combinations = {}
-    for groupe_metiers, metier in sorted(all_combinations):
-        if groupe_metiers not in grouped_combinations:
-            grouped_combinations[groupe_metiers] = []
-        grouped_combinations[groupe_metiers].append(metier)
-    
-    html = """
-    <table class="table table-bordered consumption-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">LCR Groupe Métiers</th>
-                <th rowspan="2" class="align-middle">Métier</th>
-                <th colspan="2" class="text-center header-j-minus-1">J-1 (Hier)</th>
-                <th colspan="2" class="text-center header-j">J (Aujourd'hui)</th>
-                <th rowspan="2" class="text-center header-variation align-middle">Variation<br>(Bn €)</th>
-            </tr>
-            <tr>
-                <th class="text-center header-j-minus-1">Consumption (Bn €)</th>
-                <th class="text-center header-j-minus-1">Part (%)</th>
-                <th class="text-center header-j">Consumption (Bn €)</th>
-                <th class="text-center header-j">Part (%)</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Calcul des totaux globaux pour les pourcentages
-    total_j1 = sum(lookup_j1.values())
-    total_j = sum(lookup_j.values())
-    
-    # Génération des lignes par groupe métiers
-    for groupe_metiers, metiers in grouped_combinations.items():
-        first_metier = True
-        groupe_total_j1 = sum(lookup_j1.get((groupe_metiers, m), 0) for m in metiers)
-        groupe_total_j = sum(lookup_j.get((groupe_metiers, m), 0) for m in metiers)
-        
-        for metier in sorted(metiers):
-            value_j1 = lookup_j1.get((groupe_metiers, metier), 0)
-            value_j = lookup_j.get((groupe_metiers, metier), 0)
-            variation = value_j - value_j1
-            
-            # Calcul des pourcentages
-            pct_j1 = (value_j1 / total_j1 * 100) if total_j1 != 0 else 0
-            pct_j = (value_j / total_j * 100) if total_j != 0 else 0
-            
-            html += '<tr>'
-            
-            # Affichage du groupe métiers seulement sur la première ligne
-            if first_metier:
-                rowspan = len(metiers)
-                html += f'<td rowspan="{rowspan}" class="fw-bold align-middle bg-light">{groupe_metiers}</td>'
-                first_metier = False
-            
-            html += f'<td class="ps-3">{metier}</td>'
-            
-            # Valeurs J-1
-            html += f'<td class="text-end numeric-value">{value_j1:.3f}</td>'
-            html += f'<td class="text-end numeric-value">{pct_j1:.1f}%</td>'
-            
-            # Valeurs J
-            html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
-            html += f'<td class="text-end numeric-value">{pct_j:.1f}%</td>'
-            
-            # Variation
-            css_class = "variation-positive" if variation > 0 else "variation-negative" if variation < 0 else ""
-            sign = "+" if variation > 0 else ""
-            html += f'<td class="text-end numeric-value {css_class}">{sign}{variation:.3f}</td>'
-            
-            html += '</tr>'
-        
-        # Ligne de sous-total par groupe
-        variation_groupe = groupe_total_j - groupe_total_j1
-        pct_groupe_j1 = (groupe_total_j1 / total_j1 * 100) if total_j1 != 0 else 0
-        pct_groupe_j = (groupe_total_j / total_j * 100) if total_j != 0 else 0
-        
-        css_class = "variation-positive" if variation_groupe > 0 else "variation-negative" if variation_groupe < 0 else ""
-        sign = "+" if variation_groupe > 0 else ""
-        
-        html += f'''
-        <tr class="table-secondary fw-bold">
-            <td colspan="2" class="text-end">Sous-total {groupe_metiers}:</td>
-            <td class="text-end">{groupe_total_j1:.3f}</td>
-            <td class="text-end">{pct_groupe_j1:.1f}%</td>
-            <td class="text-end">{groupe_total_j:.3f}</td>
-            <td class="text-end">{pct_groupe_j:.1f}%</td>
-            <td class="text-end {css_class}">{sign}{variation_groupe:.3f}</td>
-        </tr>
-        '''
-    
-    # Ligne de total général
-    total_variation = total_j - total_j1
-    css_class = "variation-positive" if total_variation > 0 else "variation-negative" if total_variation < 0 else ""
-    sign = "+" if total_variation > 0 else ""
-    
-    html += f'''
-        <tr class="total-row">
-            <td colspan="2" class="text-end fw-bold">TOTAL GÉNÉRAL:</td>
-            <td class="text-end fw-bold">{total_j1:.3f}</td>
-            <td class="text-end fw-bold">100.0%</td>
-            <td class="text-end fw-bold">{total_j:.3f}</td>
-            <td class="text-end fw-bold">100.0%</td>
-            <td class="text-end fw-bold {css_class}">{sign}{total_variation:.3f}</td>
-        </tr>
-    '''
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
+#                           BALANCE SHEET
 
-def calculate_consumption_variations(totals_by_metier):
-    """Calcule les variations de consumption entre J et J-1"""
-    if "j" not in totals_by_metier or "jMinus1" not in totals_by_metier:
-        return {}
-    
-    j_data = totals_by_metier["j"]
-    j1_data = totals_by_metier["jMinus1"]
-    
-    # Variation globale
-    global_variation = j_data["total_global"] - j1_data["total_global"]
-    
-    # Variations par groupe métiers
-    group_variations = {}
-    all_groups = set(j_data["by_groupe_metiers"].keys()) | set(j1_data["by_groupe_metiers"].keys())
-    
-    for group in all_groups:
-        j_value = j_data["by_groupe_metiers"].get(group, 0)
-        j1_value = j1_data["by_groupe_metiers"].get(group, 0)
-        group_variations[group] = {
-            "j_minus_1": j1_value,
-            "j": j_value,
-            "variation": round(j_value - j1_value, 3)
-        }
-    
-    return {
-        "global": {
-            "j_minus_1": j1_data["total_global"],
-            "j": j_data["total_global"],
-            "variation": round(global_variation, 3)
-        },
-        "by_groupe_metiers": group_variations
-    }
-
-def generate_consumption_analysis_text(variations, totals_by_metier):
-    """Génère le texte d'analyse de la consumption au format demandé"""
-    if not variations or "global" not in variations:
-        return "Analyse Consumption non disponible - données insuffisantes."
-    
-    global_data = variations["global"]
-    date_str = datetime.now().strftime("March %d")
-    
-    # Analyse globale
-    total_j = global_data["j"]
-    variation = global_data["variation"]
-    direction = "decrease" if variation < 0 else "increase"
-    
-    analysis = f"Overall, on {date_str}, businesses have consumption of {total_j:.2f} Bn, representing a {direction} of {abs(variation):.2f} Bn compared to yesterday."
-    
-    # Identification des principales variations par groupe
-    if "by_groupe_metiers" in variations:
-        significant_variations = []
-        for group, data in variations["by_groupe_metiers"].items():
-            group_var = data["variation"]
-            if abs(group_var) >= 0.05:  # Variations >= 50M
-                sign = "-" if group_var < 0 else "+"
-                significant_variations.append(f"{group} ({sign}{abs(group_var):.2f} Bn)")
-        
-        if significant_variations:
-            if variation < 0:
-                analysis += f" This decrease is mainly supported by {', '.join(significant_variations[:3])}."
-            else:
-                analysis += f" This increase is mainly driven by {', '.join(significant_variations[:3])}."
-    
-    return analysis
+#######################################################################################################################################
 
 def create_balance_sheet_pivot_table(dataframes):
     """
@@ -624,7 +340,7 @@ def create_balance_sheet_pivot_table(dataframes):
         summary = generate_executive_summary(variations)
         
         return {
-            "title": "Balance Sheet - Tableau Croisé Dynamique (ACTIF/PASSIF)",
+            "title": "Balance Sheet",
             "pivot_table_html": pivot_html,
             "variations": variations,
             "summary": summary,
@@ -777,6 +493,274 @@ def generate_executive_summary(variations):
         return f"Balance Sheet au {date_str} - Principales variations: {', '.join(summary_parts)}."
     else:
         return f"Balance Sheet au {date_str} - Variations mineures observées (< 100M€)."
+
+#######################################################################################################################################
+
+#                           CONSUMPTION
+
+#######################################################################################################################################
+
+def create_consumption_analysis_grouped_only(dataframes):
+    """
+    Crée l'analyse Consumption UNIQUEMENT par Groupe Métiers (sans détail des métiers)
+    
+    Args:
+        dataframes: Dict contenant les DataFrames 'j' et 'jMinus1'
+    
+    Returns:
+        Dict contenant les résultats de l'analyse Consumption groupée
+    """
+    try:
+        logger.info("💼 Création de l'analyse Consumption - Groupes Métiers uniquement")
+        
+        consumption_grouped = {}
+        totals_by_group = {}
+        
+        # Traitement de chaque fichier
+        for file_type, df in dataframes.items():
+            logger.info(f"🔄 Traitement Consumption groupé pour {file_type}")
+            
+            # Vérification des colonnes requises
+            required_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR"]
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour Consumption {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage des données (Top Conso = "O")
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            logger.info(f"📋 Après filtrage Top Conso='O': {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée avec Top Conso='O' pour Consumption {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
+                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage des champs texte
+            df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
+            
+            # Groupement UNIQUEMENT par LCR_ECO_GROUPE_METIERS (pas de détail métier)
+            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+            
+            # Conversion en milliards
+            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
+            
+            consumption_grouped[file_type] = grouped
+            
+            # Calcul des totaux
+            total_global = (df_filtered["LCR_ECO_IMPACT_LCR"].sum() / 1_000_000_000).round(3)
+            
+            totals_by_group[file_type] = {
+                "total_global": total_global,
+                "by_groupe_metiers": grouped.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict(),
+                "grouped_data": grouped
+            }
+            
+            logger.info(f"✅ Consumption groupé {file_type}: {len(grouped)} groupes, Total global = {total_global:.3f} Bn")
+        
+        # Génération du HTML du tableau groupé
+        consumption_html = generate_consumption_grouped_table_html(consumption_grouped)
+        
+        # Calcul des variations
+        variations = calculate_consumption_grouped_variations(totals_by_group)
+        
+        # Génération de l'analyse textuelle
+        analysis_text = generate_consumption_grouped_analysis_text(variations, totals_by_group)
+        
+        return {
+            "title": "LCR Consumption Analysis by Business Group (Summary)",
+            "consumption_table_html": consumption_html,
+            "variations": variations,
+            "analysis_text": analysis_text,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filter_applied": "Top Conso = 'O'",
+                "grouping": ["LCR_ECO_GROUPE_METIERS"],  # Seulement groupe, pas métier
+                "measure": "LCR_ECO_IMPACT_LCR (Bn €)",
+                "view_type": "grouped_summary"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création analyse Consumption groupée: {e}")
+        return {
+            "title": "Consumption Analysis Grouped - Erreur",
+            "error": str(e),
+            "consumption_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse Consumption groupée</p>"
+        }
+
+def generate_consumption_grouped_table_html(consumption_grouped):
+    """
+    Génère le HTML du tableau Consumption GROUPÉ (sans détail métiers)
+    """
+    if len(consumption_grouped) < 2:
+        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse Consumption groupée</div>"
+    
+    grouped_j = consumption_grouped.get("j")
+    grouped_j1 = consumption_grouped.get("jMinus1")
+    
+    if grouped_j is None or grouped_j1 is None:
+        return "<div class='alert alert-danger'>Erreur: données Consumption groupées manquantes</div>"
+    
+    # Fusion de tous les groupes métiers
+    all_groups = set()
+    all_groups.update(grouped_j["LCR_ECO_GROUPE_METIERS"].tolist())
+    all_groups.update(grouped_j1["LCR_ECO_GROUPE_METIERS"].tolist())
+    
+    # Création des dictionnaires de lookup
+    lookup_j = grouped_j.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
+    lookup_j1 = grouped_j1.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
+    
+    html = """
+    <table class="table table-bordered consumption-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="align-middle">LCR Groupe Métiers</th>
+                <th colspan="2" class="text-center header-j-minus-1">J-1 (Hier)</th>
+                <th colspan="2" class="text-center header-j">J (Aujourd'hui)</th>
+                <th rowspan="2" class="text-center header-variation align-middle">Variation<br>(Bn €)</th>
+            </tr>
+            <tr>
+                <th class="text-center header-j-minus-1">Consumption (Bn €)</th>
+                <th class="text-center header-j-minus-1">Part (%)</th>
+                <th class="text-center header-j">Consumption (Bn €)</th>
+                <th class="text-center header-j">Part (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    # Calcul des totaux globaux pour les pourcentages
+    total_j1 = sum(lookup_j1.values())
+    total_j = sum(lookup_j.values())
+    
+    # Génération des lignes - UNE LIGNE PAR GROUPE MÉTIER
+    for groupe_metiers in sorted(all_groups):
+        value_j1 = lookup_j1.get(groupe_metiers, 0)
+        value_j = lookup_j.get(groupe_metiers, 0)
+        variation = value_j - value_j1
+        
+        # Calcul des pourcentages
+        pct_j1 = (value_j1 / total_j1 * 100) if total_j1 != 0 else 0
+        pct_j = (value_j / total_j * 100) if total_j != 0 else 0
+        
+        html += '<tr>'
+        html += f'<td class="fw-bold">{groupe_metiers}</td>'
+        
+        # Valeurs J-1
+        html += f'<td class="text-end numeric-value">{value_j1:.3f}</td>'
+        html += f'<td class="text-end numeric-value">{pct_j1:.1f}%</td>'
+        
+        # Valeurs J
+        html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
+        html += f'<td class="text-end numeric-value">{pct_j:.1f}%</td>'
+        
+        # Variation
+        css_class = "variation-positive" if variation > 0 else "variation-negative" if variation < 0 else ""
+        sign = "+" if variation > 0 else ""
+        html += f'<td class="text-end numeric-value {css_class}">{sign}{variation:.3f}</td>'
+        
+        html += '</tr>'
+    
+    # Ligne de total général
+    total_variation = total_j - total_j1
+    css_class = "variation-positive" if total_variation > 0 else "variation-negative" if total_variation < 0 else ""
+    sign = "+" if total_variation > 0 else ""
+    
+    html += f'''
+        <tr class="total-row">
+            <td class="text-end fw-bold">TOTAL GÉNÉRAL:</td>
+            <td class="text-end fw-bold">{total_j1:.3f}</td>
+            <td class="text-end fw-bold">100.0%</td>
+            <td class="text-end fw-bold">{total_j:.3f}</td>
+            <td class="text-end fw-bold">100.0%</td>
+            <td class="text-end fw-bold {css_class}">{sign}{total_variation:.3f}</td>
+        </tr>
+    '''
+    
+    html += """
+        </tbody>
+    </table>
+    """
+    
+    return html
+
+def calculate_consumption_grouped_variations(totals_by_group):
+    """Calcule les variations de consumption groupée entre J et J-1"""
+    if "j" not in totals_by_group or "jMinus1" not in totals_by_group:
+        return {}
+    
+    j_data = totals_by_group["j"]
+    j1_data = totals_by_group["jMinus1"]
+    
+    # Variation globale
+    global_variation = j_data["total_global"] - j1_data["total_global"]
+    
+    # Variations par groupe métiers
+    group_variations = {}
+    all_groups = set(j_data["by_groupe_metiers"].keys()) | set(j1_data["by_groupe_metiers"].keys())
+    
+    for group in all_groups:
+        j_value = j_data["by_groupe_metiers"].get(group, 0)
+        j1_value = j1_data["by_groupe_metiers"].get(group, 0)
+        group_variations[group] = {
+            "j_minus_1": j1_value,
+            "j": j_value,
+            "variation": round(j_value - j1_value, 3)
+        }
+    
+    return {
+        "global": {
+            "j_minus_1": j1_data["total_global"],
+            "j": j_data["total_global"],
+            "variation": round(global_variation, 3)
+        },
+        "by_groupe_metiers": group_variations
+    }
+
+def generate_consumption_grouped_analysis_text(variations, totals_by_group):
+    """Génère le texte d'analyse de la consumption groupée"""
+    if not variations or "global" not in variations:
+        return "Analyse Consumption groupée non disponible - données insuffisantes."
+    
+    global_data = variations["global"]
+    date_str = datetime.now().strftime("March %d")
+    
+    # Analyse globale
+    total_j = global_data["j"]
+    variation = global_data["variation"]
+    direction = "decrease" if variation < 0 else "increase"
+    
+    analysis = f"Summary view: on {date_str}, business groups have total consumption of {total_j:.2f} Bn, representing a {direction} of {abs(variation):.2f} Bn compared to yesterday."
+    
+    # Identification des principales variations par groupe (top 3)
+    if "by_groupe_metiers" in variations:
+        significant_variations = []
+        sorted_variations = sorted(
+            variations["by_groupe_metiers"].items(), 
+            key=lambda x: abs(x[1]["variation"]), 
+            reverse=True
+        )
+        
+        for group, data in sorted_variations[:3]:  # Top 3 variations
+            group_var = data["variation"]
+            if abs(group_var) >= 0.05:  # Variations >= 50M
+                sign = "-" if group_var < 0 else "+"
+                significant_variations.append(f"{group} ({sign}{abs(group_var):.2f} Bn)")
+        
+        if significant_variations:
+            if variation < 0:
+                analysis += f" Main contributors to this decrease: {', '.join(significant_variations)}."
+            else:
+                analysis += f" Main drivers of this increase: {', '.join(significant_variations)}."
+    
+    return analysis
+
 
 if __name__ == "__main__":
     print("🚀 Steering ALM Metrics - Version Templates")

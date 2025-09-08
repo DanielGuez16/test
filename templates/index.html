@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steering ALM Metrics - Analyse LCR</title>
+    <title>Steering ALM Metrics - LCR Analysis</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -12,13 +12,25 @@
     <!-- Styles personnalisés -->
     <style>
         :root {
-            --natixis-blue: #003366;
-            --natixis-light-blue: #0066cc;
+            --natixis-blue: #9a60b1;
+            --natixis-light-blue: #c270e2;
             --natixis-green: #00a651;
             --natixis-orange: #ff6600;
             --natixis-gray: #f5f5f5;
             --success-green: #28a745;
             --danger-red: #dc3545;
+        }
+
+        .bg-primary {
+            background-color: var(--natixis-blue) !important;
+        }
+
+        .bg-secondary {
+            background-color: var(--natixis-light-blue) !important;
+        }
+
+        .text-primary {
+            color: var(--natixis-blue) !important; /* ton violet #714A80 */
         }
         
         body { 
@@ -143,7 +155,7 @@
         
         /* En-têtes de colonnes spécialisés */
         .header-j-minus-1 {
-            background: linear-gradient(135deg, #6c757d, #495057) !important;
+            background: linear-gradient(135deg, #c270e2, #c270e2) !important;
         }
         
         .header-j {
@@ -151,12 +163,12 @@
         }
         
         .header-variation {
-            background: linear-gradient(135deg, var(--natixis-orange), #ff8c00) !important;
+            background: linear-gradient(135deg, #a55bc2, #a55bc2) !important;
         }
         
         /* Cartes de métriques */
         .metric-card { 
-            background: linear-gradient(135deg, var(--natixis-blue) 0%, var(--natixis-light-blue) 100%); 
+            background: linear-gradient(135deg, var(--natixis-blue) 0%, var(--natixis-blue) 100%); 
             color: white; 
             border-radius: 15px; 
             padding: 2rem; 
@@ -177,7 +189,7 @@
         
         /* Boutons */
         .btn-analyze {
-            background: linear-gradient(45deg, var(--natixis-blue), var(--natixis-green)); 
+            background: linear-gradient(45deg, var(--natixis-blue), var(--natixis-light-blue)); 
             border: none; 
             color: white; 
             padding: 15px 40px; 
@@ -282,9 +294,9 @@
     <div class="navbar-custom">
         <div class="container d-flex justify-content-between align-items-center py-3">
             <h3 class="mb-0 text-primary fw-bold">
-                📊 Steering ALM Metrics
+                Steering ALM Metrics
             </h3>
-            <span class="badge bg-primary">Analyse LCR</span>
+            <span class="badge bg-primary">LCR Analysis</span>
         </div>
     </div>
     
@@ -293,28 +305,22 @@
         <div class="main-container p-4">
             <div class="text-center mb-5 fade-in-up">
                 <h1 class="display-5 text-primary fw-bold mb-3">
-                    Tableau Croisé Dynamique - Balance Sheet
+                    Daily LCR Analysis Tool
                 </h1>
-                <p class="lead text-muted">
-                    Analyse comparative ACTIF/PASSIF par Groupe de Produit
-                </p>
-                <small class="text-muted">
-                    Filtres: Top Conso = "O" • Réaffectation ∈ {ACTIF, PASSIF}
-                </small>
             </div>
             
             <!-- Section Upload -->
             <div class="row mb-4">
                 <div class="col-lg-6 mb-3">
                     <div class="card h-100 border-0 fade-in-up">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">📅 Fichier J (Aujourd'hui)</h5>
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">File D (Today)</h5>
                         </div>
                         <div class="card-body">
                             <div class="upload-area" onclick="document.getElementById('fileJ').click()">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <h5>Sélectionner le fichier J</h5>
-                                <p class="text-muted mb-0">Format Excel (.xlsx, .xls)</p>
+                                <h5>Select file D</h5>
+                                <p class="text-muted mb-0">Excel (.xlsx, .xls)</p>
                             </div>
                             <input type="file" id="fileJ" accept=".xlsx,.xls" style="display:none">
                             <div id="statusJ"></div>
@@ -325,13 +331,13 @@
                 <div class="col-lg-6 mb-3">
                     <div class="card h-100 border-0 fade-in-up" style="animation-delay: 0.2s;">
                         <div class="card-header bg-secondary text-white">
-                            <h5 class="mb-0">📅 Fichier J-1 (Hier)</h5>
+                            <h5 class="mb-0">File D-1 (Yesterday)</h5>
                         </div>
                         <div class="card-body">
                             <div class="upload-area" onclick="document.getElementById('fileJ1').click()">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <h5>Sélectionner le fichier J-1</h5>
-                                <p class="text-muted mb-0">Format Excel (.xlsx, .xls)</p>
+                                <h5>Select file D-1</h5>
+                                <p class="text-muted mb-0">Excel (.xlsx, .xls)</p>
                             </div>
                             <input type="file" id="fileJ1" accept=".xlsx,.xls" style="display:none">
                             <div id="statusJ1"></div>
@@ -343,7 +349,7 @@
             <!-- Bouton d'analyse -->
             <div class="text-center mb-4 fade-in-up" style="animation-delay: 0.4s;">
                 <button id="analyzeBtn" class="btn btn-analyze btn-lg" onclick="analyze()" disabled>
-                    🚀 GÉNÉRER BALANCE SHEET + CONSUMPTION
+                    BEGIN DAILY LCR ANALYSIS
                 </button>
             </div>
             
