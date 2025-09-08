@@ -373,15 +373,16 @@ function generateBalanceSheetSection(balanceSheetData) {
         html += `</div></div>`;
     }
     
+    
     // Résumé Balance Sheet
     if (balanceSheetData.summary) {
         html += `
             <div class="analysis-section fade-in-up">
-                <div class="alert alert-info border-0">
+                <div class="summary-box">
                     <div class="d-flex align-items-start">
                         <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">📝 Balance Sheet Summary</h5>
+                            <h5 class="mb-2">Balance Sheet Summary</h5>
                             <p class="mb-0">${balanceSheetData.summary}</p>
                         </div>
                     </div>
@@ -394,7 +395,7 @@ function generateBalanceSheetSection(balanceSheetData) {
 }
 
 /**
- * Génère la section Consumption
+ * Génère la section Consumption avec graphiques par métier
  */
 function generateConsumptionSection(consumptionData) {
     if (consumptionData.error) {
@@ -411,7 +412,7 @@ function generateConsumptionSection(consumptionData) {
     let html = `
         <div class="analysis-section fade-in-up mt-5">
             <div class="card border-0">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h3 class="mb-1">🏢 ${consumptionData.title || 'LCR Consumption Analysis'}</h3>
@@ -474,17 +475,22 @@ function generateConsumptionSection(consumptionData) {
     if (consumptionData.analysis_text) {
         html += `
             <div class="analysis-section fade-in-up">
-                <div class="alert alert-success border-0">
+                <div class="summary-box">
                     <div class="d-flex align-items-start">
-                        <i class="fas fa-chart-pie fa-lg me-3 mt-1"></i>
+                        <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">📈 Analyse Consumption</h5>
-                            <p class="mb-0 fst-italic">${consumptionData.analysis_text}</p>
+                            <h5 class="mb-2">Consumption Analysis</h5>
+                            <p class="mb-0">${consumptionData.analysis_text}</p>
                         </div>
                     </div>
                 </div>
             </div>
         `;
+    }
+
+    // Graphiques par métier pour les groupes significatifs
+    if (consumptionData.significant_groups && consumptionData.significant_groups.length > 0 && consumptionData.metier_details) {
+        html += generateMetierChartsSection(consumptionData.significant_groups, consumptionData.metier_details);
     }
     
     // Légende Consumption
@@ -514,6 +520,192 @@ function generateConsumptionSection(consumptionData) {
     return html;
 }
 
+/**
+ * Génère la section des graphiques par métier
+ */
+function generateMetierChartsSection(significantGroups, metierDetails) {
+    console.log('📊 Génération des graphiques métiers pour:', significantGroups);
+    console.log('📊 Données métiers:', metierDetails);
+    
+    let html = `
+        <div class="analysis-section fade-in-up">
+            <div class="card border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">📊 Details by group</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+    `;
+    
+    // Générer un graphique pour chaque groupe significatif
+    significantGroups.forEach((groupe, index) => {
+        const chartId = `metierChart_${index}`;
+        html += `
+            <div class="col-lg-6 mb-4">
+                <div class="chart-container">
+                    <h5 class="text-center mb-3">${groupe}</h5>
+                    <canvas id="${chartId}" width="400" height="300"></canvas>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Ajouter le script pour initialiser les graphiques après le rendu
+    setTimeout(() => {
+        initializeMetierCharts(significantGroups, metierDetails);
+    }, 500);
+    
+    return html;
+}
+
+/**
+ * Initialise les graphiques métiers avec Chart.js
+ */
+function initializeMetierCharts(significantGroups, metierDetails) {
+    console.log('🎨 Initialisation des graphiques métiers');
+    
+    // Vérifier que Chart.js est disponible
+    if (typeof Chart === 'undefined') {
+        console.error('❌ Chart.js non disponible');
+        return;
+    }
+    
+    significantGroups.forEach((groupe, index) => {
+        const chartId = `metierChart_${index}`;
+        const canvas = document.getElementById(chartId);
+        
+        if (!canvas) {
+            console.error(`❌ Canvas ${chartId} non trouvé`);
+            return;
+        }
+        
+        // Préparer les données pour ce groupe
+        const chartData = prepareMetierChartData(groupe, metierDetails);
+        
+        if (!chartData) {
+            console.error(`❌ Pas de données pour ${groupe}`);
+            return;
+        }
+        
+        // Créer le graphique
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `LCR variations detailed for - ${groupe}`,
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'LCR Impact (Bn €)'
+                        },
+                        grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: ''
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 0
+                        }
+                    }
+                },
+                elements: {
+                    bar: {
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+        
+        console.log(`✅ Graphique créé pour ${groupe}`);
+    });
+}
+
+/**
+ * Prépare les données pour un graphique métier
+ */
+function prepareMetierChartData(groupe, metierDetails) {
+    try {
+        // Récupérer les données J et J-1 pour ce groupe
+        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+        
+        if (dataJ.length === 0 && dataJ1.length === 0) {
+            return null;
+        }
+        
+        // Créer un mapping par métier
+        const metiersMap = new Map();
+        
+        // Ajouter les données J-1
+        dataJ1.forEach(item => {
+            metiersMap.set(item.Métier, {
+                metier: item.Métier,
+                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
+                j: 0
+            });
+        });
+        
+        // Ajouter/mettre à jour avec les données J
+        dataJ.forEach(item => {
+            if (metiersMap.has(item.Métier)) {
+                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
+            } else {
+                metiersMap.set(item.Métier, {
+                    metier: item.Métier,
+                    j_minus_1: 0,
+                    j: item.LCR_ECO_IMPACT_LCR_Bn
+                });
+            }
+        });
+        
+        // Convertir en arrays pour Chart.js - UNIQUEMENT LES VARIATIONS
+        const metiers = Array.from(metiersMap.keys());
+        const variations = metiers.map(metier => metiersMap.get(metier).j - metiersMap.get(metier).j_minus_1);
+        
+        return {
+            labels: metiers,
+            datasets: [
+                {
+                    label: 'Variation (J - J-1)',
+                    data: variations,
+                    backgroundColor: variations.map(v => v >= 0 ? 'rgba(40, 167, 69, 0.7)' : 'rgba(220, 53, 69, 0.7)'),
+                    borderColor: variations.map(v => v >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)'),
+                    borderWidth: 2
+                }
+            ]
+        };
+        
+    } catch (error) {
+        console.error(`❌ Erreur préparation données pour ${groupe}:`, error);
+        return null;
+    }
+}
 /**
  * Affiche une notification toast
  * @param {string} message - Message à afficher

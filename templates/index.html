@@ -155,11 +155,11 @@
         
         /* En-têtes de colonnes spécialisés */
         .header-j-minus-1 {
-            background: linear-gradient(135deg, #c270e2, #c270e2) !important;
+            background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-blue)) !important;
         }
         
         .header-j {
-            background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+            background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-light-blue)) !important;
         }
         
         .header-variation {
@@ -287,6 +287,39 @@
             margin-top: 15px;
             border-left: 4px solid var(--natixis-light-blue);
         }
+
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            height: 350px;
+        }
+
+        .chart-container h5 {
+            color: var(--natixis-blue);
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .chart-container canvas {
+            max-height: 280px !important;
+        }
+
+        .summary-box {
+            background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-blue));
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .summary-box h5 {
+            color: white;
+            font-weight: 600;
+        }
+
     </style>
 </head>
 <body>
@@ -361,6 +394,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="/static/js/main.js"></script>
 </body>
 </html>
