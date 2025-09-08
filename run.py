@@ -19,6 +19,8 @@ import uuid
 import logging
 from pathlib import Path
 from datetime import datetime
+import math
+import statistics
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -757,29 +759,87 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group):
     
     analysis = f"Summary view: on {date_str}, business groups have total consumption of {total_j:.2f} Bn, representing a {direction} of {abs(variation):.2f} Bn compared to yesterday."
     
-    # Identification des principales variations par groupe (top 3)
-    significant_groups = []  # Liste pour stocker les groupes significatifs
-    if "by_groupe_metiers" in variations:
-        sorted_variations = sorted(
-            variations["by_groupe_metiers"].items(), 
-            key=lambda x: abs(x[1]["variation"]), 
-            reverse=True
-        )
-        
+
+    # Identification des principales variations par groupe (auto, sans paramètre)
+    significant_groups = []
+    if "by_groupe_metiers" in variations and variations["by_groupe_metiers"]:
+        def _tukey_upper_threshold(values):
+            import statistics
+            if len(values) < 4:
+                return max(values) if values else 0.0
+            q1 = statistics.quantiles(values, n=4)[0]
+            q3 = statistics.quantiles(values, n=4)[2]
+            iqr = q3 - q1
+            return q3 + 1.5 * iqr
+
+        def _knee_index(cum_shares):
+            n = len(cum_shares)
+            if n == 0:
+                return None
+            diffs = []
+            for i, cs in enumerate(cum_shares, start=1):
+                baseline = i / n
+                diffs.append(cs - baseline)
+            k = max(range(n), key=lambda i: diffs[i])
+            return k if diffs[k] > 1e-9 else None
+
+        by_grp = variations["by_groupe_metiers"]
+        items = []
+        for group, data in by_grp.items():
+            gv = float(data.get("variation", 0.0))
+            items.append((group, gv, abs(gv)))
+
+        net_var = float(global_data.get("variation", 0.0))
+        net_mag = abs(net_var)
+
+        selected = []
+        # CAS 1 : mouvement net significatif -> sélection des "drivers" alignés (knee + outliers IQR)
+        if net_mag >= 1e-9:
+            sign = 1 if net_var >= 0 else -1
+            aligned = [(g, v, av) for (g, v, av) in items if (v > 0 and sign > 0) or (v < 0 and sign < 0)]
+            aligned.sort(key=lambda x: x[2], reverse=True)
+
+            cum = 0.0
+            cum_shares = []
+            for _, _, av in aligned:
+                cum += av
+                cum_shares.append(min(cum / net_mag, 1.0))
+
+            knee = _knee_index(cum_shares)
+            if knee is not None:
+                selected = aligned[:knee+1]
+
+            aligned_abs = [av for (_, _, av) in aligned]
+            upper = _tukey_upper_threshold(aligned_abs)
+            for tup in aligned:
+                if tup not in selected and tup[2] >= upper:
+                    selected.append(tup)
+
+            if not selected and aligned:
+                selected = [aligned[0]]  # au moins le plus gros driver
+
+        # CAS 2 : net ~ 0 -> sortir les vrais movers (IQR) des deux côtés
+        else:
+            abs_vars = [av for (_, _, av) in items]
+            upper = _tukey_upper_threshold(abs_vars)
+            movers = [(g, v, av) for (g, v, av) in items if av >= upper]
+            movers.sort(key=lambda x: x[2], reverse=True)
+            if not movers and items:
+                movers = [max(items, key=lambda x: x[2])]
+            selected = movers
+
+        # Mise en forme (identique à ta version)
         significant_variations = []
-        for group, data in sorted_variations[:3]:  # Top 3 variations
-            group_var = data["variation"]
-            if abs(group_var) >= 0.05:  # Variations >= 50M
-                sign = "-" if group_var < 0 else "+"
-                significant_variations.append(f"{group} ({sign}{abs(group_var):.2f} Bn)")
-                significant_groups.append(group)
-        
+        for g, v, av in selected:
+            sign_sym = "-" if v < 0 else "+"
+            significant_variations.append(f"{g} ({sign_sym}{abs(v):.2f} Bn)")
+            significant_groups.append(g)
+
         if significant_variations:
             if variation < 0:
                 analysis += f" Main contributors to this decrease: {', '.join(significant_variations)}."
             else:
                 analysis += f" Main drivers of this increase: {', '.join(significant_variations)}."
-    
     return analysis, significant_groups
 
 
