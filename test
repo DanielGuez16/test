@@ -1,0 +1,124 @@
+Voici un résumé complet des modifications nécessaires pour gérer les fichiers volumineux (500+ Mo) :
+
+## Plan d'action pour optimiser les gros fichiers
+
+### 1. **Modification du fichier `run.py`**
+
+**a) Ajouter la définition des colonnes utiles (début du fichier) :**
+```python
+# Colonnes requises pour les analyses
+REQUIRED_COLUMNS = {
+    "balance_sheet": [
+        "Top Conso",
+        "Réaffectation", 
+        "Groupe De Produit",
+        "Nominal Value"
+    ],
+    "consumption": [
+        "Top Conso",
+        "LCR_ECO_GROUPE_METIERS",
+        "LCR_ECO_IMPACT_LCR",
+        "Métier",
+        "Sous-Métier"
+    ]
+}
+
+ALL_REQUIRED_COLUMNS = list(set(
+    REQUIRED_COLUMNS["balance_sheet"] + 
+    REQUIRED_COLUMNS["consumption"]
+))
+```
+
+**b) Modifier la fonction `upload_file` :**
+- Remplacer `pd.read_excel(file_path, engine='openpyxl')` 
+- Par la lecture optimisée avec `usecols=columns_to_read`
+- Ajouter la validation des colonnes disponibles
+- Spécifier les types de données pour optimiser la mémoire
+
+**c) Modifier la configuration Uvicorn :**
+```python
+uvicorn.run(
+    app,
+    host="0.0.0.0",
+    port=8000,
+    reload=False,
+    log_level="info",
+    timeout_keep_alive=300,  # 5 minutes
+    limit_max_requests=1000
+)
+```
+
+**d) Corriger la ligne problématique dans `generate_metier_detailed_analysis` :**
+- Remplacer `df_for_mapping = dataframes.get("j") or dataframes.get("jMinus1")`
+- Par la version explicite sans opérateur `or` sur les DataFrames
+
+### 2. **Modification du fichier `main.js`**
+
+**a) Améliorer l'interface d'upload :**
+```javascript
+// Ajouter détection de gros fichiers
+if (file.size > 100 * 1024 * 1024) { // 100MB
+    showNotification('Fichier volumineux détecté. Traitement optimisé en cours...', 'info');
+}
+
+// Modifier l'affichage du succès pour inclure l'optimisation
+statusDiv.innerHTML = `
+    <div class="alert alert-success fade-in-up">
+        <!-- ... -->
+        <small class="text-muted">
+            ${result.rows?.toLocaleString()} rows • 
+            ${result.columns_read} useful columns • 
+            ${formatFileSize(file.size)}
+        </small>
+        ${result.optimization ? 
+            `<div class="mt-1"><small class="text-info">⚡ ${result.optimization}</small></div>` : 
+            ''}
+        <!-- ... -->
+        <span class="badge bg-success">OPTIMIZED</span>
+    </div>
+`;
+```
+
+**b) Augmenter les timeouts pour l'analyse :**
+```javascript
+// Dans la fonction analyze(), ajouter un timeout plus long
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+
+const response = await fetch('/api/analyze', { 
+    method: 'POST',
+    signal: controller.signal 
+});
+```
+
+### 3. **Tests et validation**
+
+**Ordre de test recommandé :**
+1. Tester d'abord avec un fichier de taille normale pour vérifier que rien n'est cassé
+2. Tester avec un fichier de 100-200 Mo
+3. Progresser vers 500+ Mo
+4. Mesurer les gains de performance (temps, mémoire)
+
+### 4. **Gains attendus**
+
+- **Mémoire** : Réduction de 85-90% (de 500 Mo à 40-80 Mo)
+- **Vitesse d'upload** : Réduction proportionnelle du temps de traitement
+- **Stabilité** : Moins de risques de timeout ou d'erreurs mémoire
+
+### 5. **Configuration optionnelle du serveur**
+
+Si déployé sur un serveur web :
+```nginx
+client_max_body_size 2G;
+client_body_timeout 300s;
+proxy_read_timeout 300s;
+```
+
+## Priorité des modifications
+
+1. **Critique** : Lecture optimisée avec `usecols` dans `upload_file`
+2. **Important** : Correction de la ligne `or` dans `generate_metier_detailed_analysis`
+3. **Recommandé** : Timeouts augmentés et interface améliorée
+4. **Optionnel** : Configuration serveur
+
+Cette approche devrait transformer des fichiers de 500 Mo en un processus gérable de 40-80 Mo en mémoire, rendant l'application beaucoup plus stable et rapide.
