@@ -505,18 +505,13 @@ def generate_executive_summary(variations):
 def create_consumption_analysis_grouped_only(dataframes):
     """
     Crée l'analyse Consumption UNIQUEMENT par Groupe Métiers (sans détail des métiers)
-    
-    Args:
-        dataframes: Dict contenant les DataFrames 'j' et 'jMinus1'
-    
-    Returns:
-        Dict contenant les résultats de l'analyse Consumption groupée
     """
     try:
         logger.info("💼 Création de l'analyse Consumption - Groupes Métiers uniquement")
         
         consumption_grouped = {}
         totals_by_group = {}
+        metier_details = {}  # Initialiser au début
         
         # Traitement de chaque fichier
         for file_type, df in dataframes.items():
@@ -546,7 +541,7 @@ def create_consumption_analysis_grouped_only(dataframes):
             # Nettoyage des champs texte
             df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
             
-            # Groupement UNIQUEMENT par LCR_ECO_GROUPE_METIERS (pas de détail métier)
+            # Groupement UNIQUEMENT par LCR_ECO_GROUPE_METIERS
             grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
             
             # Conversion en milliards
@@ -570,10 +565,13 @@ def create_consumption_analysis_grouped_only(dataframes):
         
         # Calcul des variations
         variations = calculate_consumption_grouped_variations(totals_by_group)
-        
+
         # Génération de l'analyse textuelle
-        analysis_text, significant_groups = generate_consumption_grouped_analysis_text(variations, totals_by_group)
-        
+        analysis_text, significant_groups = generate_consumption_grouped_analysis_text(variations, totals_by_group, dataframes)
+
+        # Génération de l'analyse détaillée par métier (NOUVELLE VERSION)
+        metier_detailed_analysis = generate_metier_detailed_analysis(significant_groups, dataframes)
+
         # Préparer les données détaillées par métier pour les groupes significatifs
         metier_details = {}
         for file_type, df in dataframes.items():
@@ -590,12 +588,14 @@ def create_consumption_analysis_grouped_only(dataframes):
                     
                     # CONVERTIR EN DICTIONNAIRE SÉRIALISABLE
                     metier_details[file_type] = grouped.to_dict(orient='records')
-
+        
+        print (f"TESTSTSTSTSTSTST : {metier_detailed_analysis}")
         return {
             "title": "LCR Consumption Analysis by Business Group (Summary)",
             "consumption_table_html": consumption_html,
             "variations": variations,
             "analysis_text": analysis_text,
+            "metier_detailed_analysis": metier_detailed_analysis, 
             "significant_groups": significant_groups,
             "metier_details": metier_details,
             "metadata": {
@@ -614,7 +614,7 @@ def create_consumption_analysis_grouped_only(dataframes):
             "error": str(e),
             "consumption_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse Consumption groupée</p>"
         }
-
+    
 def generate_consumption_grouped_table_html(consumption_grouped):
     """
     Génère le HTML du tableau Consumption GROUPÉ (sans détail métiers)
@@ -744,10 +744,31 @@ def calculate_consumption_grouped_variations(totals_by_group):
         "by_groupe_metiers": group_variations
     }
 
-def generate_consumption_grouped_analysis_text(variations, totals_by_group):
-    """Génère le texte d'analyse de la consumption groupée"""
+def generate_consumption_grouped_analysis_text(variations, totals_by_group, dataframes=None):
+    """Génère le texte d'analyse de la consumption groupée avec mapping Métier -> Sous-Métier"""
     if not variations or "global" not in variations:
-        return "Analyse Consumption groupée non disponible - données insuffisantes."
+        return "Analyse Consumption groupée non disponible - données insuffisantes.", []
+    
+    # Créer le mapping Métier -> Sous-Métier depuis les données Excel IL SERT À RIEN ICI ON UTILISE PAS MÉTIER MAIS À RÉUTILISER POUR LES MÉTIER AU NIVEAU DE GRANULARITÉ SUIVANT.
+    metier_to_sous_metier = {}
+    if dataframes is not None and isinstance(dataframes, dict): #ATTENTION NE PAS METTRE if dataframes.
+        # Utiliser le fichier J pour créer le mapping (ou J-1 si J n'existe pas)
+        df_for_mapping = dataframes.get("j")
+        if df_for_mapping is None:
+            df_for_mapping = dataframes.get("jMinus1")
+        
+        if df_for_mapping is not None:
+            # Vérifier que les colonnes existent
+            if "Métier" in df_for_mapping.columns and "Sous-Métier" in df_for_mapping.columns:
+                try:
+                    # Créer le mapping en supprimant les doublons
+                    mapping_df = df_for_mapping[["Métier", "Sous-Métier"]].dropna().drop_duplicates()
+                    metier_to_sous_metier = mapping_df.set_index("Métier")["Sous-Métier"].to_dict()
+                    logger.info(f"Mapping Métier -> Sous-Métier créé: {len(metier_to_sous_metier)} entrées")
+                except Exception as e:
+                    logger.warning(f"Erreur création mapping Métier->Sous-Métier: {e}")
+            else:
+                logger.warning("Colonnes 'Métier' ou 'Sous-Métier' non trouvées dans les données")
     
     global_data = variations["global"]
     date_str = datetime.now().strftime("March %d")
@@ -759,7 +780,6 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group):
     
     analysis = f"Summary view: on {date_str}, business groups have total consumption of {total_j:.2f} Bn, representing a {direction} of {abs(variation):.2f} Bn compared to yesterday."
     
-
     # Identification des principales variations par groupe (auto, sans paramètre)
     significant_groups = []
     if "by_groupe_metiers" in variations and variations["by_groupe_metiers"]:
@@ -828,19 +848,184 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group):
                 movers = [max(items, key=lambda x: x[2])]
             selected = movers
 
-        # Mise en forme (identique à ta version)
+        # Mise en forme avec mapping Métier -> Sous-Métier
         significant_variations = []
         for g, v, av in selected:
             sign_sym = "-" if v < 0 else "+"
-            significant_variations.append(f"{g} ({sign_sym}{abs(v):.2f} Bn)")
-            significant_groups.append(g)
+            
+            # Utiliser le mapping pour obtenir le nom complet
+            display_name = metier_to_sous_metier.get(g, g)  # Si pas de mapping trouvé, utiliser g
+            
+            significant_variations.append(f"{display_name} ({sign_sym}{abs(v):.2f} Bn)")
+            significant_groups.append(g)  # Garder l'abréviation pour les traitements ultérieurs
 
         if significant_variations:
             if variation < 0:
                 analysis += f" Main contributors to this decrease: {', '.join(significant_variations)}."
             else:
                 analysis += f" Main drivers of this increase: {', '.join(significant_variations)}."
+    
     return analysis, significant_groups
+
+def generate_metier_detailed_analysis(significant_groups, dataframes=None):
+    """
+    Génère une analyse textuelle détaillée des métiers avec les plus grosses variations
+    en recréant les données métier depuis les DataFrames
+    """
+    if not significant_groups or not dataframes:
+        return ""
+    
+    logger.info(f"Génération analyse détaillée pour groupes: {significant_groups}")
+    
+    # Créer le mapping Métier -> Sous-Métier
+    metier_to_sous_metier = {}
+    if dataframes is not None and isinstance(dataframes, dict):
+        # CORRECTION: Remplacer cette ligne problématique
+        # df_for_mapping = dataframes.get("j") or dataframes.get("jMinus1")
+        
+        # Par ceci:
+        df_for_mapping = dataframes.get("j")
+        if df_for_mapping is None:
+            df_for_mapping = dataframes.get("jMinus1")
+        
+        # Le reste du code mapping reste identique...
+        if df_for_mapping is not None:
+            has_metier = "Métier" in df_for_mapping.columns
+            has_sous_metier = "Sous-Métier" in df_for_mapping.columns
+            
+            if has_metier and has_sous_metier:
+                try:
+                    mapping_df = df_for_mapping[["Métier", "Sous-Métier"]].dropna().drop_duplicates()
+                    metier_to_sous_metier = mapping_df.set_index("Métier")["Sous-Métier"].to_dict()
+                    logger.info(f"Mapping Métier -> Sous-Métier créé pour analyse détaillée: {len(metier_to_sous_metier)} entrées")
+                except Exception as e:
+                    logger.warning(f"Erreur création mapping pour analyse détaillée: {e}")
+    
+    # Recréer les données métier depuis les DataFrames
+    metier_data = {}
+    
+    try:
+        for file_type, df in dataframes.items():
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            # Vérifier si la colonne Métier existe
+            if "Métier" not in df_filtered.columns:
+                logger.warning(f"Colonne 'Métier' non trouvée dans {file_type}, analyse détaillée impossible")
+                continue
+            
+            if len(significant_groups) > 0:
+                # Filtrer pour les groupes significatifs seulement
+                df_significant = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(significant_groups)]
+                
+                if df_significant.empty:  # Utiliser .empty au lieu de len() == 0
+                    logger.warning(f"Aucune donnée pour les groupes significatifs dans {file_type}")
+                    continue
+                
+                # Grouper par groupe métier et métier
+                grouped = df_significant.groupby(["LCR_ECO_GROUPE_METIERS", "Métier"])["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+                grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
+                
+                metier_data[file_type] = grouped
+                logger.info(f"Données métier créées pour {file_type}: {len(grouped)} lignes")
+    
+    except Exception as e:
+        logger.error(f"Erreur lors de la création des données métier: {e}")
+        return ""
+
+    # Vérifier que nous avons les données J et J-1
+    if "j" not in metier_data or "jMinus1" not in metier_data:
+        logger.warning("Données J ou J-1 manquantes pour l'analyse détaillée")
+        return ""
+    
+    data_j = metier_data["j"]
+    data_j1 = metier_data["jMinus1"]
+    
+    # Vérifier que les DataFrames ne sont pas vides
+    if data_j.empty or data_j1.empty:
+        logger.warning("DataFrames J ou J-1 vides pour l'analyse détaillée")
+        return ""
+    
+    # Créer des dictionnaires de lookup par (groupe, métier)
+    lookup_j = {}
+    lookup_j1 = {}
+    
+    try:
+        for _, row in data_j.iterrows():
+            key = (row["LCR_ECO_GROUPE_METIERS"], row["Métier"])
+            lookup_j[key] = row["LCR_ECO_IMPACT_LCR_Bn"]
+        
+        for _, row in data_j1.iterrows():
+            key = (row["LCR_ECO_GROUPE_METIERS"], row["Métier"])
+            lookup_j1[key] = row["LCR_ECO_IMPACT_LCR_Bn"]
+    
+    except Exception as e:
+        logger.error(f"Erreur lors de la création des dictionnaires lookup: {e}")
+        return ""
+    
+    # Calculer les variations par métier
+    all_keys = set(lookup_j.keys()) | set(lookup_j1.keys())
+    metier_variations = []
+    
+    for key in all_keys:
+        groupe, metier = key
+        if groupe in significant_groups:  # Seulement les groupes significatifs
+            value_j = lookup_j.get(key, 0)
+            value_j1 = lookup_j1.get(key, 0)
+            variation = value_j - value_j1
+            
+            # Utiliser le mapping pour obtenir le nom complet
+            display_name = metier_to_sous_metier.get(metier, metier)
+            
+            metier_variations.append({
+                "groupe": groupe,
+                "metier": metier,
+                "display_name": display_name,
+                "variation": variation,
+                "abs_variation": abs(variation),
+                "value_j": value_j,
+                "value_j1": value_j1
+            })
+    
+    # Trier par variation absolue décroissante
+    metier_variations.sort(key=lambda x: x["abs_variation"], reverse=True)
+    
+    # Prendre les 3-5 plus grosses variations (selon le nombre de métiers)
+    n_top = min(5, max(3, len(metier_variations) // 2))
+    top_variations = metier_variations[:n_top]
+    
+    if not top_variations:
+        return ""
+    
+    # Générer le texte d'analyse
+    date_str = datetime.now().strftime("March %d")
+    analysis_parts = []
+    
+    for i, item in enumerate(top_variations):
+        variation = item["variation"]
+        abs_variation = item["abs_variation"]
+        display_name = item["display_name"]
+        groupe = item["groupe"]
+        
+        # Ignorer les variations très faibles
+        if abs_variation < 0.01:  # Moins de 10M€
+            continue
+        
+        direction = "increased" if variation > 0 else "decreased"
+        
+        if i == 0:
+            analysis_parts.append(f"In {groupe}, {display_name} {direction} by {abs_variation:.2f} Bn")
+        else:
+            analysis_parts.append(f"{display_name} {direction} by {abs_variation:.2f} Bn")
+    
+    if analysis_parts:
+        if len(analysis_parts) == 1:
+            return f"At the detailed level: {analysis_parts[0]}."
+        else:
+            main_part = analysis_parts[0]
+            other_parts = ", ".join(analysis_parts[1:])
+            return f"At the detailed level: {main_part}, while {other_parts}."
+    
+    return ""
 
 
 if __name__ == "__main__":

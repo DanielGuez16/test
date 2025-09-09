@@ -443,7 +443,7 @@ function generateConsumptionSection(consumptionData) {
                             <div class="text-center">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <h5 class="mb-0">CONSUMPTION</h5>
-                                    <span class="badge ${isPositive ? 'bg-warning text-dark' : 'bg-danger'}">
+                                    <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                         ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                     </span>
                                 </div>
@@ -458,7 +458,7 @@ function generateConsumptionSection(consumptionData) {
                                     </div>
                                     <div class="col-4">
                                         <small class="opacity-75">Variation</small>
-                                        <h3 class="${isPositive ? 'text-warning' : 'text-danger'}">
+                                        <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
                                             ${isPositive ? '+' : ''}${globalVar.variation} Bn
                                         </h3>
                                     </div>
@@ -493,6 +493,23 @@ function generateConsumptionSection(consumptionData) {
         html += generateMetierChartsSection(consumptionData.significant_groups, consumptionData.metier_details);
     }
     
+    // Analyse textuelle par métier
+    if (consumptionData.metier_detailed_analysis) {
+        html += `
+            <div class="analysis-section fade-in-up">
+                <div class="summary-box">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
+                        <div>
+                            <h5 class="mb-2">Details by group</h5>
+                            <p class="mb-0">${consumptionData.metier_detailed_analysis}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     // Légende Consumption
     html += `
         <div class="table-legend fade-in-up">
