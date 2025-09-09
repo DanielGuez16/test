@@ -22,6 +22,8 @@ from datetime import datetime
 import math
 import statistics
 
+from file_reader import read_any_file
+
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +44,9 @@ app.add_middleware(
 required_dirs = ["data", "templates", "static", "static/js", "static/css", "static/images"]
 for directory in required_dirs:
     Path(directory).mkdir(exist_ok=True)
+
+# Formats supportés
+SUPPORTED_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.csv', '.tsv', '.txt']
 
 # Configuration des fichiers statiques et templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -121,6 +126,73 @@ async def health_check():
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
+    """
+    Upload simplifié supportant Excel, CSV, TSV
+    """
+    try:
+        logger.info(f"Upload reçu: {file.filename}, type: {file_type}")
+        
+        # Validation du fichier
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+        
+        file_extension = Path(file.filename).suffix.lower()
+        if file_extension not in SUPPORTED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Format non supporté: {file_extension}. Formats acceptés: {', '.join(SUPPORTED_EXTENSIONS)}"
+            )
+
+        # Sauvegarder le fichier
+        contents = await file.read()
+        unique_filename = f"{file_type}_{uuid.uuid4().hex[:8]}_{file.filename}"
+        file_path = Path("data") / unique_filename
+        
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        # LIRE LE FICHIER avec le nouveau module
+        try:
+            df, file_info = read_any_file(file_path, ALL_REQUIRED_COLUMNS)
+            logger.info(f"Fichier lu: {file_info}")
+            
+        except Exception as e:
+            file_path.unlink(missing_ok=True)  # Supprimer le fichier
+            raise HTTPException(status_code=422, detail=f"Erreur lecture fichier: {str(e)}")
+        
+        # Vérifier les colonnes
+        missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
+        
+        # Stocker les infos
+        file_session["files"][file_type] = {
+            "filename": unique_filename,
+            "original_name": file.filename,
+            "rows": len(df),
+            "columns": len(df.columns),
+            "upload_time": datetime.now().isoformat(),
+            "file_format": file_info['format'],
+            "missing_columns": missing_columns
+        }
+        
+        return {
+            "success": True,
+            "message": f"Fichier {file_type} lu avec succès ({file_info['format']})",
+            "filename": file.filename,
+            "format": file_info['format'],
+            "rows": file_info['rows'],
+            "columns": file_info['columns'],
+            "missing_columns": missing_columns,
+            "file_size": len(contents)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur upload: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+    
+@app.post("/api/upload")
+async def upload_file_PLUS_COMPLIQUE_MAIS_SANS_CSV(file: UploadFile = File(...), file_type: str = Form(...)):
     """
     Endpoint d'upload des fichiers Excel - Version optimisée pour gros fichiers
     
