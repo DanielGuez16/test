@@ -77,7 +77,7 @@ ALL_REQUIRED_COLUMNS = list(set(
 
 def convert_any_file_to_excel(file_path):
     """
-    Lit n'importe quel fichier et le convertit en Excel
+    Lit n'importe quel fichier et le convertit en Excel - Version optimisée
     Retourne le chemin du fichier Excel créé
     """
     file_path = Path(file_path)
@@ -90,10 +90,14 @@ def convert_any_file_to_excel(file_path):
         
         # Si c'est CSV/TSV/TXT, on le convertit
         elif extension in ['.csv', '.tsv', '.txt']:
+            logger.info(f"Conversion {extension} vers Excel en cours...")
+            
             # Détecter l'encodage
             with open(file_path, 'rb') as f:
                 raw_data = f.read(10000)
                 encoding = chardet.detect(raw_data)['encoding'] or 'utf-8'
+            
+            logger.info(f"Encodage détecté: {encoding}")
             
             # Détecter le délimiteur
             if extension == '.tsv':
@@ -108,23 +112,47 @@ def convert_any_file_to_excel(file_path):
                     else:
                         delimiter = ','
             
-            # Lire le fichier
-            df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding)
+            logger.info(f"Délimiteur détecté: '{delimiter}'")
+            
+            # Lire le fichier CSV avec optimisations pour éviter les warnings
+            df = pd.read_csv(
+                file_path, 
+                delimiter=delimiter, 
+                encoding=encoding,
+                low_memory=False,      # Évite les warnings DtypeWarning
+                dtype=str,             # Force tout en string pour éviter détection automatique
+                na_filter=False        # Évite la conversion des valeurs vides en NaN
+            )
+            
+            # Nettoyer les noms de colonnes
             df.columns = df.columns.astype(str).str.strip()
+            
+            logger.info(f"CSV lu: {len(df)} lignes, {len(df.columns)} colonnes")
+            
+            # Convertir les colonnes numériques connues après lecture
+            numeric_columns = ['Nominal Value', 'LCR_ECO_IMPACT_LCR']
+            for col in numeric_columns:
+                if col in df.columns:
+                    # Nettoyer et convertir en numérique
+                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')
             
             # Convertir en Excel
             excel_path = file_path.with_suffix('.xlsx')
+            logger.info(f"Écriture Excel vers: {excel_path}")
+            
             df.to_excel(excel_path, index=False, engine='openpyxl')
             
             # Supprimer l'original
             file_path.unlink()
             
+            logger.info(f"Conversion terminée: {extension} → .xlsx")
             return excel_path
         
         else:
             raise ValueError(f"Format non supporté: {extension}")
             
     except Exception as e:
+        logger.error(f"Erreur conversion {extension}: {e}")
         raise ValueError(f"Erreur conversion vers Excel: {str(e)}")
     
 #######################################################################################################################################
