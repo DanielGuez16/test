@@ -21,6 +21,7 @@ from pathlib import Path
 from datetime import datetime
 import math
 import statistics
+import io
 import chardet
 
 # Configuration du logging
@@ -75,86 +76,71 @@ ALL_REQUIRED_COLUMNS = list(set(
     REQUIRED_COLUMNS["consumption"]
 ))
 
-def convert_any_file_to_excel(file_path):
+def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     """
-    Lit n'importe quel fichier et le convertit en Excel - Version optimisée
-    Retourne le chemin du fichier Excel créé
+    Convertit le contenu d'un fichier directement en DataFrame
+    Sans écriture sur disque
     """
-    file_path = Path(file_path)
-    extension = file_path.suffix.lower()
-    
     try:
-        # Si c'est déjà Excel, on garde tel quel
-        if extension in ['.xlsx', '.xls', '.xlsm', '.xlsb']:
-            return file_path
+        extension = Path(filename).suffix.lower()
         
-        # Si c'est CSV/TSV/TXT, on le convertit
+        # Excel - lecture directe depuis bytes
+        if extension in ['.xlsx', '.xls', '.xlsm', '.xlsb']:
+            df = pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
+            df.columns = df.columns.astype(str).str.strip()
+            return df, {'format': extension, 'method': 'direct_excel'}
+        
+        # CSV/TSV/TXT - traitement en mémoire
         elif extension in ['.csv', '.tsv', '.txt']:
-            logger.info(f"Conversion {extension} vers Excel en cours...")
-            
             # Détecter l'encodage
-            with open(file_path, 'rb') as f:
-                raw_data = f.read(10000)
-                encoding = chardet.detect(raw_data)['encoding'] or 'utf-8'
+            encoding = chardet.detect(file_content[:10000])['encoding'] or 'utf-8'
             
-            logger.info(f"Encodage détecté: {encoding}")
+            # Décoder en string
+            text_content = file_content.decode(encoding)
             
             # Détecter le délimiteur
             if extension == '.tsv':
                 delimiter = '\t'
             else:
-                with open(file_path, 'r', encoding=encoding) as f:
-                    first_line = f.readline()
-                    if ';' in first_line:
-                        delimiter = ';'
-                    elif '\t' in first_line:
-                        delimiter = '\t'
-                    else:
-                        delimiter = ','
+                first_line = text_content.split('\n')[0]
+                if ';' in first_line:
+                    delimiter = ';'
+                elif '\t' in first_line:
+                    delimiter = '\t'
+                else:
+                    delimiter = ','
             
-            logger.info(f"Délimiteur détecté: '{delimiter}'")
-            
-            # Lire le fichier CSV avec optimisations pour éviter les warnings
+            # Lire directement depuis StringIO (en mémoire)
             df = pd.read_csv(
-                file_path, 
-                delimiter=delimiter, 
-                encoding=encoding,
-                low_memory=False,      # Évite les warnings DtypeWarning
-                dtype=str,             # Force tout en string pour éviter détection automatique
-                na_filter=False        # Évite la conversion des valeurs vides en NaN
+                io.StringIO(text_content),
+                delimiter=delimiter,
+                low_memory=False,
+                dtype=str,
+                na_filter=False
             )
             
-            # Nettoyer les noms de colonnes
+            # Nettoyer les colonnes
             df.columns = df.columns.astype(str).str.strip()
             
-            logger.info(f"CSV lu: {len(df)} lignes, {len(df.columns)} colonnes")
-            
-            # Convertir les colonnes numériques connues après lecture
+            # Convertir les colonnes numériques
             numeric_columns = ['Nominal Value', 'LCR_ECO_IMPACT_LCR']
             for col in numeric_columns:
                 if col in df.columns:
-                    # Nettoyer et convertir en numérique
                     df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')
             
-            # Convertir en Excel
-            excel_path = file_path.with_suffix('.xlsx')
-            logger.info(f"Écriture Excel vers: {excel_path}")
-            
-            df.to_excel(excel_path, index=False, engine='openpyxl')
-            
-            # Supprimer l'original
-            file_path.unlink()
-            
-            logger.info(f"Conversion terminée: {extension} → .xlsx")
-            return excel_path
+            return df, {
+                'format': extension, 
+                'encoding': encoding, 
+                'delimiter': delimiter,
+                'method': 'memory_csv'
+            }
         
         else:
             raise ValueError(f"Format non supporté: {extension}")
             
     except Exception as e:
-        logger.error(f"Erreur conversion {extension}: {e}")
-        raise ValueError(f"Erreur conversion vers Excel: {str(e)}")
-    
+        raise ValueError(f"Erreur lecture fichier: {str(e)}")
+
 #######################################################################################################################################
 
 #                           API
@@ -206,7 +192,7 @@ async def health_check():
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     """
-    Upload avec conversion automatique vers Excel
+    Upload sans écriture de fichiers - Tout en mémoire
     """
     try:
         logger.info(f"Upload reçu: {file.filename}, type: {file_type}")
@@ -216,43 +202,34 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
             raise HTTPException(status_code=400, detail="Nom de fichier manquant")
         
         file_extension = Path(file.filename).suffix.lower()
-        SUPPORTED_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.csv', '.tsv', '.txt']
         
         if file_extension not in SUPPORTED_EXTENSIONS:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Format non supporté: {file_extension}. Formats acceptés: {', '.join(SUPPORTED_EXTENSIONS)}"
+                detail=f"Format non supporté: {file_extension}"
             )
 
-        # Sauvegarder le fichier
+        # Lire le contenu en mémoire
         contents = await file.read()
-        unique_filename = f"{file_type}_{uuid.uuid4().hex[:8]}_{file.filename}"
-        file_path = Path("data") / unique_filename
         
-        with open(file_path, "wb") as f:
-            f.write(contents)
-        
-        # CONVERSION AUTOMATIQUE VERS EXCEL
+        # TRAITEMENT DIRECT EN MÉMOIRE
         try:
-            excel_path = convert_any_file_to_excel(file_path)
-            logger.info(f"Fichier converti vers Excel: {excel_path}")
-            
-            # Lire le fichier Excel pour validation
-            df = pd.read_excel(excel_path, engine='openpyxl')
-            df.columns = df.columns.astype(str).str.strip()
+            df, file_info = convert_file_content_to_dataframe(contents, file.filename)
+            logger.info(f"Fichier traité en mémoire: {file_info}")
             
         except Exception as e:
-            file_path.unlink(missing_ok=True)
-            raise HTTPException(status_code=422, detail=f"Erreur conversion: {str(e)}")
+            raise HTTPException(status_code=422, detail=f"Erreur lecture: {str(e)}")
         
         # Vérifier les colonnes
         missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
         
-        # Stocker les infos (avec le nom du fichier Excel)
+        # Stocker UNIQUEMENT les métadonnées (pas le fichier)
         file_session["files"][file_type] = {
-            "filename": excel_path.name,  # Nom du fichier Excel converti
+            "dataframe": df,  # Stocker le DataFrame directement en session
             "original_name": file.filename,
-            "original_format": file_extension,
+            "file_format": file_info['format'],
+            "encoding": file_info.get('encoding'),
+            "delimiter": file_info.get('delimiter'),
             "rows": len(df),
             "columns": len(df.columns),
             "upload_time": datetime.now().isoformat(),
@@ -261,14 +238,16 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
         
         return {
             "success": True,
-            "message": f"Fichier {file_type} lu et converti en Excel ({file_extension} → .xlsx)",
+            "message": f"Fichier {file_type} traité en mémoire ({file_info['format']})",
             "filename": file.filename,
-            "original_format": file_extension,
-            "converted_to": "Excel",
+            "format": file_info['format'],
+            "encoding": file_info.get('encoding'),
+            "delimiter": file_info.get('delimiter'),
             "rows": len(df),
             "columns": len(df.columns),
             "missing_columns": missing_columns,
-            "file_size": len(contents)
+            "file_size": len(contents),
+            "processing": "in_memory_only"
         }
         
     except HTTPException:
@@ -276,56 +255,38 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     except Exception as e:
         logger.error(f"Erreur upload: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-    
+
 @app.post("/api/analyze")
 async def analyze_files():
     """
-    Endpoint d'analyse des fichiers LCR - Version complète avec Balance Sheet et Consumption
+    Analyse directe depuis les DataFrames en mémoire
     """
     try:
-        logger.info("🔍 Début de l'analyse Balance Sheet + Consumption")
+        logger.info("Début de l'analyse depuis DataFrames en mémoire")
         
         # Vérification de la présence des deux fichiers
         if len(file_session.get("files", {})) < 2:
-            raise HTTPException(
-                status_code=400, 
-                detail="Les deux fichiers (J et J-1) sont requis pour l'analyse"
-            )
+            raise HTTPException(status_code=400, detail="Les deux fichiers sont requis")
         
         if "j" not in file_session["files"] or "jMinus1" not in file_session["files"]:
-            raise HTTPException(
-                status_code=400,
-                detail="Fichiers manquants. Veuillez uploader le fichier J et le fichier J-1"
-            )
+            raise HTTPException(status_code=400, detail="Fichiers manquants")
         
-        # Chargement des fichiers
+        # Récupérer les DataFrames directement depuis la session
         dataframes = {}
         for file_type, file_info in file_session["files"].items():
-            file_path = Path("data") / file_info["filename"]
-            
-            if not file_path.exists():
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Fichier {file_type} non trouvé sur le serveur"
-                )
-            
-            df = pd.read_excel(file_path, engine='openpyxl')
-            df.columns = df.columns.astype(str).str.strip()
+            df = file_info["dataframe"]  # DataFrame déjà en mémoire
             dataframes[file_type] = df
-            
-            logger.info(f"📊 {file_type}: {len(df)} lignes chargées")
+            logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
         
-        # Génération du tableau croisé dynamique Balance Sheet
+        # Le reste de votre code d'analyse reste identique
         balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
-        
-        # Génération de l'analyse Consumption
         consumption_results = create_consumption_analysis_grouped_only(dataframes)
         
-        logger.info("✅ Analyses Balance Sheet et Consumption terminées avec succès")
+        logger.info("Analyses terminées (traitement mémoire)")
         
         return {
             "success": True,
-            "message": "Analyses Balance Sheet et Consumption terminées",
+            "message": "Analyses terminées (traitement en mémoire)",
             "timestamp": datetime.now().isoformat(),
             "results": {
                 "balance_sheet": balance_sheet_results,
@@ -336,9 +297,9 @@ async def analyze_files():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur lors de l'analyse: {e}")
+        logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
-
+    
 #######################################################################################################################################
 
 #                           BALANCE SHEET
