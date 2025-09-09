@@ -50,6 +50,26 @@ templates = Jinja2Templates(directory="templates")
 # Variables globales pour la session (en production: utiliser une base de données)
 file_session = {"files": {}}
 
+REQUIRED_COLUMNS = {
+    "balance_sheet": [
+        "Top Conso",
+        "Réaffectation", 
+        "Groupe De Produit",
+        "Nominal Value"
+    ],
+    "consumption": [
+        "Top Conso",
+        "LCR_ECO_GROUPE_METIERS",
+        "LCR_ECO_IMPACT_LCR",
+        "Métier",
+        "Sous-Métier"
+    ]
+}
+
+ALL_REQUIRED_COLUMNS = list(set(
+    REQUIRED_COLUMNS["balance_sheet"] + 
+    REQUIRED_COLUMNS["consumption"]
+))
 
 #######################################################################################################################################
 
@@ -102,7 +122,7 @@ async def health_check():
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     """
-    Endpoint d'upload des fichiers Excel
+    Endpoint d'upload des fichiers Excel - Version optimisée pour gros fichiers
     
     Args:
         file: Fichier Excel uploadé
@@ -112,7 +132,7 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
         Réponse JSON avec les informations du fichier traité
     """
     try:
-        logger.info(f"📤 Upload reçu: {file.filename}, type: {file_type}")
+        logger.info(f"📤 Upload reçu: {file.filename}, type: {file_type}, taille: {file.size/1024/1024:.1f} Mo")
         
         # Validation du fichier
         if not file.filename:
@@ -124,6 +144,11 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
                 detail="Format non supporté. Seuls les fichiers Excel (.xlsx, .xls) sont acceptés."
             )
 
+        # Avertissement pour gros fichiers
+        file_size_mb = file.size / (1024 * 1024)
+        if file_size_mb > 100:
+            logger.info(f"⚠️ Fichier volumineux détecté: {file_size_mb:.1f} Mo - Mode optimisé activé")
+
         # Lecture et sauvegarde du fichier
         contents = await file.read()
         unique_filename = f"{file_type}_{uuid.uuid4().hex[:8]}_{file.filename}"
@@ -134,22 +159,51 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
         
         logger.info(f"💾 Fichier sauvegardé: {file_path}")
         
-        # Validation et analyse préliminaire du fichier Excel
+        # Validation et analyse préliminaire OPTIMISÉE du fichier Excel
         try:
-            df = pd.read_excel(file_path, engine='openpyxl')
-            df.columns = df.columns.astype(str).str.strip()
+            # ÉTAPE 1: Lire d'abord les en-têtes pour identifier les colonnes disponibles
+            logger.info("🔍 Analyse des colonnes disponibles...")
+            df_headers = pd.read_excel(file_path, engine='openpyxl', nrows=0)
+            available_columns = [str(col).strip() for col in df_headers.columns.tolist()]
             
-            # Vérification des colonnes requises
-            required_columns = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value"]
-            missing_columns = [col for col in required_columns if col not in df.columns]
+            # ÉTAPE 2: Identifier les colonnes présentes parmi celles requises
+            columns_to_read = [col for col in ALL_REQUIRED_COLUMNS if col in available_columns]
+            missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in available_columns]
+            
+            logger.info(f"📋 Colonnes détectées: {len(available_columns)} total")
+            logger.info(f"✅ Colonnes utiles: {len(columns_to_read)} ({columns_to_read})")
             
             if missing_columns:
-                logger.warning(f"⚠️ Colonnes manquantes dans {file.filename}: {missing_columns}")
+                logger.warning(f"⚠️ Colonnes manquantes: {missing_columns}")
             
-            logger.info(f"✅ Excel validé: {len(df)} lignes, {len(df.columns)} colonnes")
+            # ÉTAPE 3: Lecture optimisée avec seulement les colonnes nécessaires
+            logger.info("⚡ Lecture optimisée en cours...")
+            df = pd.read_excel(
+                file_path, 
+                engine='openpyxl',
+                usecols=columns_to_read,  # OPTIMISATION CLÉE - Seulement les colonnes utiles
+                dtype={
+                    'Top Conso': 'str',
+                    'Réaffectation': 'str',
+                    'Groupe De Produit': 'str',
+                    'LCR_ECO_GROUPE_METIERS': 'str',
+                    'Métier': 'str',
+                    'Sous-Métier': 'str'
+                    # Laisser pandas détecter automatiquement les types numériques pour optimiser
+                }
+            )
+            
+            # Nettoyage des noms de colonnes
+            df.columns = df.columns.astype(str).str.strip()
+            
+            optimization_ratio = len(columns_to_read) / len(available_columns) * 100
+            memory_saved = (1 - len(columns_to_read) / len(available_columns)) * 100
+            
+            logger.info(f"✅ Excel optimisé chargé: {len(df)} lignes, {len(df.columns)} colonnes utiles")
+            logger.info(f"🎯 Optimisation: {optimization_ratio:.1f}% des colonnes, ~{memory_saved:.1f}% mémoire économisée")
             
         except Exception as e:
-            logger.error(f"❌ Erreur lecture Excel: {e}")
+            logger.error(f"❌ Erreur lecture Excel optimisée: {e}")
             # Supprimer le fichier en cas d'erreur
             file_path.unlink(missing_ok=True)
             raise HTTPException(
@@ -164,17 +218,31 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
             "rows": len(df),
             "columns": len(df.columns),
             "upload_time": datetime.now().isoformat(),
-            "missing_columns": missing_columns
+            "missing_columns": missing_columns,
+            "optimization_info": {
+                "total_columns_available": len(available_columns),
+                "columns_read": len(columns_to_read),
+                "memory_optimization": f"{memory_saved:.1f}%",
+                "file_size_mb": file_size_mb
+            }
         }
         
         return {
             "success": True,
-            "message": f"Fichier {file_type} traité avec succès",
+            "message": f"Fichier {file_type} traité avec succès (mode optimisé)",
             "filename": file.filename,
             "rows": len(df),
-            "columns": len(df.columns),
+            "columns_read": len(df.columns),
+            "total_columns_available": len(available_columns),
             "file_size": len(contents),
-            "missing_columns": missing_columns
+            "file_size_mb": round(file_size_mb, 1),
+            "missing_columns": missing_columns,
+            "optimization": f"Lecture de {len(columns_to_read)}/{len(available_columns)} colonnes (~{memory_saved:.1f}% mémoire économisée)",
+            "performance": {
+                "columns_optimization_ratio": f"{optimization_ratio:.1f}%",
+                "estimated_memory_saved": f"{memory_saved:.1f}%",
+                "large_file_mode": file_size_mb > 100
+            }
         }
         
     except HTTPException:
@@ -880,15 +948,10 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
     # Créer le mapping Métier -> Sous-Métier
     metier_to_sous_metier = {}
     if dataframes is not None and isinstance(dataframes, dict):
-        # CORRECTION: Remplacer cette ligne problématique
-        # df_for_mapping = dataframes.get("j") or dataframes.get("jMinus1")
-        
-        # Par ceci:
         df_for_mapping = dataframes.get("j")
         if df_for_mapping is None:
             df_for_mapping = dataframes.get("jMinus1")
         
-        # Le reste du code mapping reste identique...
         if df_for_mapping is not None:
             has_metier = "Métier" in df_for_mapping.columns
             has_sous_metier = "Sous-Métier" in df_for_mapping.columns
@@ -1037,8 +1100,10 @@ if __name__ == "__main__":
     
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="localhost",
         port=8000,
         reload=False,
-        log_level="info"
+        log_level="info",
+        timeout_keep_alive=300,  # 5 minutes
+        limit_max_requests=1000
     )

@@ -178,7 +178,13 @@ async function analyze() {
     `;
     
     try {
-        const response = await fetch('/api/analyze', { method: 'POST' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+
+        const response = await fetch('/api/analyze', { 
+            method: 'POST',
+            signal: controller.signal 
+        });
         
         if (response.ok) {
             const result = await response.json();
