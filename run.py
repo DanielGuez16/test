@@ -1025,7 +1025,7 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
         logger.error(f"Erreur lors de la création des dictionnaires lookup: {e}")
         return ""
     
-    # Calculer les variations par métier
+# Calculer les variations par métier
     all_keys = set(lookup_j.keys()) | set(lookup_j1.keys())
     metier_variations = []
     
@@ -1049,44 +1049,53 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
                 "value_j1": value_j1
             })
     
-    # Trier par variation absolue décroissante
-    metier_variations.sort(key=lambda x: x["abs_variation"], reverse=True)
+    # NOUVEAU: Grouper par groupe métier et prendre le top 3 de chaque groupe
+    variations_by_group = {}
+    for variation in metier_variations:
+        groupe = variation["groupe"]
+        if groupe not in variations_by_group:
+            variations_by_group[groupe] = []
+        variations_by_group[groupe].append(variation)
     
-    # Prendre les 3-5 plus grosses variations (selon le nombre de métiers)
-    n_top = min(5, max(3, len(metier_variations) // 2))
-    top_variations = metier_variations[:n_top]
-    
-    if not top_variations:
-        return ""
+    # Trier chaque groupe par variation absolue décroissante et prendre le top 3
+    top_variations_by_group = {}
+    for groupe, variations in variations_by_group.items():
+        # Trier par variation absolue décroissante
+        sorted_variations = sorted(variations, key=lambda x: x["abs_variation"], reverse=True)
+        # Prendre les 3 premières (ou moins si moins de 3 métiers)
+        top_variations_by_group[groupe] = sorted_variations[:3]
     
     # Générer le texte d'analyse
     date_str = datetime.now().strftime("March %d")
-    analysis_parts = []
+    group_sentences = []
     
-    for i, item in enumerate(top_variations):
-        variation = item["variation"]
-        abs_variation = item["abs_variation"]
-        display_name = item["display_name"]
-        groupe = item["groupe"]
-        
-        # Ignorer les variations très faibles
-        if abs_variation < 0.01:  # Moins de 10M€
-            continue
-        
-        direction = "increased" if variation > 0 else "decreased"
-        
-        if i == 0:
-            analysis_parts.append(f"In {groupe}, {display_name} {direction} by {abs_variation:.2f} Bn")
-        else:
-            analysis_parts.append(f"{display_name} {direction} by {abs_variation:.2f} Bn")
+    # Traiter chaque groupe séparément pour créer des phrases distinctes
+    for groupe in significant_groups:
+        if groupe in top_variations_by_group:
+            group_variations = top_variations_by_group[groupe]
+            group_parts = []
+            
+            for item in group_variations:
+                variation = item["variation"]
+                abs_variation = item["abs_variation"]
+                display_name = item["display_name"]
+                
+                # Ignorer les variations très faibles
+                if abs_variation < 0.01:  # Moins de 10M€
+                    continue
+                
+                direction = "increased" if variation > 0 else "decreased"
+                group_parts.append(f"{display_name} {direction} by {abs_variation:.2f} Bn")
+            
+            # Créer une phrase complète pour ce groupe avec le nom du groupe en gras
+            if group_parts:
+                group_sentence = f"In <strong>{groupe}</strong>, {', '.join(group_parts)}"
+                group_sentences.append(group_sentence)
     
-    if analysis_parts:
-        if len(analysis_parts) == 1:
-            return f"At the detailed level: {analysis_parts[0]}."
-        else:
-            main_part = analysis_parts[0]
-            other_parts = ", ".join(analysis_parts[1:])
-            return f"At the detailed level: {main_part}, while {other_parts}."
+    if group_sentences:
+        # Joindre les phrases avec ". " pour séparer chaque groupe
+        full_text = ". ".join(group_sentences)
+        return f"At the detailed level: {full_text}."
     
     return ""
 
