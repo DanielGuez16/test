@@ -21,8 +21,7 @@ from pathlib import Path
 from datetime import datetime
 import math
 import statistics
-
-from file_reader import read_any_file
+import chardet
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -76,6 +75,58 @@ ALL_REQUIRED_COLUMNS = list(set(
     REQUIRED_COLUMNS["consumption"]
 ))
 
+def convert_any_file_to_excel(file_path):
+    """
+    Lit n'importe quel fichier et le convertit en Excel
+    Retourne le chemin du fichier Excel créé
+    """
+    file_path = Path(file_path)
+    extension = file_path.suffix.lower()
+    
+    try:
+        # Si c'est déjà Excel, on garde tel quel
+        if extension in ['.xlsx', '.xls', '.xlsm', '.xlsb']:
+            return file_path
+        
+        # Si c'est CSV/TSV/TXT, on le convertit
+        elif extension in ['.csv', '.tsv', '.txt']:
+            # Détecter l'encodage
+            with open(file_path, 'rb') as f:
+                raw_data = f.read(10000)
+                encoding = chardet.detect(raw_data)['encoding'] or 'utf-8'
+            
+            # Détecter le délimiteur
+            if extension == '.tsv':
+                delimiter = '\t'
+            else:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    first_line = f.readline()
+                    if ';' in first_line:
+                        delimiter = ';'
+                    elif '\t' in first_line:
+                        delimiter = '\t'
+                    else:
+                        delimiter = ','
+            
+            # Lire le fichier
+            df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding)
+            df.columns = df.columns.astype(str).str.strip()
+            
+            # Convertir en Excel
+            excel_path = file_path.with_suffix('.xlsx')
+            df.to_excel(excel_path, index=False, engine='openpyxl')
+            
+            # Supprimer l'original
+            file_path.unlink()
+            
+            return excel_path
+        
+        else:
+            raise ValueError(f"Format non supporté: {extension}")
+            
+    except Exception as e:
+        raise ValueError(f"Erreur conversion vers Excel: {str(e)}")
+    
 #######################################################################################################################################
 
 #                           API
@@ -127,7 +178,7 @@ async def health_check():
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     """
-    Upload simplifié supportant Excel, CSV, TSV
+    Upload avec conversion automatique vers Excel
     """
     try:
         logger.info(f"Upload reçu: {file.filename}, type: {file_type}")
@@ -137,6 +188,8 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
             raise HTTPException(status_code=400, detail="Nom de fichier manquant")
         
         file_extension = Path(file.filename).suffix.lower()
+        SUPPORTED_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.csv', '.tsv', '.txt']
+        
         if file_extension not in SUPPORTED_EXTENSIONS:
             raise HTTPException(
                 status_code=400, 
@@ -151,36 +204,41 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
         with open(file_path, "wb") as f:
             f.write(contents)
         
-        # LIRE LE FICHIER avec le nouveau module
+        # CONVERSION AUTOMATIQUE VERS EXCEL
         try:
-            df, file_info = read_any_file(file_path, ALL_REQUIRED_COLUMNS)
-            logger.info(f"Fichier lu: {file_info}")
+            excel_path = convert_any_file_to_excel(file_path)
+            logger.info(f"Fichier converti vers Excel: {excel_path}")
+            
+            # Lire le fichier Excel pour validation
+            df = pd.read_excel(excel_path, engine='openpyxl')
+            df.columns = df.columns.astype(str).str.strip()
             
         except Exception as e:
-            file_path.unlink(missing_ok=True)  # Supprimer le fichier
-            raise HTTPException(status_code=422, detail=f"Erreur lecture fichier: {str(e)}")
+            file_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=422, detail=f"Erreur conversion: {str(e)}")
         
         # Vérifier les colonnes
         missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
         
-        # Stocker les infos
+        # Stocker les infos (avec le nom du fichier Excel)
         file_session["files"][file_type] = {
-            "filename": unique_filename,
+            "filename": excel_path.name,  # Nom du fichier Excel converti
             "original_name": file.filename,
+            "original_format": file_extension,
             "rows": len(df),
             "columns": len(df.columns),
             "upload_time": datetime.now().isoformat(),
-            "file_format": file_info['format'],
             "missing_columns": missing_columns
         }
         
         return {
             "success": True,
-            "message": f"Fichier {file_type} lu avec succès ({file_info['format']})",
+            "message": f"Fichier {file_type} lu et converti en Excel ({file_extension} → .xlsx)",
             "filename": file.filename,
-            "format": file_info['format'],
-            "rows": file_info['rows'],
-            "columns": file_info['columns'],
+            "original_format": file_extension,
+            "converted_to": "Excel",
+            "rows": len(df),
+            "columns": len(df.columns),
             "missing_columns": missing_columns,
             "file_size": len(contents)
         }
@@ -191,138 +249,6 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
         logger.error(f"Erreur upload: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
     
-@app.post("/api/upload")
-async def upload_file_PLUS_COMPLIQUE_MAIS_SANS_CSV(file: UploadFile = File(...), file_type: str = Form(...)):
-    """
-    Endpoint d'upload des fichiers Excel - Version optimisée pour gros fichiers
-    
-    Args:
-        file: Fichier Excel uploadé
-        file_type: Type de fichier ('j' ou 'jMinus1')
-    
-    Returns:
-        Réponse JSON avec les informations du fichier traité
-    """
-    try:
-        logger.info(f"📤 Upload reçu: {file.filename}, type: {file_type}, taille: {file.size/1024/1024:.1f} Mo")
-        
-        # Validation du fichier
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
-        
-        if not file.filename.lower().endswith(('.xlsx', '.xls')):
-            raise HTTPException(
-                status_code=400, 
-                detail="Format non supporté. Seuls les fichiers Excel (.xlsx, .xls) sont acceptés."
-            )
-
-        # Avertissement pour gros fichiers
-        file_size_mb = file.size / (1024 * 1024)
-        if file_size_mb > 100:
-            logger.info(f"⚠️ Fichier volumineux détecté: {file_size_mb:.1f} Mo - Mode optimisé activé")
-
-        # Lecture et sauvegarde du fichier
-        contents = await file.read()
-        unique_filename = f"{file_type}_{uuid.uuid4().hex[:8]}_{file.filename}"
-        file_path = Path("data") / unique_filename
-        
-        with open(file_path, "wb") as f:
-            f.write(contents)
-        
-        logger.info(f"💾 Fichier sauvegardé: {file_path}")
-        
-        # Validation et analyse préliminaire OPTIMISÉE du fichier Excel
-        try:
-            # ÉTAPE 1: Lire d'abord les en-têtes pour identifier les colonnes disponibles
-            logger.info("🔍 Analyse des colonnes disponibles...")
-            df_headers = pd.read_excel(file_path, engine='openpyxl', nrows=0)
-            available_columns = [str(col).strip() for col in df_headers.columns.tolist()]
-            
-            # ÉTAPE 2: Identifier les colonnes présentes parmi celles requises
-            columns_to_read = [col for col in ALL_REQUIRED_COLUMNS if col in available_columns]
-            missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in available_columns]
-            
-            logger.info(f"📋 Colonnes détectées: {len(available_columns)} total")
-            logger.info(f"✅ Colonnes utiles: {len(columns_to_read)} ({columns_to_read})")
-            
-            if missing_columns:
-                logger.warning(f"⚠️ Colonnes manquantes: {missing_columns}")
-            
-            # ÉTAPE 3: Lecture optimisée avec seulement les colonnes nécessaires
-            logger.info("⚡ Lecture optimisée en cours...")
-            df = pd.read_excel(
-                file_path, 
-                engine='openpyxl',
-                usecols=columns_to_read,  # OPTIMISATION CLÉE - Seulement les colonnes utiles
-                dtype={
-                    'Top Conso': 'str',
-                    'Réaffectation': 'str',
-                    'Groupe De Produit': 'str',
-                    'LCR_ECO_GROUPE_METIERS': 'str',
-                    'Métier': 'str',
-                    'Sous-Métier': 'str'
-                    # Laisser pandas détecter automatiquement les types numériques pour optimiser
-                }
-            )
-            
-            # Nettoyage des noms de colonnes
-            df.columns = df.columns.astype(str).str.strip()
-            
-            optimization_ratio = len(columns_to_read) / len(available_columns) * 100
-            memory_saved = (1 - len(columns_to_read) / len(available_columns)) * 100
-            
-            logger.info(f"✅ Excel optimisé chargé: {len(df)} lignes, {len(df.columns)} colonnes utiles")
-            logger.info(f"🎯 Optimisation: {optimization_ratio:.1f}% des colonnes, ~{memory_saved:.1f}% mémoire économisée")
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur lecture Excel optimisée: {e}")
-            # Supprimer le fichier en cas d'erreur
-            file_path.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=422, 
-                detail=f"Fichier Excel invalide ou corrompu: {str(e)}"
-            )
-        
-        # Stockage des informations du fichier
-        file_session["files"][file_type] = {
-            "filename": unique_filename,
-            "original_name": file.filename,
-            "rows": len(df),
-            "columns": len(df.columns),
-            "upload_time": datetime.now().isoformat(),
-            "missing_columns": missing_columns,
-            "optimization_info": {
-                "total_columns_available": len(available_columns),
-                "columns_read": len(columns_to_read),
-                "memory_optimization": f"{memory_saved:.1f}%",
-                "file_size_mb": file_size_mb
-            }
-        }
-        
-        return {
-            "success": True,
-            "message": f"Fichier {file_type} traité avec succès (mode optimisé)",
-            "filename": file.filename,
-            "rows": len(df),
-            "columns_read": len(df.columns),
-            "total_columns_available": len(available_columns),
-            "file_size": len(contents),
-            "file_size_mb": round(file_size_mb, 1),
-            "missing_columns": missing_columns,
-            "optimization": f"Lecture de {len(columns_to_read)}/{len(available_columns)} colonnes (~{memory_saved:.1f}% mémoire économisée)",
-            "performance": {
-                "columns_optimization_ratio": f"{optimization_ratio:.1f}%",
-                "estimated_memory_saved": f"{memory_saved:.1f}%",
-                "large_file_mode": file_size_mb > 100
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Erreur inattendue lors de l'upload: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
-
 @app.post("/api/analyze")
 async def analyze_files():
     """
