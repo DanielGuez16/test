@@ -297,14 +297,14 @@ function generateBalanceSheetSection(balanceSheetData) {
         `;
         
         const variations = balanceSheetData.variations;
-        
+
         // Carte ACTIF
         if (variations.ACTIF) {
             const actif = variations.ACTIF;
             const isPositive = actif.variation >= 0;
             
             html += `
-                <div class="col-md-3 mb-3">
+                <div class="col-md-6 mb-3">
                     <div class="metric-card">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -340,7 +340,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             const isPositive = passif.variation >= 0;
             
             html += `
-                <div class="col-md-3 mb-3">
+                <div class="col-md-6 mb-3">
                     <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -369,7 +369,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                 </div>
             `;
         }
-        
+
         html += `</div></div>`;
     }
     
@@ -479,7 +479,7 @@ function generateConsumptionSection(consumptionData) {
                     <div class="d-flex align-items-start">
                         <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">Consumption Analysis</h5>
+                            <h5 class="mb-2">Consumption Summary</h5>
                             <p class="mb-0">${consumptionData.analysis_text}</p>
                         </div>
                     </div>

@@ -320,16 +320,26 @@
             font-weight: 600;
         }
 
+        .navbar-logo {
+            height: 40px;
+            margin-right: 15px;
+            transition: transform 0.3s ease;
+        }
+
+        .navbar-logo:hover {
+            transform: scale(1.05);
+        }
+
     </style>
 </head>
 <body>
     <!-- Navigation -->
     <div class="navbar-custom">
         <div class="container d-flex justify-content-between align-items-center py-3">
-            <h3 class="mb-0 text-primary fw-bold">
-                Steering ALM Metrics
-            </h3>
-            <span class="badge bg-primary">LCR Analysis</span>
+            <div class="d-flex align-items-center">
+                <img src="/static/images/bpce_logo.png" alt="BPCE Logo" class="navbar-logo">
+            </div>
+            <span class="badge bg-primary">Steering ALM Metrics</span>
         </div>
     </div>
     

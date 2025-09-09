@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 # Création des dossiers requis
-required_dirs = ["data", "templates", "static", "static/js", "static/css"]
+required_dirs = ["data", "templates", "static", "static/js", "static/css", "static/images"]
 for directory in required_dirs:
     Path(directory).mkdir(exist_ok=True)
 
