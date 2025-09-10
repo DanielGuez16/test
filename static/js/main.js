@@ -619,7 +619,7 @@ function generateBalanceSheetSection(balanceSheetData) {
     let html = `
         <div class="analysis-section fade-in-up">
             <div class="card border-0">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h3 class="mb-1"> ${balanceSheetData.title || 'Balance Sheet Analysis'}</h3>
@@ -637,13 +637,7 @@ function generateBalanceSheetSection(balanceSheetData) {
     `;
     
     // Variations Balance Sheet
-    if (balanceSheetData.variations) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <h4 class="text-center mb-4">Balance Sheet Variations (D vs D-1)</h4>
-                <div class="row">
-        `;
-        
+    if (balanceSheetData.variations) {        
         const variations = balanceSheetData.variations;
 
         // Carte ACTIF
@@ -653,10 +647,10 @@ function generateBalanceSheetSection(balanceSheetData) {
             
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="metric-card">
+                    <div class="metric-card p-2">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">ASSET</h5>
+                                <h6 class="mb-0">ASSET</h6>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                     ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                 </span>
@@ -664,17 +658,17 @@ function generateBalanceSheetSection(balanceSheetData) {
                             <div class="row text-center">
                                 <div class="col-6">
                                     <small class="opacity-75">D-1</small>
-                                    <h3>${actif.j_minus_1} Bn €</h3>
+                                    <h4>${actif.j_minus_1} Bn €</h4>
                                 </div>
                                 <div class="col-6">
                                     <small class="opacity-75">D</small>
-                                    <h3>${actif.j} Bn €</h3>
+                                    <h4>${actif.j} Bn €</h4>
                                 </div>
                             </div>
                             <hr class="my-3 opacity-50">
-                            <h2 class="${isPositive ? 'text-success' : 'text-danger'}">
+                            <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
                                 ${isPositive ? '+' : ''}${actif.variation} Bn €
-                            </h2>
+                            </h3>
                             <small class="opacity-75">Variation</small>
                         </div>
                     </div>
@@ -689,10 +683,10 @@ function generateBalanceSheetSection(balanceSheetData) {
             
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
+                    <div class="metric-card p-2">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">LIABILITY</h5>
+                                <h6 class="mb-0">LIABILITY</h6>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                     ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                 </span>
@@ -700,17 +694,17 @@ function generateBalanceSheetSection(balanceSheetData) {
                             <div class="row text-center">
                                 <div class="col-6">
                                     <small class="opacity-75">D-1</small>
-                                    <h3>${passif.j_minus_1} Bn €</h3>
+                                    <h4>${passif.j_minus_1} Bn €</h4>
                                 </div>
                                 <div class="col-6">
                                     <small class="opacity-75">D</small>
-                                    <h3>${passif.j} Bn €</h3>
+                                    <h4>${passif.j} Bn €</h4>
                                 </div>
                             </div>
                             <hr class="my-3 opacity-50">
-                            <h2 class="${isPositive ? 'text-success' : 'text-danger'}">
+                            <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
                                 ${isPositive ? '+' : ''}${passif.variation} Bn €
-                            </h2>
+                            </h3>
                             <small class="opacity-75">Variation</small>
                         </div>
                     </div>
@@ -728,9 +722,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             <div class="analysis-section fade-in-up">
                 <div class="summary-box">
                     <div class="d-flex align-items-start">
-                        <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">Balance Sheet Summary</h5>
                             <p class="mb-0">${balanceSheetData.summary}</p>
                         </div>
                     </div>
@@ -760,7 +752,7 @@ function generateConsumptionSection(consumptionData) {
     let html = `
         <div class="analysis-section fade-in-up mt-5">
             <div class="card border-0">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h3 class="mb-1"> ${consumptionData.title || 'LCR Consumption Analysis'}</h3>
@@ -784,13 +776,12 @@ function generateConsumptionSection(consumptionData) {
         
         html += `
             <div class="analysis-section fade-in-up">
-                <h4 class="text-center mb-4">Consumption Variations (D vs D-1)</h4>
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <div class="metric-card" style="background: linear-gradient(135deg, #9a60b1 0%, #9a60b1 100%);">
+                        <div class="metric-card p-2">
                             <div class="text-center">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h5 class="mb-0">CONSUMPTION</h5>
+                                    <h6 class="mb-0">CONSUMPTION</h6>
                                     <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
                                         ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                     </span>
@@ -798,17 +789,17 @@ function generateConsumptionSection(consumptionData) {
                                 <div class="row text-center">
                                     <div class="col-4">
                                         <small class="opacity-75">D-1</small>
-                                        <h3>${globalVar.j_minus_1} Bn</h3>
+                                        <h4>${globalVar.j_minus_1} Bn</h4>
                                     </div>
                                     <div class="col-4">
                                         <small class="opacity-75">D</small>
-                                        <h3>${globalVar.j} Bn</h3>
+                                        <h4>${globalVar.j} Bn</h4>
                                     </div>
                                     <div class="col-4">
                                         <small class="opacity-75">Variation</small>
-                                        <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
+                                        <h4 class="${isPositive ? 'text-success' : 'text-danger'}">
                                             ${isPositive ? '+' : ''}${globalVar.variation} Bn
-                                        </h3>
+                                        </h4>
                                     </div>
                                 </div>
                             </div>
@@ -825,9 +816,7 @@ function generateConsumptionSection(consumptionData) {
             <div class="analysis-section fade-in-up">
                 <div class="summary-box">
                     <div class="d-flex align-items-start">
-                        <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">Consumption Summary</h5>
                             <p class="mb-0">${consumptionData.analysis_text}</p>
                         </div>
                     </div>
@@ -872,7 +861,7 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
     let html = `
         <div class="analysis-section fade-in-up">
             <div class="card border-0">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header no-background">
                     <h4 class="mb-0">Details by group</h4>
                 </div>
                 <div class="card-body">
@@ -1057,16 +1046,16 @@ function prepareMetierChartData(groupe, metierDetails) {
                     backgroundColor: variations.map((v, index) => {
                         // Couleur spéciale pour le total (dernière barre)
                         if (index === variations.length - 1) {
-                            return v >= 0 ? 'rgba(0, 123, 255, 0.8)' : 'rgba(255, 193, 7, 0.8)'; // Bleu ou orange pour le total
+                            return v >= 0 ? '#6B218D' : '#6B218D'; // Bleu ou orange pour le total
                         }
                         // Couleurs normales pour les métiers
-                        return v >= 0 ? 'rgba(40, 167, 69, 0.7)' : 'rgba(220, 53, 69, 0.7)';
+                        return v >= 0 ? '#51A0A2' : '#805bed';
                     }),
                     borderColor: variations.map((v, index) => {
                         if (index === variations.length - 1) {
-                            return v >= 0 ? 'rgba(0, 123, 255, 1)' : 'rgba(255, 193, 7, 1)';
+                            return v >= 0 ? '#6B218D' : '#6B218D';
                         }
-                        return v >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)';
+                        return v >= 0 ? '#51A0A2' : '#805bed';
                     }),
                     borderWidth: variations.map((v, index) => {
                         // Bordure plus épaisse pour le total
