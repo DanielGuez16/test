@@ -194,10 +194,15 @@ async function analyze() {
             
             if (result.success) {
                 displayCompleteResults(result.results);
-                showNotification('Analyses Balance Sheet et Consumption terminées avec succès !', 'success');
+                showNotification('Analyses successfully completed!', 'success');
+                // Afficher le chatbot APRÈS le message de succès et un délai
+                setTimeout(() => {
+                    showChatbot();
+                }, 1000); // 1 seconde après le message de succès
             } else {
                 throw new Error(result.message || 'Erreur dans l\'analyse');
             }
+
         } else {
             const errorText = await response.text();
             throw new Error(`Erreur serveur ${response.status}: ${errorText}`);
@@ -246,8 +251,8 @@ function displayCompleteResults(analysisResults) {
     }
     
     document.getElementById('results').innerHTML = html;
-    
-    // Scroll vers les résultats
+
+    // Scroll vers les résultats SANS afficher le chatbot
     setTimeout(() => {
         const firstSection = document.querySelector('.analysis-section');
         if (firstSection) {
@@ -256,7 +261,6 @@ function displayCompleteResults(analysisResults) {
                 block: 'start'
             });
         }
-        showChatbot();
     }, 500);
 }
 
