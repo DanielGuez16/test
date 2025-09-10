@@ -193,12 +193,16 @@ async function analyze() {
             console.log('🔍 Consumption:', result.results?.consumption);
             
             if (result.success) {
-                displayCompleteResults(result.results);
+                // Attendre que l'affichage soit complètement terminé
+                await displayCompleteResults(result.results);
+                
+                // Maintenant afficher le message de succès
                 showNotification('Analyses successfully completed!', 'success');
-                // Afficher le chatbot APRÈS le message de succès et un délai
+                
+                // Et ENFIN afficher le chatbot
                 setTimeout(() => {
                     showChatbot();
-                }, 1000); // 1 seconde après le message de succès
+                }, 1000);
             } else {
                 throw new Error(result.message || 'Erreur dans l\'analyse');
             }
@@ -233,35 +237,44 @@ async function analyze() {
  * @param {Object} analysisResults - Résultats complets de l'analyse
  */
 function displayCompleteResults(analysisResults) {
-    if (!analysisResults) {
-        document.getElementById('results').innerHTML = '<div class="alert alert-danger">Aucun résultat d\'analyse disponible</div>';
-        return;
-    }
-    
-    let html = '';
-    
-    // Section Balance Sheet
-    if (analysisResults.balance_sheet) {
-        html += generateBalanceSheetSection(analysisResults.balance_sheet);
-    }
-    
-    // Section Consumption
-    if (analysisResults.consumption) {
-        html += generateConsumptionSection(analysisResults.consumption);
-    }
-    
-    document.getElementById('results').innerHTML = html;
-
-    // Scroll vers les résultats SANS afficher le chatbot
-    setTimeout(() => {
-        const firstSection = document.querySelector('.analysis-section');
-        if (firstSection) {
-            firstSection.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+    return new Promise((resolve) => {
+        if (!analysisResults) {
+            document.getElementById('results').innerHTML = '<div class="alert alert-danger">Aucun résultat d\'analyse disponible</div>';
+            resolve();
+            return;
         }
-    }, 500);
+        
+        let html = '';
+        
+        // Section Balance Sheet
+        if (analysisResults.balance_sheet) {
+            html += generateBalanceSheetSection(analysisResults.balance_sheet);
+        }
+        
+        // Section Consumption
+        if (analysisResults.consumption) {
+            html += generateConsumptionSection(analysisResults.consumption);
+        }
+        
+        document.getElementById('results').innerHTML = html;
+        
+        // Attendre que le DOM soit mis à jour et les animations finies
+        setTimeout(() => {
+            const firstSection = document.querySelector('.analysis-section');
+            if (firstSection) {
+                firstSection.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+            
+            // Résoudre la Promise après que tout soit affiché
+            setTimeout(() => {
+                resolve();
+            }, 1000); // Attendre que le scroll et les animations soient terminés
+            
+        }, 500);
+    });
 }
 
 /**
