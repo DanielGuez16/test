@@ -23,6 +23,20 @@ import math
 import statistics
 import io
 import chardet
+import json
+from typing import Dict, Any
+
+from llm_connector import LLMConnector
+
+# Variables globales pour la session chatbot
+chatbot_session = {
+    "messages": [],
+    "context_data": {},
+    "uploaded_documents": []
+}
+
+# Initialiser le connecteur LLM
+llm_connector = LLMConnector()
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -299,7 +313,164 @@ async def analyze_files():
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
+
+@app.post("/api/chat")
+async def chat_with_ai(request: Request):
+    """
+    Endpoint pour le chatbot IA
+    """
+    try:
+        data = await request.json()
+        user_message = data.get("message", "")
+        
+        if not user_message.strip():
+            raise HTTPException(status_code=400, detail="Message vide")
+        
+        # Préparer le contexte depuis les données d'analyse
+        context_prompt = prepare_analysis_context()
+        
+        # Ajouter les documents uploadés au contexte
+        documents_context = prepare_documents_context()
+        if documents_context:
+            context_prompt += f"\n\nDocuments fournis par l'utilisateur:\n{documents_context}"
+        
+        # Obtenir la réponse de l'IA
+        ai_response = llm_connector.get_llm_response(
+            user_prompt=user_message,
+            context_prompt=context_prompt,
+            modelID="gpt-4o-mini-2024-07-18",
+            temperature=0.1
+        )
+        
+        # Sauvegarder la conversation
+        chatbot_session["messages"].append({
+            "type": "user",
+            "message": user_message,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        chatbot_session["messages"].append({
+            "type": "assistant",
+            "message": ai_response,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        return {
+            "success": True,
+            "response": ai_response,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur chatbot: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
+
+@app.post("/api/upload-document")
+async def upload_document(file: UploadFile = File(...)):
+    """
+    Upload de documents pour le contexte du chatbot
+    """
+    try:
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+        
+        contents = await file.read()
+        
+        # Traiter selon le type de fichier
+        if file.filename.endswith('.txt'):
+            text_content = contents.decode('utf-8')
+        elif file.filename.endswith('.pdf'):
+            # Vous devrez installer PyPDF2 : pip install PyPDF2
+            import PyPDF2
+            from io import BytesIO
+            pdf_reader = PyPDF2.PdfReader(BytesIO(contents))
+            text_content = ""
+            for page in pdf_reader.pages:
+                text_content += page.extract_text()
+        else:
+            text_content = contents.decode('utf-8', errors='ignore')
+        
+        # Sauvegarder le document
+        doc_data = {
+            "filename": file.filename,
+            "content": text_content,
+            "upload_time": datetime.now().isoformat(),
+            "size": len(contents)
+        }
+        
+        chatbot_session["uploaded_documents"].append(doc_data)
+        
+        return {
+            "success": True,
+            "message": f"Document {file.filename} ajouté au contexte",
+            "filename": file.filename,
+            "size": len(contents)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur upload document: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+
+def prepare_analysis_context() -> str:
+    """
+    Prépare le contexte depuis les analyses existantes
+    """
+    context_parts = []
     
+    # Ajouter les données de session si disponibles
+    if file_session.get("files"):
+        context_parts.append("DONNÉES ANALYSÉES:")
+        for file_type, file_info in file_session["files"].items():
+            df = file_info["dataframe"]
+            context_parts.append(f"- Fichier {file_type}: {len(df)} lignes, {len(df.columns)} colonnes")
+            context_parts.append(f"  Colonnes: {', '.join(df.columns.tolist()[:10])}")
+    
+    # Ajouter un résumé des analyses précédentes si disponibles
+    context_parts.append("\nCONTEXTE MÉTIER:")
+    context_parts.append("- Application d'analyse LCR (Liquidity Coverage Ratio)")
+    context_parts.append("- Analyse Balance Sheet (ACTIF/PASSIF)")
+    context_parts.append("- Analyse Consumption par groupes métiers")
+    context_parts.append("- Comparaison J vs J-1 (aujourd'hui vs hier)")
+    
+    return "\n".join(context_parts)
+
+def prepare_documents_context() -> str:
+    """
+    Prépare le contexte depuis les documents uploadés
+    """
+    if not chatbot_session["uploaded_documents"]:
+        return ""
+    
+    context_parts = []
+    for doc in chatbot_session["uploaded_documents"]:
+        context_parts.append(f"Document: {doc['filename']}")
+        context_parts.append(f"Contenu: {doc['content'][:2000]}...")  # Limiter à 2000 chars
+        context_parts.append("---")
+    
+    return "\n".join(context_parts)
+
+
+@app.get("/api/chat-history")
+async def get_chat_history():
+    """
+    Récupère l'historique des messages du chatbot
+    """
+    return {
+        "success": True,
+        "messages": chatbot_session["messages"],
+        "documents_count": len(chatbot_session["uploaded_documents"])
+    }
+
+@app.delete("/api/chat-clear")
+async def clear_chat():
+    """
+    Vide l'historique du chatbot
+    """
+    chatbot_session["messages"].clear()
+    chatbot_session["uploaded_documents"].clear()
+    return {"success": True, "message": "Historique effacé"}
+
 #######################################################################################################################################
 
 #                           BALANCE SHEET

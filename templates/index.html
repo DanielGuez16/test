@@ -330,6 +330,98 @@
             transform: scale(1.05);
         }
 
+        /* Styles Chatbot */
+        .chatbot-section {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            margin-top: 50px;
+        }
+
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e6ed;
+            border-radius: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            max-width: 80%;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue));
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .chat-message.assistant {
+            background: white;
+            border: 1px solid #e0e6ed;
+            margin-right: auto;
+        }
+
+        .chat-input {
+            border: 2px solid var(--natixis-light-blue);
+            border-radius: 25px;
+            padding: 12px 20px;
+            font-size: 14px;
+        }
+
+        .chat-input:focus {
+            border-color: var(--natixis-blue);
+            box-shadow: 0 0 0 0.2rem rgba(154, 96, 177, 0.25);
+        }
+
+        .btn-chat {
+            background: var(--natixis-blue);
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-chat:hover {
+            background: var(--natixis-light-blue);
+        }
+
+        .document-upload {
+            border: 2px dashed var(--natixis-light-blue);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .document-upload:hover {
+            border-color: var(--natixis-green);
+            background: rgba(0, 166, 81, 0.05);
+        }
+
+        .uploaded-docs {
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .doc-item {
+            background: #e3f2fd;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
     </style>
 </head>
 <body>
@@ -398,6 +490,57 @@
             
             <!-- Section Résultats -->
             <div id="results" class="fade-in-up" style="animation-delay: 0.6s;"></div>
+
+            <!-- Section Chatbot -->
+            <div id="chatbot-section" class="chatbot-section p-4 mt-5" style="display: none;">
+                <div class="card border-0">
+                    <div class="card-header bg-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">AI Analysis Assistant</h4>
+                            <div>
+                                <button class="btn btn-outline-light btn-sm me-2" onclick="clearChat()">
+                                    <i class="fas fa-trash"></i> Clear
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" onclick="toggleChatbot()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <!-- Zone de chat -->
+                                <div id="chat-container" class="chat-container mb-3"></div>
+                                
+                                <!-- Input de chat -->
+                                <div class="d-flex gap-2">
+                                    <input type="text" id="chat-input" class="form-control chat-input" 
+                                        placeholder="Posez une question sur les analyses..." 
+                                        onkeypress="handleChatKeyPress(event)">
+                                    <button class="btn btn-chat text-white" onclick="sendMessage()">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4">
+                                <!-- Upload de documents -->
+                                <h6 class="mb-3">Add Context Documents</h6>
+                                <div class="document-upload mb-3" onclick="document.getElementById('doc-upload').click()">
+                                    <i class="fas fa-file-upload"></i>
+                                    <p class="mb-0">Upload PDF, TXT, DOC...</p>
+                                </div>
+                                <input type="file" id="doc-upload" accept=".pdf,.txt,.doc,.docx" 
+                                    style="display:none" onchange="uploadDocument(this.files[0])">
+                                
+                                <!-- Liste des documents -->
+                                <div id="uploaded-docs" class="uploaded-docs"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

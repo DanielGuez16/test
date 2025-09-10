@@ -256,7 +256,213 @@ function displayCompleteResults(analysisResults) {
                 block: 'start'
             });
         }
+        showChatbot();
     }, 500);
+}
+
+/**
+ * Variables globales pour le chatbot
+ */
+let chatMessages = [];
+
+/**
+ * Affiche la section chatbot après les analyses
+ */
+function showChatbot() {
+    document.getElementById('chatbot-section').style.display = 'block';
+    
+    // Message initial du bot
+    if (chatMessages.length === 0) {
+        addChatMessage('assistant', 'Hello! I can help you analyze the LCR data that was just processed. You can ask me questions about the Balance Sheet variations, Consumption trends, or upload additional documents for context.');
+    }
+}
+
+/**
+ * Toggle l'affichage du chatbot
+ */
+function toggleChatbot() {
+    const chatSection = document.getElementById('chatbot-section');
+    chatSection.style.display = chatSection.style.display === 'none' ? 'block' : 'none';
+}
+
+/**
+ * Envoie un message au chatbot
+ */
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Ajouter le message utilisateur
+    addChatMessage('user', message);
+    input.value = '';
+    
+    // Afficher l'indicateur de frappe
+    addTypingIndicator();
+    
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: message })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            removeTypingIndicator();
+            addChatMessage('assistant', result.response);
+        } else {
+            removeTypingIndicator();
+            addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+        }
+        
+    } catch (error) {
+        console.error('Chat error:', error);
+        removeTypingIndicator();
+        addChatMessage('assistant', 'Connection error. Please check your network.');
+    }
+}
+
+/**
+ * Ajoute un message au chat
+ */
+function addChatMessage(type, message) {
+    const container = document.getElementById('chat-container');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${type}`;
+    
+    if (type === 'user') {
+        messageDiv.innerHTML = `<strong>You:</strong> ${message}`;
+    } else {
+        messageDiv.innerHTML = `<strong>AI:</strong> ${message}`;
+    }
+    
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    // Sauvegarder en mémoire
+    chatMessages.push({ type, message, timestamp: new Date() });
+}
+
+/**
+ * Gère la touche Entrée dans l'input de chat
+ */
+function handleChatKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+/**
+ * Affiche l'indicateur de frappe
+ */
+function addTypingIndicator() {
+    const container = document.getElementById('chat-container');
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'typing-indicator';
+    typingDiv.className = 'chat-message assistant';
+    typingDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm me-2" style="width: 1rem; height: 1rem;"></div>
+            <em>AI is thinking...</em>
+        </div>
+    `;
+    
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Supprime l'indicateur de frappe
+ */
+function removeTypingIndicator() {
+    const indicator = document.getElementById('typing-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+/**
+ * Upload d'un document pour le contexte
+ */
+async function uploadDocument(file) {
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        showNotification(`Uploading ${file.name}...`, 'info');
+        
+        const response = await fetch('/api/upload-document', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message, 'success');
+            updateUploadedDocsList();
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+        
+    } catch (error) {
+        console.error('Document upload error:', error);
+        showNotification(`Error uploading ${file.name}: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Met à jour la liste des documents uploadés
+ */
+async function updateUploadedDocsList() {
+    try {
+        const response = await fetch('/api/chat-history');
+        const result = await response.json();
+        
+        const docsContainer = document.getElementById('uploaded-docs');
+        if (result.success && result.documents_count > 0) {
+            docsContainer.innerHTML = `
+                <h6 class="mb-2">Documents (${result.documents_count})</h6>
+                <div class="doc-item">
+                    <i class="fas fa-file-alt me-2"></i>
+                    ${result.documents_count} document(s) in context
+                </div>
+            `;
+        } else {
+            docsContainer.innerHTML = '';
+        }
+        
+    } catch (error) {
+        console.error('Error updating docs list:', error);
+    }
+}
+
+/**
+ * Vide l'historique du chat
+ */
+async function clearChat() {
+    if (!confirm('Clear all chat history and documents?')) return;
+    
+    try {
+        const response = await fetch('/api/chat-clear', { method: 'DELETE' });
+        
+        if (response.ok) {
+            document.getElementById('chat-container').innerHTML = '';
+            document.getElementById('uploaded-docs').innerHTML = '';
+            chatMessages = [];
+            showNotification('Chat history cleared', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Error clearing chat:', error);
+        showNotification('Error clearing chat', 'error');
+    }
 }
 
 /**
