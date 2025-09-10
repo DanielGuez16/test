@@ -179,7 +179,7 @@ async function analyze() {
     
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
 
         const response = await fetch('/api/analyze', { 
             method: 'POST',
@@ -191,33 +191,43 @@ async function analyze() {
         if (response.ok) {
             const result = await response.json();
             console.log('📊 Résultats de l\'analyse:', result);
-            console.log('🔍 Context ready:', result.context_ready);
             
             if (result.success) {
                 // Attendre que l'affichage soit complètement terminé
                 await displayCompleteResults(result.results);
                 
+                // AFFICHER L'INDICATEUR DE CHARGEMENT CONTEXTE
+                document.getElementById('context-loading').style.display = 'block';
+                
                 // Vérifier que le contexte est prêt côté serveur
                 if (result.context_ready) {
-                    showNotification('Analyses successfully completed! Chatbot ready.', 'success');
+                    showNotification('Analyses successfully completed!', 'success');
                     
-                    // Double vérification optionnelle
-                    const contextStatus = await verifyContextReady();
-                    if (contextStatus) {
-                        console.log('✅ Contexte vérifié, affichage du chatbot');
-                        setTimeout(() => {
+                    // Double vérification avec un petit délai pour l'effet visuel
+                    setTimeout(async () => {
+                        const contextStatus = await verifyContextReady();
+                        
+                        // MASQUER L'INDICATEUR DE CHARGEMENT
+                        document.getElementById('context-loading').style.display = 'none';
+                        
+                        if (contextStatus) {
+                            console.log('✅ Contexte vérifié, affichage du chatbot');
+                            showNotification('AI Assistant ready!', 'success');
                             showChatbot();
-                        }, 500);
-                    } else {
-                        console.warn('⚠️ Contexte pas encore prêt, attente...');
-                        setTimeout(() => {
-                            showChatbot();
-                        }, 2000);
-                    }
+                        } else {
+                            console.warn('⚠️ Contexte pas encore prêt');
+                            showNotification('AI Assistant loading...', 'info');
+                            setTimeout(() => {
+                                document.getElementById('context-loading').style.display = 'none';
+                                showChatbot();
+                            }, 1000);
+                        }
+                    }, 1000); // Délai pour montrer le chargement
                 } else {
-                    // Fallback si le flag n'est pas présent
+                    // Fallback
                     showNotification('Analysis completed, preparing chatbot...', 'info');
                     setTimeout(() => {
+                        document.getElementById('context-loading').style.display = 'none';
                         showChatbot();
                     }, 3000);
                 }
@@ -231,6 +241,9 @@ async function analyze() {
         }
     } catch (error) {
         console.error('❌ Erreur analyse:', error);
+        
+        // MASQUER L'INDICATEUR EN CAS D'ERREUR
+        document.getElementById('context-loading').style.display = 'none';
         
         document.getElementById('results').innerHTML = `
             <div class="analysis-section fade-in-up">
@@ -298,20 +311,19 @@ function displayCompleteResults(analysisResults) {
         
         document.getElementById('results').innerHTML = html;
         
-        // Attendre que le DOM soit mis à jour et les animations finies
+        // Attendre que le DOM soit mis à jour
         setTimeout(() => {
             const firstSection = document.querySelector('.analysis-section');
-            if (firstSection) {
-                firstSection.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
+            
+            // INITIALISER LES GRAPHIQUES ICI
+            if (window.pendingCharts) {
+                initializeMetierCharts(window.pendingCharts.significantGroups, window.pendingCharts.metierDetails);
+                delete window.pendingCharts;
             }
             
-            // Résoudre la Promise après que tout soit affiché
             setTimeout(() => {
                 resolve();
-            }, 1000); // Attendre que le scroll et les animations soient terminés
+            }, 1000);
             
         }, 500);
     });
@@ -887,11 +899,8 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
         </div>
     `;
     
-    // Ajouter le script pour initialiser les graphiques après le rendu
-    setTimeout(() => {
-        initializeMetierCharts(significantGroups, metierDetails);
-    }, 500);
-    
+    window.pendingCharts = { significantGroups, metierDetails };
+
     return html;
 }
 
