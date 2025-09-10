@@ -297,6 +297,24 @@ async def analyze_files():
         consumption_results = create_consumption_analysis_grouped_only(dataframes)
         
         logger.info("Analyses terminées (traitement mémoire)")
+
+        # Sauvegarder les résultats complets pour le chatbot
+        chatbot_session["context_data"] = {
+            "balance_sheet": balance_sheet_results,
+            "consumption": consumption_results,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "raw_dataframes_info": {
+                file_type: {
+                    "shape": [len(df), len(df.columns)],
+                    "columns": df.columns.tolist(),
+                    "sample_data": df.head(3).to_dict('records') if len(df) > 0 else [],
+                    "file_info": file_session["files"][file_type]
+                }
+                for file_type, df in dataframes.items()
+            }
+        }
+
+        logger.info("Données sauvegardées pour le chatbot")
         
         return {
             "success": True,
@@ -409,24 +427,81 @@ async def upload_document(file: UploadFile = File(...)):
 
 def prepare_analysis_context() -> str:
     """
-    Prépare le contexte depuis les analyses existantes
+    Prépare le contexte détaillé depuis les données sauvegardées
     """
     context_parts = []
     
-    # Ajouter les données de session si disponibles
-    if file_session.get("files"):
-        context_parts.append("DONNÉES ANALYSÉES:")
-        for file_type, file_info in file_session["files"].items():
-            df = file_info["dataframe"]
-            context_parts.append(f"- Fichier {file_type}: {len(df)} lignes, {len(df.columns)} colonnes")
-            context_parts.append(f"  Colonnes: {', '.join(df.columns.tolist()[:10])}")
-    
-    # Ajouter un résumé des analyses précédentes si disponibles
-    context_parts.append("\nCONTEXTE MÉTIER:")
-    context_parts.append("- Application d'analyse LCR (Liquidity Coverage Ratio)")
-    context_parts.append("- Analyse Balance Sheet (ACTIF/PASSIF)")
-    context_parts.append("- Analyse Consumption par groupes métiers")
+    # Contexte métier de base
+    context_parts.append("CONTEXTE MÉTIER:")
+    context_parts.append("- Application d'analyse LCR (Liquidity Coverage Ratio) pour banque")
+    context_parts.append("- Analyse Balance Sheet (ACTIF/PASSIF) en milliards d'euros")
+    context_parts.append("- Analyse Consumption par groupes métiers en milliards")
     context_parts.append("- Comparaison J vs J-1 (aujourd'hui vs hier)")
+    
+    # Données d'analyse si disponibles
+    if chatbot_session.get("context_data"):
+        data = chatbot_session["context_data"]
+        
+        context_parts.append(f"\nANALYSE EFFECTUÉE LE : {data.get('analysis_timestamp', 'Inconnue')}")
+        
+        # Balance Sheet
+        if data.get("balance_sheet") and not data["balance_sheet"].get("error"):
+            bs = data["balance_sheet"]
+            context_parts.append("\n=== BALANCE SHEET RESULTS ===")
+            context_parts.append(f"Titre: {bs.get('title', 'Balance Sheet')}")
+            
+            if bs.get("variations"):
+                context_parts.append("Variations détaillées:")
+                for category, var_data in bs["variations"].items():
+                    context_parts.append(f"- {category}: D-1 = {var_data['j_minus_1']} Md€, D = {var_data['j']} Md€")
+                    context_parts.append(f"  → Variation = {var_data['variation']} Md€")
+            
+            if bs.get("summary"):
+                context_parts.append(f"Résumé exécutif: {bs['summary']}")
+        
+        # Consumption
+        if data.get("consumption") and not data["consumption"].get("error"):
+            cons = data["consumption"]
+            context_parts.append("\n=== CONSUMPTION LCR RESULTS ===")
+            context_parts.append(f"Titre: {cons.get('title', 'Consumption Analysis')}")
+            
+            # Variation globale
+            if cons.get("variations", {}).get("global"):
+                global_var = cons["variations"]["global"]
+                context_parts.append(f"Consumption total: D-1 = {global_var['j_minus_1']} Md, D = {global_var['j']} Md")
+                context_parts.append(f"Variation globale = {global_var['variation']} Md")
+            
+            # Variations par groupe métier
+            if cons.get("variations", {}).get("by_groupe_metiers"):
+                context_parts.append("\nVariations par groupe métier:")
+                for groupe, var_data in cons["variations"]["by_groupe_metiers"].items():
+                    if abs(var_data["variation"]) > 0.01:  # Seulement les variations > 10M€
+                        context_parts.append(f"- {groupe}: {var_data['variation']} Md (D-1: {var_data['j_minus_1']}, D: {var_data['j']})")
+            
+            # Analyses textuelles
+            if cons.get("analysis_text"):
+                context_parts.append(f"\nAnalyse principale: {cons['analysis_text']}")
+            
+            if cons.get("metier_detailed_analysis"):
+                context_parts.append(f"Analyse détaillée: {cons['metier_detailed_analysis']}")
+            
+            # Groupes significatifs
+            if cons.get("significant_groups"):
+                context_parts.append(f"Groupes avec variations significatives: {', '.join(cons['significant_groups'])}")
+        
+        # Informations sur les fichiers source
+        if data.get("raw_dataframes_info"):
+            context_parts.append("\n=== FICHIERS SOURCE ===")
+            for file_type, info in data["raw_dataframes_info"].items():
+                context_parts.append(f"Fichier {file_type}: {info['shape'][0]} lignes, {info['shape'][1]} colonnes")
+                context_parts.append(f"Colonnes: {', '.join(info['columns'])}")
+                if info.get("sample_data"):
+                    context_parts.append("Échantillon de données:")
+                    for i, row in enumerate(info["sample_data"][:2]):  # 2 premières lignes
+                        context_parts.append(f"  Ligne {i+1}: {str(row)[:200]}...")
+    
+    else:
+        context_parts.append("\nAucune analyse disponible - les analyses doivent être lancées d'abord.")
     
     return "\n".join(context_parts)
 
@@ -489,6 +564,19 @@ async def clear_chat():
     chatbot_session["messages"].clear()
     chatbot_session["uploaded_documents"].clear()
     return {"success": True, "message": "Historique effacé"}
+
+@app.get("/api/chatbot-context")
+async def get_chatbot_context():
+    """
+    Endpoint de debug pour voir le contexte du chatbot
+    """
+    return {
+        "success": True,
+        "has_context_data": bool(chatbot_session.get("context_data")),
+        "context_keys": list(chatbot_session.get("context_data", {}).keys()),
+        "messages_count": len(chatbot_session.get("messages", [])),
+        "documents_count": len(chatbot_session.get("uploaded_documents", []))
+    }
 
 #######################################################################################################################################
 

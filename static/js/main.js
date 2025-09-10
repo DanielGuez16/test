@@ -327,7 +327,7 @@ async function sendMessage() {
 }
 
 /**
- * Ajoute un message au chat
+ * Ajoute un message au chat avec rendu Markdown
  */
 function addChatMessage(type, message) {
     const container = document.getElementById('chat-container');
@@ -337,7 +337,9 @@ function addChatMessage(type, message) {
     if (type === 'user') {
         messageDiv.innerHTML = `<strong>You:</strong> ${message}`;
     } else {
-        messageDiv.innerHTML = `<strong>AI:</strong> ${message}`;
+        // Parser le markdown pour l'IA
+        const formattedMessage = parseMarkdownToHtml(message);
+        messageDiv.innerHTML = `<strong>AI:</strong> <div class="ai-response">${formattedMessage}</div>`;
     }
     
     container.appendChild(messageDiv);
@@ -345,6 +347,41 @@ function addChatMessage(type, message) {
     
     // Sauvegarder en mémoire
     chatMessages.push({ type, message, timestamp: new Date() });
+}
+
+/**
+ * Convertit le markdown simple en HTML propre
+ */
+function parseMarkdownToHtml(text) {
+    return text
+        // Titres ## -> <h4>
+        .replace(/^## (.+)$/gm, '<h4 class="mt-3 mb-2 text-primary">$1</h4>')
+        .replace(/^### (.+)$/gm, '<h5 class="mt-2 mb-1 text-secondary">$1</h5>')
+        
+        // Gras **texte** -> <strong>
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        
+        // Italique *texte* -> <em>
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        
+        // Listes - item -> <ul><li>
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul class="mb-2">$1</ul>')
+        
+        // Listes numérotées 1. item -> <ol><li>
+        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ol class="mb-2">$1</ol>')
+        
+        // Code `code` -> <code>
+        .replace(/`(.+?)`/g, '<code class="bg-light px-1 rounded">$1</code>')
+        
+        // Sauts de ligne
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        
+        // Envelopper dans <p> si pas de balises block
+        .replace(/^(?!<[h|u|o|d])(.+)/, '<p>$1')
+        .replace(/(.+)(?!>)$/, '$1</p>');
 }
 
 /**
