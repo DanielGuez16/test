@@ -691,7 +691,7 @@ def create_balance_sheet_pivot_table(dataframes):
         summary = generate_executive_summary(variations)
         
         return {
-            "title": "Balance Sheet",
+            "title": "1. Balance Sheet",
             "pivot_table_html": pivot_html,
             "variations": variations,
             "summary": summary,
@@ -939,7 +939,7 @@ def create_consumption_analysis_grouped_only(dataframes):
         
         print (f"TESTSTSTSTSTSTST : {metier_detailed_analysis}")
         return {
-            "title": "LCR Consumption Analysis",
+            "title": "2. LCR Consumption",
             "consumption_table_html": consumption_html,
             "variations": variations,
             "analysis_text": analysis_text,

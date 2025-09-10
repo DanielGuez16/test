@@ -654,6 +654,11 @@ function generateBalanceSheetSection(balanceSheetData) {
     
     // Variations Balance Sheet
     if (balanceSheetData.variations) {
+        html += `
+            <div class="analysis-section fade-in-up">
+                <div class="row justify-content-center">
+        `;
+
         const variations = balanceSheetData.variations;
 
         // Carte ACTIF
@@ -662,7 +667,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             const isPositive = actif.variation >= 0;
             
             html += `
-                <div class="col-md-6 mb-3">
+                <div class="col-md-5 mb-3">
                     <div class="metric-card p-3">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -698,7 +703,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             const isPositive = passif.variation >= 0;
             
             html += `
-                <div class="col-md-6 mb-3">
+                <div class="col-md-5 mb-3">
                     <div class="metric-card p-3">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -730,6 +735,13 @@ function generateBalanceSheetSection(balanceSheetData) {
 
         html += `
                 </div>
+            </div>
+        `;
+
+        // Trait de séparation à la fin 
+        html += `
+            <div class="analysis-section">
+                <hr class="balance-sheet-separator">
             </div>
         `;
     }
@@ -847,6 +859,13 @@ function generateConsumptionSection(consumptionData) {
         `;
     }
     ;
+
+    // Trait de séparation à la fin 
+    html += `
+        <div class="analysis-section">
+            <hr class="balance-sheet-separator">
+        </div>
+    `;
     
     return html;
 }
