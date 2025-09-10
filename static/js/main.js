@@ -143,7 +143,7 @@ function checkAnalyzeButtonState() {
         analyzeBtn.classList.add('pulse');
         
         // Notification visuelle
-        showNotification('Les deux fichiers sont prêts ! Vous pouvez lancer l\'analyse.', 'success');
+        showNotification('Both files are loaded! You can start the analysis.', 'success');
     } else {
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
@@ -370,35 +370,65 @@ function addChatMessage(type, message) {
  * Convertit le markdown simple en HTML propre
  */
 function parseMarkdownToHtml(text) {
-    return text
-        // Titres ## -> <h4>
-        .replace(/^## (.+)$/gm, '<h4 class="mt-3 mb-2 text-primary">$1</h4>')
-        .replace(/^### (.+)$/gm, '<h5 class="mt-2 mb-1 text-secondary">$1</h5>')
+    try {
+        // Configuration de Marked pour être plus permissif
+        marked.setOptions({
+            breaks: true,        // Conversion des \n en <br>
+            gfm: true,          // GitHub Flavored Markdown
+            tables: true,       // Support des tableaux
+            sanitize: false,    // On utilisera DOMPurify après
+            smartypants: true,  // Typographie intelligente
+            highlight: function(code, lang) {
+                // Coloration syntaxique basique
+                return `<code class="language-${lang || 'text'}">${code}</code>`;
+            }
+        });
         
-        // Gras **texte** -> <strong>
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        // Parser le markdown
+        let html = marked.parse(text);
         
-        // Italique *texte* -> <em>
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        // Nettoyer et sécuriser le HTML avec DOMPurify
+        html = DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: [
+                'p', 'br', 'strong', 'em', 'u', 'del', 's', 'strike',
+                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+                'blockquote', 'pre', 'code',
+                'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                'a', 'img', 'hr', 'div', 'span',
+                'sup', 'sub', 'mark', 'small'
+            ],
+            ALLOWED_ATTR: [
+                'href', 'title', 'alt', 'src', 'class', 'id',
+                'target', 'rel', 'colspan', 'rowspan'
+            ]
+        });
         
-        // Listes - item -> <ul><li>
-        .replace(/^- (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>)/s, '<ul class="mb-2">$1</ul>')
+        // Ajouter les classes Bootstrap/CSS personnalisées
+        html = html
+            .replace(/<h1/g, '<h1 class="mt-4 mb-3 text-primary"')
+            .replace(/<h2/g, '<h2 class="mt-4 mb-3 text-primary"')
+            .replace(/<h3/g, '<h3 class="mt-3 mb-2 text-primary"')
+            .replace(/<h4/g, '<h4 class="mt-3 mb-2 text-secondary"')
+            .replace(/<h5/g, '<h5 class="mt-2 mb-1 text-secondary"')
+            .replace(/<h6/g, '<h6 class="mt-2 mb-1"')
+            .replace(/<table/g, '<table class="table table-bordered table-sm my-3"')
+            .replace(/<blockquote/g, '<blockquote class="border-start border-primary ps-3 ms-3 fst-italic"')
+            .replace(/<pre/g, '<pre class="bg-light p-3 rounded"')
+            .replace(/<code(?![^>]*class)/g, '<code class="bg-light px-1 rounded"')
+            .replace(/<ul/g, '<ul class="mb-2"')
+            .replace(/<ol/g, '<ol class="mb-2"')
+            .replace(/<hr/g, '<hr class="my-3"')
+            .replace(/<img/g, '<img class="img-fluid rounded my-2"')
+            .replace(/<a(?![^>]*target)/g, '<a class="text-primary" target="_blank" rel="noopener noreferrer"');
         
-        // Listes numérotées 1. item -> <ol><li>
-        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>)/s, '<ol class="mb-2">$1</ol>')
+        return html;
         
-        // Code `code` -> <code>
-        .replace(/`(.+?)`/g, '<code class="bg-light px-1 rounded">$1</code>')
-        
-        // Sauts de ligne
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>')
-        
-        // Envelopper dans <p> si pas de balises block
-        .replace(/^(?!<[h|u|o|d])(.+)/, '<p>$1')
-        .replace(/(.+)(?!>)$/, '$1</p>');
+    } catch (error) {
+        console.error('Erreur parsing Markdown:', error);
+        // Fallback en cas d'erreur
+        return `<p class="text-danger">Erreur de formatage du message</p><pre>${text}</pre>`;
+    }
 }
 
 /**
