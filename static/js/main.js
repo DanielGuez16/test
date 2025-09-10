@@ -649,6 +649,9 @@ function initializeMetierCharts(significantGroups, metierDetails) {
 /**
  * Prépare les données pour un graphique métier
  */
+/**
+ * Prépare les données pour un graphique métier (version triée avec total)
+ */
 function prepareMetierChartData(groupe, metierDetails) {
     try {
         // Récupérer les données J et J-1 pour ce groupe
@@ -684,25 +687,58 @@ function prepareMetierChartData(groupe, metierDetails) {
             }
         });
         
-        // Convertir en arrays pour Chart.js - UNIQUEMENT LES VARIATIONS
-        const metiers = Array.from(metiersMap.keys());
-        const variations = metiers.map(metier => metiersMap.get(metier).j - metiersMap.get(metier).j_minus_1);
+        // Calculer les variations et trier par ordre décroissant
+        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({
+            metier: metier,
+            variation: data.j - data.j_minus_1,
+            j: data.j,
+            j_minus_1: data.j_minus_1
+        }));
+        
+        // TRIER PAR VARIATION DÉCROISSANTE (positives d'abord, puis négatives)
+        metierVariations.sort((a, b) => b.variation - a.variation);
+        
+        // Calculer la variation totale du groupe
+        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
+        
+        // Extraire les données triées pour Chart.js
+        const labels = metierVariations.map(item => item.metier);
+        const variations = metierVariations.map(item => item.variation);
+        
+        // AJOUTER LA BARRE TOTAL À LA FIN
+        labels.push('TOTAL GROUP');
+        variations.push(totalVariation);
         
         return {
-            labels: metiers,
+            labels: labels,
             datasets: [
                 {
                     label: 'Variation (D - D-1)',
                     data: variations,
-                    backgroundColor: variations.map(v => v >= 0 ? 'rgba(40, 167, 69, 0.7)' : 'rgba(220, 53, 69, 0.7)'),
-                    borderColor: variations.map(v => v >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)'),
-                    borderWidth: 2
+                    backgroundColor: variations.map((v, index) => {
+                        // Couleur spéciale pour le total (dernière barre)
+                        if (index === variations.length - 1) {
+                            return v >= 0 ? 'rgba(0, 123, 255, 0.8)' : 'rgba(255, 193, 7, 0.8)'; // Bleu ou orange pour le total
+                        }
+                        // Couleurs normales pour les métiers
+                        return v >= 0 ? 'rgba(40, 167, 69, 0.7)' : 'rgba(220, 53, 69, 0.7)';
+                    }),
+                    borderColor: variations.map((v, index) => {
+                        if (index === variations.length - 1) {
+                            return v >= 0 ? 'rgba(0, 123, 255, 1)' : 'rgba(255, 193, 7, 1)';
+                        }
+                        return v >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)';
+                    }),
+                    borderWidth: variations.map((v, index) => {
+                        // Bordure plus épaisse pour le total
+                        return index === variations.length - 1 ? 3 : 2;
+                    })
                 }
             ]
         };
         
     } catch (error) {
-        console.error(`❌ Erreur préparation données pour ${groupe}:`, error);
+        console.error(`⚠ Erreur préparation données pour ${groupe}:`, error);
         return null;
     }
 }

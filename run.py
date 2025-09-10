@@ -566,7 +566,6 @@ def create_consumption_analysis_grouped_only(dataframes):
         
         consumption_grouped = {}
         totals_by_group = {}
-        metier_details = {}  # Initialiser au début
         
         # Traitement de chaque fichier
         for file_type, df in dataframes.items():
@@ -890,8 +889,13 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group, data
                 if tup not in selected and tup[2] >= upper:
                     selected.append(tup)
 
-            if not selected and aligned:
-                selected = [aligned[0]]  # au moins le plus gros driver
+            # GARANTIR AU MOINS 2 DRIVERS pour CAS 1
+            if len(selected) < 2 and len(aligned) >= 2:
+                # Prendre les 2 plus gros drivers alignés
+                selected = aligned[:2]
+            elif len(selected) < 1 and len(aligned) >= 1:
+                # Fallback : au moins 1 driver si disponible
+                selected = [aligned[0]]
 
         # CAS 2 : net ~ 0 -> sortir les vrais movers (IQR) des deux côtés
         else:
@@ -899,9 +903,25 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group, data
             upper = _tukey_upper_threshold(abs_vars)
             movers = [(g, v, av) for (g, v, av) in items if av >= upper]
             movers.sort(key=lambda x: x[2], reverse=True)
-            if not movers and items:
-                movers = [max(items, key=lambda x: x[2])]
-            selected = movers
+            
+            # GARANTIR AU MOINS 2 MOVERS pour CAS 2
+            if len(movers) < 2 and len(items) >= 2:
+                # Prendre les 2 plus grosses variations absolues
+                items_sorted = sorted(items, key=lambda x: x[2], reverse=True)
+                selected = items_sorted[:2]
+            elif len(movers) >= 2:
+                selected = movers
+            elif len(movers) == 1:
+                # 1 mover détecté, ajouter le suivant par taille
+                items_sorted = sorted(items, key=lambda x: x[2], reverse=True)
+                selected = movers + [item for item in items_sorted if item not in movers][:1]
+            else:
+                # Aucun mover détecté, prendre les 2 plus gros
+                if len(items) >= 2:
+                    items_sorted = sorted(items, key=lambda x: x[2], reverse=True)
+                    selected = items_sorted[:2]
+                elif len(items) == 1:
+                    selected = items
 
         # Mise en forme avec mapping Métier -> Sous-Métier
         significant_variations = []
@@ -909,7 +929,7 @@ def generate_consumption_grouped_analysis_text(variations, totals_by_group, data
             sign_sym = "-" if v < 0 else "+"
             
             # Utiliser le mapping pour obtenir le nom complet
-            display_name = metier_to_sous_metier.get(g, g)  # Si pas de mapping trouvé, utiliser g
+            display_name = metier_to_sous_metier.get(g, g)
             
             significant_variations.append(f"{display_name} ({sign_sym}{abs(v):.2f} Bn)")
             significant_groups.append(g)  # Garder l'abréviation pour les traitements ultérieurs
@@ -1012,7 +1032,7 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
         logger.error(f"Erreur lors de la création des dictionnaires lookup: {e}")
         return ""
     
-# Calculer les variations par métier
+    # Calculer les variations par métier
     all_keys = set(lookup_j.keys()) | set(lookup_j1.keys())
     metier_variations = []
     
