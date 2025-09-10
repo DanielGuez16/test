@@ -163,10 +163,10 @@ async function analyze() {
             <div class="card border-0">
                 <div class="card-body text-center py-5">
                     <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
-                    <h4 class="text-primary">Génération des analyses en cours...</h4>
+                    <h4 class="text-primary">Generating analyses...</h4>
                     <p class="text-muted">
-                        Balance Sheet + Consumption<br>
-                        <small>Filtrage ACTIF/PASSIF • LCR par métier • Top Conso = "O"</small>
+                        Balance Sheet + Consumption + Ressources <br>
+                        <small>ACTIF/PASSIF • LCR par métier • Top Conso = "O"</small>
                     </p>
                     <div class="progress mt-3" style="height: 6px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
@@ -316,7 +316,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h5 class="mb-0">ASSET</h5>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                    ${isPositive ? '📈' : '📉'}
+                                    ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                 </span>
                             </div>
                             <div class="row text-center">
@@ -352,7 +352,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h5 class="mb-0">LIABILITY</h5>
                                 <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                    ${isPositive ? '📈' : '📉'}
+                                    ${isPositive ? '📈 Increase' : '📉 Decrease'}
                                 </span>
                             </div>
                             <div class="row text-center">
@@ -515,30 +515,7 @@ function generateConsumptionSection(consumptionData) {
             </div>
         `;
     }
-
-    // Légende Consumption
-    html += `
-        <div class="table-legend fade-in-up">
-            <div class="row">
-                <div class="col-md-6">
-                    <h6>📋 Paramètres Consumption</h6>
-                    <ul class="list-unstyled mb-0">
-                        <li><small>• Filtrage: Top Conso = "O"</small></li>
-                        <li><small>• Groupement: LCR_ECO_GROUPE_METIERS, Métier</small></li>
-                        <li><small>• Mesure: LCR_ECO_IMPACT_LCR (Bn)</small></li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <h6>📊 Format</h6>
-                    <ul class="list-unstyled mb-0">
-                        <li><small>• Valeurs en milliards (Bn)</small></li>
-                        <li><small>• Parts en pourcentage (%)</small></li>
-                        <li><small>• Sous-totaux par Groupe Métiers</small></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    `;
+    ;
     
     return html;
 }
@@ -554,7 +531,7 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
         <div class="analysis-section fade-in-up">
             <div class="card border-0">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">📊 Details by group</h4>
+                    <h4 class="mb-0">Details by group</h4>
                 </div>
                 <div class="card-body">
                     <div class="row">
