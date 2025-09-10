@@ -939,7 +939,7 @@ def create_consumption_analysis_grouped_only(dataframes):
         
         print (f"TESTSTSTSTSTSTST : {metier_detailed_analysis}")
         return {
-            "title": "LCR Consumption Analysis by Business Group (Summary)",
+            "title": "LCR Consumption Analysis",
             "consumption_table_html": consumption_html,
             "variations": variations,
             "analysis_text": analysis_text,

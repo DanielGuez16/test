@@ -622,9 +622,8 @@ function generateBalanceSheetSection(balanceSheetData) {
                 <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-1"> ${balanceSheetData.title || 'Balance Sheet Analysis'}</h3>
+                            <h3 class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h3>
                         </div>
-                        <span class="badge bg-light text-primary">Balance Sheet</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -635,9 +634,26 @@ function generateBalanceSheetSection(balanceSheetData) {
             </div>
         </div>
     `;
+
+        
+    // Résumé Balance Sheet
+    if (balanceSheetData.summary) {
+        html += `
+            <div class="analysis-section fade-in-up">
+                <div class="summary-box">
+                    <div class="d-flex align-items-start">
+                        <div>
+                            <p class="mb-0">${balanceSheetData.summary}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
     
     // Variations Balance Sheet
-    if (balanceSheetData.variations) {        
+    if (balanceSheetData.variations) {
         const variations = balanceSheetData.variations;
 
         // Carte ACTIF
@@ -647,7 +663,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="metric-card p-2">
+                    <div class="metric-card p-3">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="mb-0">ASSET</h6>
@@ -683,7 +699,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="metric-card p-2">
+                    <div class="metric-card p-3">
                         <div class="text-center">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="mb-0">LIABILITY</h6>
@@ -712,20 +728,7 @@ function generateBalanceSheetSection(balanceSheetData) {
             `;
         }
 
-        html += `</div></div>`;
-    }
-    
-    
-    // Résumé Balance Sheet
-    if (balanceSheetData.summary) {
         html += `
-            <div class="analysis-section fade-in-up">
-                <div class="summary-box">
-                    <div class="d-flex align-items-start">
-                        <div>
-                            <p class="mb-0">${balanceSheetData.summary}</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         `;
@@ -755,9 +758,8 @@ function generateConsumptionSection(consumptionData) {
                 <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-1"> ${consumptionData.title || 'LCR Consumption Analysis'}</h3>
+                            <h3 class="mb-1"> ${consumptionData.title || '2. LCR Consumption'}</h3>
                         </div>
-                        <span class="badge bg-light text-primary">Consumption</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -768,6 +770,21 @@ function generateConsumptionSection(consumptionData) {
             </div>
         </div>
     `;
+
+    // Analyse textuelle Consumption
+    if (consumptionData.analysis_text) {
+        html += `
+            <div class="analysis-section fade-in-up">
+                <div class="summary-box">
+                    <div class="d-flex align-items-start">
+                        <div>
+                            <p class="mb-0">${consumptionData.analysis_text}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     
     // Métriques Consumption globales
     if (consumptionData.variations && consumptionData.variations.global) {
@@ -809,21 +826,6 @@ function generateConsumptionSection(consumptionData) {
             </div>
         `;
     }
-    
-    // Analyse textuelle Consumption
-    if (consumptionData.analysis_text) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="summary-box">
-                    <div class="d-flex align-items-start">
-                        <div>
-                            <p class="mb-0">${consumptionData.analysis_text}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
 
     // Graphiques par métier pour les groupes significatifs
     if (consumptionData.significant_groups && consumptionData.significant_groups.length > 0 && consumptionData.metier_details) {
@@ -836,9 +838,7 @@ function generateConsumptionSection(consumptionData) {
             <div class="analysis-section fade-in-up">
                 <div class="summary-box">
                     <div class="d-flex align-items-start">
-                        <i class="fas fa-clipboard-list fa-lg me-3 mt-1"></i>
                         <div>
-                            <h5 class="mb-2">Details by group</h5>
                             <p class="mb-0">${consumptionData.metier_detailed_analysis}</p>
                         </div>
                     </div>
