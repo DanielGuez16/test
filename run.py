@@ -292,13 +292,13 @@ async def analyze_files():
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
         
-        # Le reste de votre code d'analyse reste identique
+        # Analyses
         balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
         consumption_results = create_consumption_analysis_grouped_only(dataframes)
         
         logger.info("Analyses terminées (traitement mémoire)")
 
-        # Sauvegarder les résultats complets pour le chatbot
+        # SAUVEGARDER LE CONTEXTE CHATBOT AVANT LA RÉPONSE
         chatbot_session["context_data"] = {
             "balance_sheet": balance_sheet_results,
             "consumption": consumption_results,
@@ -314,12 +314,13 @@ async def analyze_files():
             }
         }
 
-        logger.info("Données sauvegardées pour le chatbot")
+        logger.info("Analyses ET contexte chatbot terminés - tout est prêt")
         
         return {
             "success": True,
-            "message": "Analyses terminées (traitement en mémoire)",
+            "message": "Analyses terminées avec contexte chatbot prêt",
             "timestamp": datetime.now().isoformat(),
+            "context_ready": True,  # FLAG IMPORTANT
             "results": {
                 "balance_sheet": balance_sheet_results,
                 "consumption": consumption_results
@@ -331,6 +332,7 @@ async def analyze_files():
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
+    
 
 @app.post("/api/chat")
 async def chat_with_ai(request: Request):
@@ -377,6 +379,20 @@ async def chat_with_ai(request: Request):
     except Exception as e:
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
+
+@app.get("/api/context-status")
+async def get_context_status():
+    """Vérifie si le contexte du chatbot est prêt"""
+    has_context = bool(chatbot_session.get("context_data"))
+    context_keys = list(chatbot_session.get("context_data", {}).keys()) if has_context else []
+    
+    return {
+        "context_ready": has_context,
+        "context_keys": context_keys,
+        "timestamp": datetime.now().isoformat(),
+        "analysis_timestamp": chatbot_session.get("context_data", {}).get("analysis_timestamp")
+    }
+
 
 @app.post("/api/upload-document")
 async def upload_document(file: UploadFile = File(...)):

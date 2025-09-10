@@ -186,23 +186,41 @@ async function analyze() {
             signal: controller.signal 
         });
         
+        clearTimeout(timeoutId);
+        
         if (response.ok) {
             const result = await response.json();
             console.log('📊 Résultats de l\'analyse:', result);
-            console.log('🔍 Balance Sheet:', result.results?.balance_sheet);
-            console.log('🔍 Consumption:', result.results?.consumption);
+            console.log('🔍 Context ready:', result.context_ready);
             
             if (result.success) {
                 // Attendre que l'affichage soit complètement terminé
                 await displayCompleteResults(result.results);
                 
-                // Maintenant afficher le message de succès
-                showNotification('Analyses successfully completed!', 'success');
-                
-                // Et ENFIN afficher le chatbot
-                setTimeout(() => {
-                    showChatbot();
-                }, 1000);
+                // Vérifier que le contexte est prêt côté serveur
+                if (result.context_ready) {
+                    showNotification('Analyses successfully completed! Chatbot ready.', 'success');
+                    
+                    // Double vérification optionnelle
+                    const contextStatus = await verifyContextReady();
+                    if (contextStatus) {
+                        console.log('✅ Contexte vérifié, affichage du chatbot');
+                        setTimeout(() => {
+                            showChatbot();
+                        }, 500);
+                    } else {
+                        console.warn('⚠️ Contexte pas encore prêt, attente...');
+                        setTimeout(() => {
+                            showChatbot();
+                        }, 2000);
+                    }
+                } else {
+                    // Fallback si le flag n'est pas présent
+                    showNotification('Analysis completed, preparing chatbot...', 'info');
+                    setTimeout(() => {
+                        showChatbot();
+                    }, 3000);
+                }
             } else {
                 throw new Error(result.message || 'Erreur dans l\'analyse');
             }
@@ -229,6 +247,28 @@ async function analyze() {
         `;
         
         showNotification('Erreur lors de l\'analyse', 'error');
+    }
+}
+
+/**
+ * Vérifie que le contexte du chatbot est vraiment prêt côté serveur
+ */
+async function verifyContextReady() {
+    try {
+        console.log('🔍 Vérification du statut du contexte...');
+        const response = await fetch('/api/context-status');
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('📋 Statut contexte:', result);
+            return result.context_ready;
+        } else {
+            console.error('❌ Erreur vérification contexte:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Erreur checking context status:', error);
+        return false;
     }
 }
 
