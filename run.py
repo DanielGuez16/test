@@ -326,13 +326,8 @@ async def chat_with_ai(request: Request):
         if not user_message.strip():
             raise HTTPException(status_code=400, detail="Message vide")
         
-        # Préparer le contexte depuis les données d'analyse
-        context_prompt = prepare_analysis_context()
-        
-        # Ajouter les documents uploadés au contexte
-        documents_context = prepare_documents_context()
-        if documents_context:
-            context_prompt += f"\n\nDocuments fournis par l'utilisateur:\n{documents_context}"
+        # Préparer le contexte complet avec historique
+        context_prompt = prepare_conversation_context()
         
         # Obtenir la réponse de l'IA
         ai_response = llm_connector.get_llm_response(
@@ -447,6 +442,30 @@ def prepare_documents_context() -> str:
         context_parts.append(f"Document: {doc['filename']}")
         context_parts.append(f"Contenu: {doc['content'][:2000]}...")  # Limiter à 2000 chars
         context_parts.append("---")
+    
+    return "\n".join(context_parts)
+
+def prepare_conversation_context() -> str:
+    """
+    Prépare le contexte complet incluant analyses + documents + historique
+    """
+    context_parts = []
+    
+    # Contexte des analyses
+    context_parts.append(prepare_analysis_context())
+    
+    # Documents uploadés
+    docs_context = prepare_documents_context()
+    if docs_context:
+        context_parts.append(f"\n\nDocuments fournis par l'utilisateur:\n{docs_context}")
+    
+    # Historique de conversation (derniers 10 messages pour éviter de surcharger)
+    if chatbot_session["messages"]:
+        context_parts.append("\n\nHistorique de la conversation précédente:")
+        for msg in chatbot_session["messages"][-10:]:
+            role = "Utilisateur" if msg["type"] == "user" else "Assistant"
+            context_parts.append(f"{role}: {msg['message']}")
+        context_parts.append("\n--- Fin de l'historique ---")
     
     return "\n".join(context_parts)
 
