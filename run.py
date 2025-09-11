@@ -25,6 +25,8 @@ import io
 import chardet
 import json
 from typing import Dict, Any
+import psutil
+import os
 
 from llm_connector import LLMConnector
 
@@ -209,6 +211,12 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     Upload sans écriture de fichiers - Tout en mémoire
     """
     try:
+
+        # MONITORING INITIAL
+        process = psutil.Process(os.getpid())
+        memory_start = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire avant upload {file_type}: {memory_start:.1f} MB")
+
         logger.info(f"Upload reçu: {file.filename}, type: {file_type}")
         
         # Validation du fichier
@@ -225,6 +233,7 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
 
         # Lire le contenu en mémoire
         contents = await file.read()
+        file_size = len(contents)  # Sauvegarder la taille AVANT suppression
         
         # TRAITEMENT DIRECT EN MÉMOIRE
         try:
@@ -232,23 +241,42 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
             logger.info(f"Fichier traité en mémoire: {file_info}")
             
         except Exception as e:
+            del contents
             raise HTTPException(status_code=422, detail=f"Erreur lecture: {str(e)}")
+        
+        # Sauvegarder les infos AVANT filtrage
+        original_rows = len(df)
+        original_columns = len(df.columns)
         
         # Vérifier les colonnes
         missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
-        
-        # Stocker UNIQUEMENT les métadonnées (pas le fichier)
+
+        # Filtrer et stocker seulement les données utiles
+        df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
+
+        # Stocker les métadonnées avec DataFrame filtré
         file_session["files"][file_type] = {
-            "dataframe": df,  # Stocker le DataFrame directement en session
+            "dataframe": df_filtered,
             "original_name": file.filename,
             "file_format": file_info['format'],
             "encoding": file_info.get('encoding'),
             "delimiter": file_info.get('delimiter'),
-            "rows": len(df),
-            "columns": len(df.columns),
+            "rows": len(df_filtered),  # Utiliser df_filtered
+            "columns": len(df_filtered.columns),  # Utiliser df_filtered
             "upload_time": datetime.now().isoformat(),
             "missing_columns": missing_columns
         }
+
+        # MAINTENANT libérer la mémoire
+        del contents
+        del df
+        import gc
+        gc.collect()
+
+        # MONITORING FINAL
+        memory_end = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire après upload {file_type}: {memory_end:.1f} MB (diff: +{memory_end-memory_start:.1f} MB)")
+        
         
         return {
             "success": True,
@@ -257,10 +285,10 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
             "format": file_info['format'],
             "encoding": file_info.get('encoding'),
             "delimiter": file_info.get('delimiter'),
-            "rows": len(df),
-            "columns": len(df.columns),
+            "rows": original_rows,  # Utiliser les valeurs sauvegardées
+            "columns": original_columns,  # Utiliser les valeurs sauvegardées
             "missing_columns": missing_columns,
-            "file_size": len(contents),
+            "file_size": file_size,  # Utiliser la valeur sauvegardée
             "processing": "in_memory_only"
         }
         
@@ -269,6 +297,22 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     except Exception as e:
         logger.error(f"Erreur upload: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+def cleanup_session_memory():
+    """Nettoie la mémoire des DataFrames de session"""
+    try:
+        if "files" in file_session:
+            for file_type in list(file_session["files"].keys()):
+                if file_type in file_session["files"] and "dataframe" in file_session["files"][file_type]:
+                    del file_session["files"][file_type]["dataframe"]
+                    logger.info(f"DataFrame {file_type} supprimé de la session")
+        
+        import gc
+        gc.collect()
+        logger.info("Mémoire de session nettoyée")
+    except Exception as e:
+        logger.warning(f"Erreur nettoyage mémoire: {e}")
+
 
 @app.post("/api/analyze")
 async def analyze_files():
@@ -315,12 +359,17 @@ async def analyze_files():
         }
 
         logger.info("Analyses ET contexte chatbot terminés - tout est prêt")
-        
+
+        # MONITORING MÉMOIRE
+        process = psutil.Process(os.getpid())
+        memory_analysis = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire après analyse complète: {memory_analysis:.1f} MB")
+
         return {
             "success": True,
             "message": "Analyses terminées avec contexte chatbot prêt",
             "timestamp": datetime.now().isoformat(),
-            "context_ready": True,  # FLAG IMPORTANT
+            "context_ready": True,  
             "results": {
                 "balance_sheet": balance_sheet_results,
                 "consumption": consumption_results
@@ -1409,11 +1458,12 @@ if __name__ == "__main__":
     print("⏹️  Ctrl+C pour arrêter")
     
     uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        reload=False,
-        log_level="info",
-        timeout_keep_alive=300,  # 5 minutes
-        limit_max_requests=1000
+    app,
+    host="0.0.0.0",
+    port=8000,
+    reload=False,
+    log_level="info",
+    timeout_keep_alive=600,  # 10 minutes
+    limit_max_requests=100,  # Réduire pour forcer le recyclage
+    workers=1  # Une seule instance pour éviter la duplication mémoire
     )

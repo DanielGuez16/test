@@ -14,8 +14,45 @@ let filesReady = { j: false, j1: false };
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Interface ALM initialisée');
     initializeFileUploads();
-    initializeAnalyzeButton();
+    initializeDragAndDrop();
 });
+
+function initializeDragAndDrop() {
+    const uploadAreas = document.querySelectorAll('.upload-area');
+    
+    uploadAreas.forEach(area => {
+        area.addEventListener('dragover', handleDragOver);
+        area.addEventListener('dragenter', handleDragEnter);
+        area.addEventListener('dragleave', handleDragLeave);
+        area.addEventListener('drop', handleDrop);
+    });
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+function handleDragEnter(e) {
+    e.preventDefault();
+}
+
+function handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        const isFileJ = e.currentTarget.closest('.card').querySelector('h5').textContent.includes('D (');
+        const fileType = isFileJ ? 'j' : 'jMinus1';
+        uploadFile(files[0], fileType);
+    }
+}
+
 
 /**
  * Initialise les listeners pour les uploads de fichiers
@@ -179,7 +216,7 @@ async function analyze() {
     
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        const timeoutId = setTimeout(() => controller.abort(), 600000);
 
         const response = await fetch('/api/analyze', { 
             method: 'POST',
