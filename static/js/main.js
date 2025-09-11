@@ -345,7 +345,16 @@ function displayCompleteResults(analysisResults) {
         if (analysisResults.consumption) {
             html += generateConsumptionSection(analysisResults.consumption);
         }
-        
+
+        // AJOUTER LE BOUTON D'EXPORT ICI
+        html += `
+            <div class="text-center my-4">
+                <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
+                    <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
+                </button>
+            </div>
+        `;
+
         document.getElementById('results').innerHTML = html;
         
         // Attendre que le DOM soit mis à jour
@@ -1241,4 +1250,41 @@ function debugInfo() {
         analyzeButtonState: document.getElementById('analyzeBtn').disabled,
         timestamp: new Date().toISOString()
     });
+}
+
+
+// Dans main.js, après l'affichage des résultats
+function addExportButton() {
+    const exportButton = `
+        <div class="text-center my-4">
+            <button class="btn btn-secondary" onclick="exportToPDF()">
+                <i class="fas fa-download me-2"></i>Export to PDF
+            </button>
+        </div>
+    `;
+    document.getElementById('results').insertAdjacentHTML('beforeend', exportButton);
+}
+
+async function exportToPDF() {
+    try {
+        showNotification('Generating PDF...', 'info');
+        
+        const response = await fetch('/api/export-pdf', { method: 'POST' });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `LCR_Analysis_${new Date().toISOString().slice(0,10)}.pdf`;
+            a.click();
+            
+            showNotification('PDF downloaded successfully!', 'success');
+        } else {
+            throw new Error('Export failed');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Error exporting PDF', 'error');
+    }
 }

@@ -9,7 +9,7 @@ pour séparer la logique métier de la présentation.
 """
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,8 +27,10 @@ import json
 from typing import Dict, Any
 import psutil
 import os
+import tempfile
 
 from llm_connector import LLMConnector
+from report_generator import ReportGenerator
 
 # Variables globales pour la session chatbot
 chatbot_session = {
@@ -894,6 +896,66 @@ def generate_executive_summary(variations):
     else:
         return f"Balance Sheet au {date_str} - Variations mineures observées (< 100M€)."
 
+
+@app.post("/api/export-pdf")
+async def export_pdf():
+    try:
+        logger.info("Début génération PDF")
+        
+        # Récupérer les données d'analyse
+        if not chatbot_session.get("context_data"):
+            raise HTTPException(status_code=400, detail="Aucune analyse disponible")
+        
+        logger.info("Données d'analyse trouvées")
+        
+        # Récupérer la dernière réponse IA
+        last_ai_response = None
+        if chatbot_session["messages"]:
+            ai_messages = [msg for msg in chatbot_session["messages"] if msg["type"] == "assistant"]
+            if ai_messages:
+                last_ai_response = ai_messages[-1]["message"]
+        
+        logger.info(f"Dernière réponse IA: {bool(last_ai_response)}")
+        
+        # Générer le rapport
+        generator = ReportGenerator(
+            analysis_results={
+                "balance_sheet": chatbot_session["context_data"].get("balance_sheet"),
+                "consumption": chatbot_session["context_data"].get("consumption")
+            },
+            last_ai_response=last_ai_response
+        )
+        
+        logger.info("ReportGenerator créé")
+        
+        # Créer fichier temporaire
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"LCR_Analysis_{timestamp}.pdf"
+        
+        # Utiliser un chemin compatible macOS
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        output_path = os.path.join(temp_dir, output_filename)
+        
+        logger.info(f"Chemin de sortie: {output_path}")
+        
+        # Générer PDF
+        await generator.export_to_pdf(output_path)
+        
+        logger.info("PDF généré avec succès")
+        
+        return FileResponse(
+            output_path,
+            filename=output_filename,
+            media_type="application/pdf"
+        )
+        
+    except Exception as e:
+        logger.error(f"Erreur export PDF: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Erreur export PDF: {str(e)}")
+    
 #######################################################################################################################################
 
 #                           CONSUMPTION
