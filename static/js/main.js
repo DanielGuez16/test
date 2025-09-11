@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Interface ALM initialisée');
     initializeFileUploads();
     initializeAnalyzeButton();
-    initializeDragAndDrop();
 });
 
 /**
@@ -131,45 +130,6 @@ async function uploadFile(file, type) {
         checkAnalyzeButtonState();
     }
 }
-
-
-
-function initializeDragAndDrop() {
-    const uploadAreas = document.querySelectorAll('.upload-area');
-    
-    uploadAreas.forEach(area => {
-        area.addEventListener('dragover', handleDragOver);
-        area.addEventListener('dragenter', handleDragEnter);
-        area.addEventListener('dragleave', handleDragLeave);
-        area.addEventListener('drop', handleDrop);
-    });
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.currentTarget.classList.add('drag-over');
-}
-
-function handleDragEnter(e) {
-    e.preventDefault();
-}
-
-function handleDragLeave(e) {
-    e.currentTarget.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('drag-over');
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        const isFileJ = e.currentTarget.closest('.card').querySelector('h5').textContent.includes('D (');
-        const fileType = isFileJ ? 'j' : 'jMinus1';
-        uploadFile(files[0], fileType);
-    }
-}
-
 
 /**
  * Vérifie l'état du bouton d'analyse
@@ -529,23 +489,6 @@ function parseMarkdownToHtml(text) {
 function handleChatKeyPress(event) {
     if (event.key === 'Enter') {
         sendMessage();
-    }
-}
-
-/**
- * Nettoie la mémoire côté serveur
- */
-async function clearServerMemory() {
-    try {
-        const response = await fetch('/api/clear-memory', { method: 'POST' });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification(result.message, 'success');
-            console.log('Mémoire serveur nettoyée');
-        }
-    } catch (error) {
-        console.error('Erreur nettoyage mémoire:', error);
     }
 }
 

@@ -93,25 +93,15 @@ ALL_REQUIRED_COLUMNS = list(set(
 def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     """
     Convertit le contenu d'un fichier directement en DataFrame
-    OPTIMISÉ pour réduire la consommation mémoire
+    Sans écriture sur disque
     """
     try:
         extension = Path(filename).suffix.lower()
-        
-        # Colonnes nécessaires seulement
-        NEEDED_COLUMNS = ["Top Conso", "Réaffectation", "Groupe De Produit", 
-                         "Nominal Value", "LCR_ECO_GROUPE_METIERS", 
-                         "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
         
         # Excel - lecture directe depuis bytes
         if extension in ['.xlsx', '.xls', '.xlsm', '.xlsb']:
             df = pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
             df.columns = df.columns.astype(str).str.strip()
-            
-            # FILTRER immédiatement les colonnes
-            existing_columns = [col for col in NEEDED_COLUMNS if col in df.columns]
-            df = df[existing_columns].copy()
-            
             return df, {'format': extension, 'method': 'direct_excel'}
         
         # CSV/TSV/TXT - traitement en mémoire
@@ -134,13 +124,13 @@ def convert_file_content_to_dataframe(file_content: bytes, filename: str):
                 else:
                     delimiter = ','
             
-            # Lire SEULEMENT les colonnes nécessaires
+            # Lire directement depuis StringIO (en mémoire)
             df = pd.read_csv(
                 io.StringIO(text_content),
                 delimiter=delimiter,
                 low_memory=False,
-                na_filter=True,  # Changé de False à True
-                usecols=lambda col: col in NEEDED_COLUMNS  # NOUVEAU: filtre colonnes
+                dtype=str,
+                na_filter=False
             )
             
             # Nettoyer les colonnes
@@ -150,13 +140,13 @@ def convert_file_content_to_dataframe(file_content: bytes, filename: str):
             numeric_columns = ['Nominal Value', 'LCR_ECO_IMPACT_LCR']
             for col in numeric_columns:
                 if col in df.columns:
-                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce')
+                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')
             
             return df, {
                 'format': extension, 
                 'encoding': encoding, 
                 'delimiter': delimiter,
-                'method': 'memory_csv_optimized'
+                'method': 'memory_csv'
             }
         
         else:
@@ -164,7 +154,7 @@ def convert_file_content_to_dataframe(file_content: bytes, filename: str):
             
     except Exception as e:
         raise ValueError(f"Erreur lecture fichier: {str(e)}")
-    
+
 #######################################################################################################################################
 
 #                           API
@@ -279,11 +269,11 @@ async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
     except Exception as e:
         logger.error(f"Erreur upload: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-    
+
 @app.post("/api/analyze")
 async def analyze_files():
     """
-    Analyse directe depuis les DataFrames en mémoire - OPTIMISÉ
+    Analyse directe depuis les DataFrames en mémoire
     """
     try:
         logger.info("Début de l'analyse depuis DataFrames en mémoire")
@@ -298,7 +288,7 @@ async def analyze_files():
         # Récupérer les DataFrames directement depuis la session
         dataframes = {}
         for file_type, file_info in file_session["files"].items():
-            df = file_info["dataframe"]
+            df = file_info["dataframe"]  # DataFrame déjà en mémoire
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
         
@@ -313,25 +303,24 @@ async def analyze_files():
             "balance_sheet": balance_sheet_results,
             "consumption": consumption_results,
             "analysis_timestamp": datetime.now().isoformat(),
-            # SUPPRIMER raw_dataframes_info pour économiser mémoire
+            "raw_dataframes_info": {
+                file_type: {
+                    "shape": [len(df), len(df.columns)],
+                    "columns": df.columns.tolist(),
+                    "sample_data": df.head(3).to_dict('records') if len(df) > 0 else [],
+                    "file_info": file_session["files"][file_type]
+                }
+                for file_type, df in dataframes.items()
+            }
         }
 
-        # NETTOYER LA MÉMOIRE IMMÉDIATEMENT
-        for file_type in list(file_session["files"].keys()):
-            if "dataframe" in file_session["files"][file_type]:
-                del file_session["files"][file_type]["dataframe"]
-        
-        # Force garbage collection
-        import gc
-        gc.collect()
-        
-        logger.info("Analyses ET contexte chatbot terminés - mémoire nettoyée")
+        logger.info("Analyses ET contexte chatbot terminés - tout est prêt")
         
         return {
             "success": True,
             "message": "Analyses terminées avec contexte chatbot prêt",
             "timestamp": datetime.now().isoformat(),
-            "context_ready": True,
+            "context_ready": True,  # FLAG IMPORTANT
             "results": {
                 "balance_sheet": balance_sheet_results,
                 "consumption": consumption_results
@@ -390,35 +379,6 @@ async def chat_with_ai(request: Request):
     except Exception as e:
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
-
-@app.post("/api/clear-memory")
-async def clear_memory():
-    """
-    Nettoie la mémoire après analyse
-    """
-    global file_session, chatbot_session
-    
-    # Vider les sessions
-    file_session = {"files": {}}
-    
-    # Garder seulement les 3 derniers messages du chatbot
-    if len(chatbot_session.get("messages", [])) > 3:
-        chatbot_session["messages"] = chatbot_session["messages"][-3:]
-    
-    # Vider les documents uploadés
-    chatbot_session["uploaded_documents"] = []
-    
-    # Force garbage collection
-    import gc
-    gc.collect()
-    
-    logger.info("Mémoire nettoyée manuellement")
-    
-    return {
-        "success": True, 
-        "message": "Mémoire nettoyée",
-        "timestamp": datetime.now().isoformat()
-    }
 
 @app.get("/api/context-status")
 async def get_context_status():
@@ -561,22 +521,17 @@ def prepare_analysis_context() -> str:
     
     return "\n".join(context_parts)
 
-
 def prepare_documents_context() -> str:
     """
-    Prépare le contexte depuis les documents uploadés - LIMITÉ
+    Prépare le contexte depuis les documents uploadés
     """
     if not chatbot_session["uploaded_documents"]:
         return ""
     
-    # LIMITER à 2 derniers documents seulement
-    recent_docs = chatbot_session["uploaded_documents"][-5:]
-    
     context_parts = []
-    for doc in recent_docs:
+    for doc in chatbot_session["uploaded_documents"]:
         context_parts.append(f"Document: {doc['filename']}")
-        # LIMITER le contenu à 1000 chars au lieu de 2000
-        context_parts.append(f"Contenu: {doc['content'][:1000]}...")
+        context_parts.append(f"Contenu: {doc['content'][:2000]}...")  # Limiter à 2000 chars
         context_parts.append("---")
     
     return "\n".join(context_parts)
@@ -584,27 +539,27 @@ def prepare_documents_context() -> str:
 def prepare_conversation_context() -> str:
     """
     Prépare le contexte complet incluant analyses + documents + historique
-    OPTIMISÉ pour limiter la mémoire
     """
     context_parts = []
     
     # Contexte des analyses
     context_parts.append(prepare_analysis_context())
     
-    # Documents uploadés (limiter à 3 derniers)
+    # Documents uploadés
     docs_context = prepare_documents_context()
     if docs_context:
         context_parts.append(f"\n\nDocuments fournis par l'utilisateur:\n{docs_context}")
     
-    # Historique de conversation (RÉDUIT à 5 messages au lieu de 10)
+    # Historique de conversation (derniers 10 messages pour éviter de surcharger)
     if chatbot_session["messages"]:
         context_parts.append("\n\nHistorique de la conversation précédente:")
-        for msg in chatbot_session["messages"][-5:]:  # CHANGÉ de 10 à 5
+        for msg in chatbot_session["messages"][-10:]:
             role = "Utilisateur" if msg["type"] == "user" else "Assistant"
             context_parts.append(f"{role}: {msg['message']}")
         context_parts.append("\n--- Fin de l'historique ---")
     
     return "\n".join(context_parts)
+
 
 @app.get("/api/chat-history")
 async def get_chat_history():
