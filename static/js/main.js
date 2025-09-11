@@ -996,9 +996,6 @@ function initializeMetierCharts(significantGroups, metierDetails) {
 /**
  * Prépare les données pour un graphique métier
  */
-/**
- * Prépare les données pour un graphique métier (version triée avec total)
- */
 function prepareMetierChartData(groupe, metierDetails) {
     try {
         // Récupérer les données J et J-1 pour ce groupe
@@ -1048,13 +1045,31 @@ function prepareMetierChartData(groupe, metierDetails) {
         // Calculer la variation totale du groupe
         const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
         
-        // Extraire les données triées pour Chart.js
-        const labels = metierVariations.map(item => item.metier);
-        const variations = metierVariations.map(item => item.variation);
+        // NOUVEAU: Positionner intelligemment la barre TOTAL
+        let labels = [];
+        let variations = [];
         
-        // AJOUTER LA BARRE TOTAL À LA FIN
-        labels.push('TOTAL GROUP');
-        variations.push(totalVariation);
+        if (totalVariation >= 0) {
+            // Si le total est positif, le mettre tout à gauche
+            labels.push('TOTAL GROUP');
+            variations.push(totalVariation);
+            
+            // Ajouter les métiers ensuite
+            metierVariations.forEach(item => {
+                labels.push(item.metier);
+                variations.push(item.variation);
+            });
+        } else {
+            // Si le total est négatif, mettre d'abord les métiers
+            metierVariations.forEach(item => {
+                labels.push(item.metier);
+                variations.push(item.variation);
+            });
+            
+            // Puis mettre le total à droite
+            labels.push('TOTAL GROUP');
+            variations.push(totalVariation);
+        }
         
         return {
             labels: labels,
@@ -1063,22 +1078,27 @@ function prepareMetierChartData(groupe, metierDetails) {
                     label: 'Variation (D - D-1)',
                     data: variations,
                     backgroundColor: variations.map((v, index) => {
-                        // Couleur spéciale pour le total (dernière barre)
-                        if (index === variations.length - 1) {
-                            return v >= 0 ? '#6B218D' : '#6B218D'; // Bleu ou orange pour le total
+                        // Identifier si c'est la barre TOTAL
+                        const isTotalBar = labels[index] === 'TOTAL GROUP';
+                        
+                        if (isTotalBar) {
+                            return v >= 0 ? '#6B218D' : '#6B218D'; // Couleur spéciale pour le total
                         }
                         // Couleurs normales pour les métiers
                         return v >= 0 ? '#51A0A2' : '#805bed';
                     }),
                     borderColor: variations.map((v, index) => {
-                        if (index === variations.length - 1) {
+                        const isTotalBar = labels[index] === 'TOTAL GROUP';
+                        
+                        if (isTotalBar) {
                             return v >= 0 ? '#6B218D' : '#6B218D';
                         }
                         return v >= 0 ? '#51A0A2' : '#805bed';
                     }),
                     borderWidth: variations.map((v, index) => {
+                        const isTotalBar = labels[index] === 'TOTAL GROUP';
                         // Bordure plus épaisse pour le total
-                        return index === variations.length - 1 ? 3 : 2;
+                        return isTotalBar ? 3 : 2;
                     })
                 }
             ]
@@ -1089,6 +1109,8 @@ function prepareMetierChartData(groupe, metierDetails) {
         return null;
     }
 }
+
+
 /**
  * Affiche une notification toast
  * @param {string} message - Message à afficher
