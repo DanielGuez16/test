@@ -622,7 +622,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                 <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h2 class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h2>
+                            <h2 style="color: #76279b;" class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h2>
                         </div>
                     </div>
                 </div>
@@ -770,7 +770,7 @@ function generateConsumptionSection(consumptionData) {
                 <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h2 class="mb-1"> ${consumptionData.title || '2. LCR Consumption'}</h2>
+                            <h2 style="color: #76279b;" class="mb-1"> ${consumptionData.title || '2. LCR Consumption'}</h2>
                         </div>
                     </div>
                 </div>
