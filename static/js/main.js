@@ -622,7 +622,7 @@ function generateBalanceSheetSection(balanceSheetData) {
                 <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h3>
+                            <h2 class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h2>
                         </div>
                     </div>
                 </div>
@@ -770,7 +770,7 @@ function generateConsumptionSection(consumptionData) {
                 <div class="card-header no-background">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-1"> ${consumptionData.title || '2. LCR Consumption'}</h3>
+                            <h2 class="mb-1"> ${consumptionData.title || '2. LCR Consumption'}</h2>
                         </div>
                     </div>
                 </div>
@@ -881,7 +881,7 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
         <div class="analysis-section fade-in-up">
             <div class="card border-0">
                 <div class="card-header no-background">
-                    <h4 class="mb-0">Details by group</h4>
+                    <h4 class="mb-0">Details by group (LCR Consumption)</h4>
                 </div>
                 <div class="card-body">
                     <div class="row">
