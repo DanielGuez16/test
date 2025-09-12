@@ -8,8 +8,8 @@ Application FastAPI utilisant un système de templates Jinja2
 pour séparer la logique métier de la présentation.
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, Cookie
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -24,10 +24,12 @@ import statistics
 import io
 import chardet
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import psutil
 import os
 import tempfile
+from user import authenticate_user, log_activity, get_logs, USERS_DB, get_logs_stats
+import secrets
 
 from llm_connector import LLMConnector
 from report_generator import ReportGenerator
@@ -48,6 +50,19 @@ logger = logging.getLogger(__name__)
 
 # Création de l'application FastAPI
 app = FastAPI(title="Steering ALM Metrics", version="2.0.0")
+
+
+# Session utilisateur global (en production: vraies sessions)
+active_sessions = {}
+
+def generate_session_token():
+    return secrets.token_urlsafe(32)
+
+def get_current_user_from_session(session_token: Optional[str] = Cookie(None)):
+    """Récupère l'utilisateur depuis le token de session"""
+    if not session_token or session_token not in active_sessions:
+        return None
+    return active_sessions[session_token]
 
 # Configuration CORS
 app.add_middleware(
@@ -165,34 +180,29 @@ def convert_file_content_to_dataframe(file_content: bytes, filename: str):
 
 #######################################################################################################################################
 
-
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """
-    Page d'accueil de l'application
+    """Page d'accueil - redirige vers login si non connecté"""
+    session_token = request.cookies.get("session_token")
+    current_user = get_current_user_from_session(session_token)
     
-    Utilise le template Jinja2 pour séparer la présentation
-    de la logique métier.
-    """
-    try:
-        return templates.TemplateResponse("index.html", {
+    if not current_user:
+        # Utilisateur non connecté -> page de login
+        return templates.TemplateResponse("login.html", {
             "request": request,
-            "title": "Steering ALM Metrics",
-            "version": "2.0.0",
-            "timestamp": datetime.now().isoformat()
+            "title": "Login - Steering ALM Metrics"
         })
-    except Exception as e:
-        logger.error(f"Erreur chargement template: {e}")
-        # Fallback en cas d'erreur de template
-        return HTMLResponse(content="""
-            <html>
-                <body style="font-family: Arial; padding: 50px; text-align: center;">
-                    <h1>Steering ALM Metrics</h1>
-                    <p style="color: red;">Erreur de chargement du template</p>
-                    <p>Vérifiez que le fichier templates/index.html existe</p>
-                </body>
-            </html>
-        """)
+    
+    # Utilisateur connecté -> page principale
+    log_activity(current_user["username"], "ACCESS", "Accessed main page")
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "title": "Steering ALM Metrics",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "user": current_user
+    })
 
 @app.get("/health")
 async def health_check():
@@ -207,11 +217,89 @@ async def health_check():
         "static_available": Path("static/js/main.js").exists()
     }
 
+@app.post("/api/login")
+async def login(request: Request):
+    """Authentification utilisateur"""
+    try:
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+        
+        user = authenticate_user(username, password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Créer une session
+        session_token = generate_session_token()
+        active_sessions[session_token] = user
+        
+        log_activity(username, "LOGIN", "Successful login")
+        
+        response = JSONResponse({
+            "success": True,
+            "message": f"Welcome {user['full_name']}!",
+            "redirect": "/"
+        })
+        
+        # Définir le cookie de session
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            max_age=24*60*60,  # 24 heures
+            samesite="lax"
+        )
+        
+        return response
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "message": str(e)}, 
+            status_code=401
+        )
+
+@app.post("/api/logout")
+async def logout(request: Request):
+    """Déconnexion utilisateur"""
+    session_token = request.cookies.get("session_token")
+    
+    if session_token and session_token in active_sessions:
+        user = active_sessions[session_token]
+        log_activity(user["username"], "LOGOUT", "User logged out")
+        del active_sessions[session_token]
+    
+    response = JSONResponse({"success": True, "redirect": "/"})
+    response.delete_cookie("session_token")
+    return response
+
+@app.get("/api/logs-stats")
+async def get_logs_statistics(session_token: Optional[str] = Cookie(None)):
+    """Statistiques sur les logs (admins seulement)"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    from user import get_logs_stats
+    stats = get_logs_stats()
+    
+    return {
+        "success": True,
+        "stats": stats
+    }
+
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(..., max_size=1024*1024*1024), file_type: str = Form(...)):
-    """
-    Upload sans écriture de fichiers - Tout en mémoire
-    """
+async def upload_file(file: UploadFile = File(...), 
+                     file_type: str = Form(...),
+                     session_token: Optional[str] = Cookie(None)):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Ajouter au début de la fonction
+    log_activity(current_user["username"], "FILE_UPLOAD", f"Uploaded {file.filename} as {file_type}")
     try:
 
         # MONITORING INITIAL
@@ -300,6 +388,46 @@ async def upload_file(file: UploadFile = File(..., max_size=1024*1024*1024), fil
         logger.error(f"Erreur upload: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
+@app.get("/api/logs")
+async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    logs = get_logs(limit)
+    return {
+        "success": True,
+        "logs": logs,
+        "total": len(logs)
+    }
+
+@app.get("/api/users")
+async def get_users_list(session_token: Optional[str] = Cookie(None)):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    users = [
+        {
+            "username": user["username"],
+            "full_name": user["full_name"], 
+            "role": user["role"],
+            "created_at": user["created_at"]
+        }
+        for user in USERS_DB.values()
+    ]
+    
+    return {
+        "success": True,
+        "users": users
+    }
+
 def cleanup_session_memory():
     """Nettoie la mémoire des DataFrames de session"""
     try:
@@ -315,12 +443,15 @@ def cleanup_session_memory():
     except Exception as e:
         logger.warning(f"Erreur nettoyage mémoire: {e}")
 
-
 @app.post("/api/analyze")
-async def analyze_files():
-    """
-    Analyse directe depuis les DataFrames en mémoire
-    """
+async def analyze_files(session_token: Optional[str] = Cookie(None)):
+    # Vérifier l'authentification
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Logger l'activité
+    log_activity(current_user["username"], "ANALYSIS", "Started LCR analysis")
     try:
         logger.info("Début de l'analyse depuis DataFrames en mémoire")
         
@@ -386,16 +517,24 @@ async def analyze_files():
     
 
 @app.post("/api/chat")
-async def chat_with_ai(request: Request):
+async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
     """
     Endpoint pour le chatbot IA
     """
+    # Vérifier l'authentification
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
     try:
         data = await request.json()
         user_message = data.get("message", "")
         
         if not user_message.strip():
             raise HTTPException(status_code=400, detail="Message vide")
+        
+        # NOUVEAU LOG : Message envoyé à l'IA
+        log_activity(current_user["username"], "CHAT_MESSAGE", f"Sent message to AI: {user_message[:100]}{'...' if len(user_message) > 100 else ''}")
         
         # Préparer le contexte complet avec historique
         context_prompt = prepare_conversation_context()
@@ -446,13 +585,20 @@ async def get_context_status():
 
 
 @app.post("/api/upload-document")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), session_token: Optional[str] = Cookie(None)):
     """
     Upload de documents pour le contexte du chatbot
     """
+    # Vérifier l'authentification
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     try:
         if not file.filename:
             raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+        
+        # NOUVEAU LOG : Document uploadé pour contexte
+        log_activity(current_user["username"], "DOCUMENT_UPLOAD", f"Uploaded context document: {file.filename}")
         
         contents = await file.read()
         
@@ -898,9 +1044,17 @@ def generate_executive_summary(variations):
 
 
 @app.post("/api/export-pdf")
-async def export_pdf():
+async def export_pdf(session_token: Optional[str] = Cookie(None)):
+    # Vérifier l'authentification
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
     try:
         logger.info("Début génération PDF")
+
+        # NOUVEAU LOG : Début génération PDF
+        log_activity(current_user["username"], "PDF_EXPORT_START", "Started PDF report generation")
         
         # Récupérer les données d'analyse
         if not chatbot_session.get("context_data"):
@@ -943,6 +1097,9 @@ async def export_pdf():
         await generator.export_to_pdf(output_path)
         
         logger.info("PDF généré avec succès")
+
+        # NOUVEAU LOG : PDF téléchargé avec succès
+        log_activity(current_user["username"], "PDF_EXPORT_SUCCESS", f"PDF report downloaded: {output_filename}")
         
         return FileResponse(
             output_path,
@@ -951,6 +1108,10 @@ async def export_pdf():
         )
         
     except Exception as e:
+
+        # NOUVEAU LOG : Erreur génération PDF
+        log_activity(current_user["username"], "PDF_EXPORT_ERROR", f"PDF generation failed: {str(e)}")
+        
         logger.error(f"Erreur export PDF: {e}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")

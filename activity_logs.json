@@ -1,0 +1,44 @@
+[
+  {
+    "timestamp": "2025-09-12T16:28:13.352770",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-12T16:28:13.362337",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-12T18:04:18.725326",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-12T18:04:18.737449",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-12T18:09:11.953474",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-12T18:09:11.962194",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-12T18:10:01.088721",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGOUT",
+    "details": "User logged out"
+  }
+]

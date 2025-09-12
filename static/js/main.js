@@ -71,6 +71,17 @@ function initializeFileUploads() {
     });
 }
 
+async function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        const response = await fetch('/api/logout', { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            window.location.href = result.redirect;
+        }
+    }
+}
+
 /**
  * Initialise le bouton d'analyse
  */
@@ -1243,6 +1254,60 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
+async function loadLogsStats() {
+    try {
+        const response = await fetch('/api/logs-stats');
+        const result = await response.json();
+        
+        if (result.success) {
+            const stats = result.stats;
+            const statsHtml = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">${stats.total}</h5>
+                                <p class="card-text">Total Logs</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">${stats.users}</h5>
+                                <p class="card-text">Active Users</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-info">${stats.actions}</h5>
+                                <p class="card-text">Action Types</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">Online</h5>
+                                <p class="card-text">System Status</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+            `;
+            
+            document.getElementById('logs-container').innerHTML = statsHtml;
+            // Charger les logs après les statistiques
+            loadActivityLogs();
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+        document.getElementById('logs-container').innerHTML = '<div class="alert alert-danger">Error loading statistics</div>';
+    }
+}
 /**
  * Retourne l'icône appropriée pour le type de notification
  * @param {string} type - Type de notification
@@ -1339,4 +1404,127 @@ async function exportToPDF() {
         exportButton.disabled = false;
         exportButton.innerHTML = originalContent;
     }
+}
+
+function showAdminPanel() {
+    const modal = new bootstrap.Modal(document.getElementById('admin-panel'));
+    modal.show();
+    
+    // Charger les statistiques et les logs au premier affichage
+    loadLogsStats(); // Cette fonction chargera aussi les logs
+    
+    // Ajouter un listener pour charger les users quand on clique sur l'onglet
+    document.querySelector('a[href="#users-tab"]').addEventListener('click', function() {
+        loadUsers();
+    });
+}
+
+async function loadActivityLogs() {
+    try {
+        const response = await fetch('/api/logs?limit=50');
+        const result = await response.json();
+        
+        if (result.success) {
+            displayLogs(result.logs);
+        }
+    } catch (error) {
+        console.error('Error loading logs:', error);
+        document.getElementById('logs-container').innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
+    }
+}
+
+function displayLogs(logs) {
+    // Chercher le conteneur des logs ou créer une div après les stats
+    let logsContainer = document.getElementById('logs-table-container');
+    if (!logsContainer) {
+        logsContainer = document.createElement('div');
+        logsContainer.id = 'logs-table-container';
+        document.getElementById('logs-container').appendChild(logsContainer);
+    }
+    
+    if (logs.length === 0) {
+        logsContainer.innerHTML = '<div class="alert alert-info">No activity logs found</div>';
+        return;
+    }
+    
+    let html = `
+        <h5>Recent Activity Logs</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    logs.reverse().forEach(log => {
+        html += `
+            <tr>
+                <td><small>${new Date(log.timestamp).toLocaleString()}</small></td>
+                <td><span class="badge bg-primary">${log.username.split('@')[0]}</span></td>
+                <td><strong>${log.action}</strong></td>
+                <td><small>${log.details}</small></td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    logsContainer.innerHTML = html;
+}
+
+async function loadUsers() {
+    try {
+        const response = await fetch('/api/users');
+        const result = await response.json();
+        
+        if (result.success) {
+            displayUsers(result.users);
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('users-container').innerHTML = '<div class="alert alert-danger">Error loading users</div>';
+    }
+}
+
+function displayUsers(users) {
+    const container = document.getElementById('users-container');
+    
+    if (users.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No users found</div>';
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    users.forEach(user => {
+        const roleClass = user.role === 'admin' ? 'bg-primary' : 'bg-secondary';
+        html += `
+            <tr>
+                <td><code>${user.username}</code></td>
+                <td><strong>${user.full_name}</strong></td>
+                <td><span class="badge ${roleClass}">${user.role}</span></td>
+                <td><small>${new Date(user.created_at).toLocaleDateString()}</small></td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
 }
