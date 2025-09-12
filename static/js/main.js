@@ -88,7 +88,7 @@ async function uploadFile(file, type) {
     
     try {
         console.log(`📤 Upload ${type}:`, file.name);
-        
+
         // Affichage du statut de progression
         statusDiv.innerHTML = `
             <div class="alert alert-info fade-in-up">
@@ -101,16 +101,20 @@ async function uploadFile(file, type) {
                 </div>
             </div>
         `;
-        
+                
         // Préparation de la requête
         const formData = new FormData();
         formData.append('file', file);
         formData.append('file_type', type);
         
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
+
         // Envoi à l'API
         const response = await fetch('/api/upload', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
         
         if (response.ok) {

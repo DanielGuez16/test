@@ -208,7 +208,7 @@ async def health_check():
     }
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), file_type: str = Form(...)):
+async def upload_file(file: UploadFile = File(..., max_size=1024*1024*1024), file_type: str = Form(...)):
     """
     Upload sans écriture de fichiers - Tout en mémoire
     """
