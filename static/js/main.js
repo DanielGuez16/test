@@ -1266,8 +1266,15 @@ function addExportButton() {
 }
 
 async function exportToPDF() {
+    const exportButton = document.querySelector('button[onclick="exportToPDF()"]');
+    const originalContent = exportButton.innerHTML;
+    
     try {
-        showNotification('Generating PDF...', 'info');
+        // Changer le bouton en mode loading
+        exportButton.disabled = true;
+        exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>GENERATING PDF...';
+        
+        showNotification('Generating PDF report...', 'info');
         
         const response = await fetch('/api/export-pdf', { method: 'POST' });
         
@@ -1286,5 +1293,9 @@ async function exportToPDF() {
     } catch (error) {
         console.error('Export error:', error);
         showNotification('Error exporting PDF', 'error');
+    } finally {
+        // Restaurer le bouton
+        exportButton.disabled = false;
+        exportButton.innerHTML = originalContent;
     }
 }

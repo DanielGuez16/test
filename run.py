@@ -857,7 +857,7 @@ def calculate_variations(totals_summary):
         return {}
     
     variations = {}
-    for category in ["ACTIF", "PASSIF"]:
+    for category in ["ASSET", "LIABILITY"]:
         j_value = totals_summary["j"].get(category, 0)
         j1_value = totals_summary["jMinus1"].get(category, 0)
         
@@ -888,13 +888,13 @@ def generate_executive_summary(variations):
     for category, data in variations.items():
         variation = data["variation"]
         if abs(variation) >= 0.1:  # Variations significatives >= 100M€
-            direction = "hausse" if variation > 0 else "baisse"
-            summary_parts.append(f"{category}: {direction} de {abs(variation):.2f} Md€")
+            direction = "increase" if variation > 0 else "decrease"
+            summary_parts.append(f"{category}: {direction} of {abs(variation):.2f} Md€")
     
     if summary_parts:
         return f"On {date_str} Natixis' balance sheet presents some variations: {', '.join(summary_parts)}."
     else:
-        return f"Balance Sheet au {date_str} - Variations mineures observées (< 100M€)."
+        return f"Balance Sheet on {date_str} - Small variations observed (< 100M€)."
 
 
 @app.post("/api/export-pdf")
@@ -1047,8 +1047,7 @@ def create_consumption_analysis_grouped_only(dataframes):
                     
                     # CONVERTIR EN DICTIONNAIRE SÉRIALISABLE
                     metier_details[file_type] = grouped.to_dict(orient='records')
-        
-        print (f"TESTSTSTSTSTSTST : {metier_detailed_analysis}")
+    
         return {
             "title": "2. LCR Consumption",
             "consumption_table_html": consumption_html,
