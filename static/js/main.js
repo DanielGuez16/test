@@ -389,6 +389,9 @@ let chatMessages = [];
  */
 function showChatbot() {
     document.getElementById('chatbot-section').style.display = 'block';
+
+    // Initialiser le drag & drop pour les documents
+    initializeDocumentDragAndDrop();
     
     // Message initial du bot
     if (chatMessages.length === 0) {
@@ -466,6 +469,40 @@ function addChatMessage(type, message) {
     
     // Sauvegarder en mémoire
     chatMessages.push({ type, message, timestamp: new Date() });
+}
+
+function initializeDocumentDragAndDrop() {
+    const docUploadArea = document.getElementById('doc-upload-area');
+    
+    if (docUploadArea) {
+        docUploadArea.addEventListener('dragover', handleDocDragOver);
+        docUploadArea.addEventListener('dragenter', handleDocDragEnter);
+        docUploadArea.addEventListener('dragleave', handleDocDragLeave);
+        docUploadArea.addEventListener('drop', handleDocDrop);
+    }
+}
+
+function handleDocDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+function handleDocDragEnter(e) {
+    e.preventDefault();
+}
+
+function handleDocDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+function handleDocDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        uploadDocument(files[0]);
+    }
 }
 
 /**
