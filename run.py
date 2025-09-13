@@ -28,7 +28,7 @@ from typing import Dict, Any, Optional
 import psutil
 import os
 import tempfile
-from user import authenticate_user, log_activity, get_logs, USERS_DB, get_logs_stats
+from user import authenticate_user, log_activity, get_logs, USERS_DB
 import secrets
 
 from llm_connector import LLMConnector
@@ -1003,7 +1003,8 @@ def calculate_variations(totals_summary):
         return {}
     
     variations = {}
-    for category in ["ASSET", "LIABILITY"]:
+    for category in ["ACTIF", "PASSIF"]:
+        
         j_value = totals_summary["j"].get(category, 0)
         j1_value = totals_summary["jMinus1"].get(category, 0)
         
@@ -1032,10 +1033,16 @@ def generate_executive_summary(variations):
     summary_parts = []
     
     for category, data in variations.items():
+        if category == "ACTIF":
+            category_name = "ASSET"
+        elif category == "PASSIF": 
+            category_name = "LIABILITY"
+        else:
+            category_name = category  # fallback
         variation = data["variation"]
         if abs(variation) >= 0.1:  # Variations significatives >= 100M€
             direction = "increase" if variation > 0 else "decrease"
-            summary_parts.append(f"{category}: {direction} of {abs(variation):.2f} Md€")
+            summary_parts.append(f"{category_name}: {direction} of {abs(variation):.2f} Md€")
     
     if summary_parts:
         return f"On {date_str} Natixis' balance sheet presents some variations: {', '.join(summary_parts)}."

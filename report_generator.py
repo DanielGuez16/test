@@ -451,8 +451,12 @@ class ReportGenerator:
             variation = data["variation"]
             is_positive = variation >= 0
             
-            # Traduire les catégories
-            category_name = "ASSET" if category == "ACTIF" else "LIABILITY"
+            if category == "ACTIF":
+                category_name = "ASSET"
+            elif category == "PASSIF": 
+                category_name = "LIABILITY"
+            else:
+                category_name = category  # fallback
             
             html += f"""
             <div class="balance-variation-card">
