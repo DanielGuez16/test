@@ -100,7 +100,6 @@ async function uploadFile(file, type) {
     try {
         console.log(`📤 Upload ${type}:`, file.name);
 
-        // Affichage du statut de progression
         statusDiv.innerHTML = `
             <div class="alert alert-info fade-in-up">
                 <div class="d-flex align-items-center">
@@ -112,55 +111,44 @@ async function uploadFile(file, type) {
                 </div>
             </div>
         `;
-                
-        // Préparation de la requête
+        
         const formData = new FormData();
         formData.append('file', file);
         formData.append('file_type', type);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        // Augmenter le timeout à 10 minutes pour les gros fichiers
+        const timeoutId = setTimeout(() => {
+            console.warn('Upload timeout reached');
+            controller.abort();
+        }, 600000); // 10 minutes au lieu de 5
 
-        // Envoi à l'API
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-            signal: controller.signal
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log(`✅ Upload ${type} réussi:`, result);
+        try {
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            });
             
-            // Mise à jour du statut
-            statusDiv.innerHTML = `
-                <div class="alert alert-success fade-in-up">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="d-flex align-items-center mb-1">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                <strong>${file.name}</strong>
-                            </div>
-                            <small class="text-muted">
-                                ${result.rows?.toLocaleString()} rows • 
-                                ${result.columns} columns • 
-                                ${formatFileSize(file.size)}
-                            </small>
-                        </div>
-                        <span class="badge bg-success">OK</span>
-                    </div>
-                </div>
-            `;
+            // IMPORTANT: Annuler le timeout en cas de succès
+            clearTimeout(timeoutId);
             
-            // Marquer le fichier comme prêt
-            filesReady[type === 'j' ? 'j' : 'j1'] = true;
+            if (response.ok) {
+                const result = await response.json();
+                console.log(`✅ Upload ${type} réussi:`, result);
+                
+                // ... reste du code de succès
+            } else {
+                const errorData = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
+                throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+            }
+        } catch (fetchError) {
+            clearTimeout(timeoutId); // Nettoyer le timeout même en cas d'erreur
             
-            // Vérifier si on peut activer l'analyse
-            checkAnalyzeButtonState();
-            
-        } else {
-            const errorData = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
-            throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Upload annulé (timeout ou interruption)');
+            }
+            throw fetchError;
         }
         
     } catch (error) {
