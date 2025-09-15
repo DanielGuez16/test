@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 
-# Base de données utilisateurs simple (en production: vraie BDD)
+# Base de donnÃ©es utilisateurs simple (en production: vraie BDD)
 USERS_DB = {
     "daniel.guez@natixis.com": {
         "username": "daniel.guez@natixis.com",
@@ -50,7 +50,7 @@ def authenticate_user(username: str, password: str) -> Optional[Dict]:
     return None
 
 def log_activity(username: str, action: str, details: str = ""):
-    """Enregistre une activité utilisateur dans un fichier JSON persistant"""
+    """Enregistre une activitÃ© utilisateur dans un fichier JSON persistant"""
     log_entry = {
         "timestamp": datetime.now().isoformat(),
         "username": username,
@@ -65,19 +65,19 @@ def log_activity(username: str, action: str, details: str = ""):
             with open(LOGS_FILE, "r", encoding="utf-8") as f:
                 logs = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
-            # Si le fichier est corrompu ou vide, on repart à zéro
+            # Si le fichier est corrompu ou vide, on repart Ã  zÃ©ro
             logs = []
     
     # Ajouter le nouveau log
     logs.append(log_entry)
     
-    # Limiter à 1000 logs maximum (pour éviter un fichier trop gros)
+    # Limiter Ã  1000 logs maximum (pour Ã©viter un fichier trop gros)
     if len(logs) > 1000:
-        logs = logs[-1000:]  # Garder les 1000 plus récents
+        logs = logs[-1000:]  # Garder les 1000 plus rÃ©cents
     
     # Sauvegarder dans le fichier
     try:
-        # Créer le dossier si nécessaire
+        # CrÃ©er le dossier si nÃ©cessaire
         Path(LOGS_FILE).parent.mkdir(exist_ok=True)
         
         with open(LOGS_FILE, "w", encoding="utf-8") as f:
@@ -88,7 +88,7 @@ def log_activity(username: str, action: str, details: str = ""):
         print(f"ERREUR sauvegarde log: {e}")
 
 def get_logs(limit: int = 100) -> List[Dict]:
-    """Récupère les logs d'activité depuis le fichier JSON"""
+    """RÃ©cupÃ¨re les logs d'activitÃ© depuis le fichier JSON"""
     if not os.path.exists(LOGS_FILE):
         return []
     
@@ -96,7 +96,7 @@ def get_logs(limit: int = 100) -> List[Dict]:
         with open(LOGS_FILE, "r", encoding="utf-8") as f:
             logs = json.load(f)
         
-        # Retourner les derniers logs (limité)
+        # Retourner les derniers logs (limitÃ©)
         return logs[-limit:] if logs else []
     
     except (json.JSONDecodeError, FileNotFoundError, Exception) as e:

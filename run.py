@@ -1101,7 +1101,7 @@ async def export_pdf(session_token: Optional[str] = Cookie(None)):
         logger.info(f"Chemin de sortie: {output_path}")
         
         # Générer PDF
-        generator.export_to_pdf(output_path)
+        await generator.export_to_pdf(output_path)
         
         logger.info("PDF généré avec succès")
 

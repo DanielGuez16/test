@@ -1,14 +1,12 @@
 # report_generator.py
 import asyncio
-from weasyprint import HTML, CSS
-import matplotlib.pyplot as plt
+from pyppeteer import launch
 from pathlib import Path
 from datetime import datetime
 import tempfile
 import os
 import json
 import base64
-import io
 
 class ReportGenerator:
     def __init__(self, analysis_results, last_ai_response=None):
@@ -17,8 +15,8 @@ class ReportGenerator:
         self.timestamp = datetime.now()
         self.chart_images = {}  # Stockage des images de graphiques
     
-    def generate_static_charts(self):
-        """Génère les graphiques statiques avec matplotlib"""
+    async def capture_charts_with_puppeteer(self, browser):
+        """Capture les graphiques depuis une page HTML temporaire avec Chart.js"""
         cons = self.analysis_results.get("consumption", {})
         significant_groups = cons.get("significant_groups", [])
         metier_details = cons.get("metier_details", {})
@@ -26,106 +24,260 @@ class ReportGenerator:
         if not significant_groups or not metier_details:
             return {}
         
-        chart_images = {}
+        # Créer le HTML temporaire avec Chart.js et les mêmes données que l'interface
+        chart_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+            <style>
+                body {{ margin: 0; padding: 20px; background: white; }}
+                .chart-container {{ 
+                    width: 600px; 
+                    height: 300px; 
+                    margin: 15px auto; 
+                    background: white; 
+                    padding: 20px;
+                    border: 1px solid #e0e6ed;
+                    border-radius: 8px;
+                }}
+                canvas {{ background: white !important; }}
+                h3 {{ 
+                    color: #76279b; 
+                    text-align: center; 
+                    margin-bottom: 20px; 
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                }}
+            </style>
+        </head>
+        <body>
+            <div id="charts-container"></div>
+            <script>
+                const significantGroups = {json.dumps(significant_groups)};
+                const metierDetails = {json.dumps(metier_details)};
+                
+                // Copie exacte de la fonction prepareMetierChartData de main.js
+                function prepareMetierChartData(groupe, metierDetails) {{
+                    try {{
+                        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+                        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+                        
+                        if (dataJ.length === 0 && dataJ1.length === 0) {{
+                            return null;
+                        }}
+                        
+                        const metiersMap = new Map();
+                        
+                        // Ajouter les données J-1
+                        dataJ1.forEach(item => {{
+                            metiersMap.set(item.Métier, {{
+                                metier: item.Métier,
+                                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
+                                j: 0
+                            }});
+                        }});
+                        
+                        // Ajouter/mettre à jour avec les données J
+                        dataJ.forEach(item => {{
+                            if (metiersMap.has(item.Métier)) {{
+                                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
+                            }} else {{
+                                metiersMap.set(item.Métier, {{
+                                    metier: item.Métier,
+                                    j_minus_1: 0,
+                                    j: item.LCR_ECO_IMPACT_LCR_Bn
+                                }});
+                            }}
+                        }});
+                        
+                        // Calculer les variations et trier
+                        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({{
+                            metier: metier,
+                            variation: data.j - data.j_minus_1,
+                            j: data.j,
+                            j_minus_1: data.j_minus_1
+                        }}));
+                        
+                        metierVariations.sort((a, b) => b.variation - a.variation);
+                        
+                        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
+                        
+                        let labels = [];
+                        let variations = [];
+                        
+                        if (totalVariation >= 0) {{
+                            labels.push('TOTAL GROUP');
+                            variations.push(totalVariation);
+                            
+                            metierVariations.forEach(item => {{
+                                labels.push(item.metier);
+                                variations.push(item.variation);
+                            }});
+                        }} else {{
+                            metierVariations.forEach(item => {{
+                                labels.push(item.metier);
+                                variations.push(item.variation);
+                            }});
+                            
+                            labels.push('TOTAL GROUP');
+                            variations.push(totalVariation);
+                        }}
+                        
+                        return {{
+                            labels: labels,
+                            datasets: [{{
+                                label: 'Variation (D - D-1)',
+                                data: variations,
+                                backgroundColor: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    
+                                    if (isTotalBar) {{
+                                        return '#6B218D';
+                                    }}
+                                    return v >= 0 ? '#51A0A2' : '#805bed';
+                                }}),
+                                borderColor: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    
+                                    if (isTotalBar) {{
+                                        return '#6B218D';
+                                    }}
+                                    return v >= 0 ? '#51A0A2' : '#805bed';
+                                }}),
+                                borderWidth: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    return isTotalBar ? 3 : 2;
+                                }})
+                            }}]
+                        }};
+                        
+                    }} catch (error) {{
+                        console.error('Erreur préparation données pour', groupe, ':', error);
+                        return null;
+                    }}
+                }}
+                
+                // Créer les graphiques
+                const container = document.getElementById('charts-container');
+                let chartsCreated = 0;
+                
+                significantGroups.forEach((groupe, index) => {{
+                    const chartData = prepareMetierChartData(groupe, metierDetails);
+                    
+                    if (!chartData) {{
+                        chartsCreated++;
+                        return;
+                    }}
+                    
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'chart-container';
+                    chartDiv.innerHTML = `
+                        <h3>${{groupe}}</h3>
+                        <canvas id="metierChart_${{index}}" width="200" height="100"></canvas>
+                    `;
+                    container.appendChild(chartDiv);
+                    
+                    const canvas = document.getElementById(`metierChart_${{index}}`);
+                    
+                    new Chart(canvas.getContext('2d'), {{
+                        type: 'bar',
+                        data: chartData,
+                        options: {{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {{
+                                title: {{
+                                    display: true,
+                                    text: `LCR variations detailed for - ${{groupe}}`,
+                                    font: {{ size: 14, weight: 'bold' }}
+                                }},
+                                legend: {{
+                                    display: true,
+                                    position: 'top'
+                                }}
+                            }},
+                            scales: {{
+                                y: {{
+                                    beginAtZero: false,
+                                    title: {{
+                                        display: true,
+                                        text: 'LCR Impact (Bn €)'
+                                    }},
+                                    grid: {{
+                                        color: 'rgba(0,0,0,0.1)'
+                                    }}
+                                }},
+                                x: {{
+                                    title: {{
+                                        display: true,
+                                        text: ''
+                                    }},
+                                    ticks: {{
+                                        maxRotation: 45,
+                                        minRotation: 0
+                                    }}
+                                }}
+                            }},
+                            elements: {{
+                                bar: {{
+                                    borderWidth: 1
+                                }}
+                            }}
+                        }}
+                    }});
+                    
+                    chartsCreated++;
+                }});
+                
+                // Marquer comme prêt quand tous les graphiques sont créés
+                setTimeout(() => {{
+                    document.body.classList.add('charts-ready');
+                    console.log('Charts ready, total created:', chartsCreated);
+                }}, 2000);
+            </script>
+        </body>
+        </html>
+        """
         
-        for groupe in significant_groups:
+        # Écrire le fichier temporaire
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8')
+        temp_file.write(chart_html)
+        temp_file.close()
+        
+        # Créer une nouvelle page pour la capture
+        page = await browser.newPage()
+        await page.setViewport({'width': 1200, 'height': 800})
+        
+        try:
+            # Naviguer vers le fichier temporaire
+            await page.goto(f'file://{temp_file.name}')
+            
+            # Attendre que Chart.js soit chargé et que les graphiques soient rendus
+            await page.waitForSelector('.charts-ready', {'timeout': 15000})
+            await page.waitFor(1000)  # Attendre 1s supplémentaire pour l'animation
+            
+            # Capturer chaque graphique individuellement
+            chart_images = {}
+            for i, groupe in enumerate(significant_groups):
+                try:
+                    element = await page.querySelector(f'#metierChart_{i}')
+                    if element:
+                        screenshot = await element.screenshot({'type': 'png'})
+                        chart_images[groupe] = base64.b64encode(screenshot).decode()
+                except Exception as e:
+                    print(f"Erreur capture graphique {groupe}: {e}")
+            
+            await page.close()
+            
+        finally:
+            # Nettoyer le fichier temporaire
             try:
-                # Préparer les données comme dans main.js
-                chart_data = self.prepare_chart_data(groupe, metier_details)
-                if not chart_data:
-                    continue
-                
-                # Créer le graphique matplotlib
-                fig, ax = plt.subplots(figsize=(10, 6))
-                
-                labels = chart_data['labels']
-                variations = chart_data['data']
-                
-                # Couleurs selon votre logique
-                colors = []
-                for i, (label, var) in enumerate(zip(labels, variations)):
-                    if label == 'TOTAL GROUP':
-                        colors.append('#6B218D')
-                    else:
-                        colors.append('#51A0A2' if var >= 0 else '#805bed')
-                
-                bars = ax.bar(labels, variations, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
-                
-                ax.set_title(f'LCR variations detailed for - {groupe}', 
-                        fontweight='bold', fontsize=14, color='#76279b')
-                ax.set_ylabel('LCR Impact (Bn €)', fontweight='bold')
-                ax.grid(axis='y', alpha=0.3)
-                
-                if len(labels) > 5:
-                    plt.xticks(rotation=45, ha='right')
-                
-                # Valeurs sur les barres
-                for bar, value in zip(bars, variations):
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height,
-                        f'{value:+.3f}', ha='center', va='bottom' if height >= 0 else 'top',
-                        fontweight='bold', fontsize=9)
-                
-                plt.tight_layout()
-                
-                # Convertir en base64
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', 
-                        facecolor='white', edgecolor='none')
-                buffer.seek(0)
-                chart_images[groupe] = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-            except Exception as e:
-                print(f"Erreur génération graphique {groupe}: {e}")
+                os.unlink(temp_file.name)
+            except:
+                pass
         
         return chart_images
-
-
-    def prepare_chart_data(self, groupe, metier_details):
-        """Reproduit la logique de prepareMetierChartData de main.js"""
-        try:
-            data_j = metier_details.get('j', [])
-            data_j1 = metier_details.get('jMinus1', [])
-            
-            j_filtered = [item for item in data_j if item.get('LCR_ECO_GROUPE_METIERS') == groupe]
-            j1_filtered = [item for item in data_j1 if item.get('LCR_ECO_GROUPE_METIERS') == groupe]
-            
-            if not j_filtered and not j1_filtered:
-                return None
-            
-            metiers = {}
-            
-            for item in j1_filtered:
-                metier = item.get('Métier', 'Unknown')
-                metiers[metier] = {'j_minus_1': item.get('LCR_ECO_IMPACT_LCR_Bn', 0), 'j': 0}
-            
-            for item in j_filtered:
-                metier = item.get('Métier', 'Unknown')
-                if metier in metiers:
-                    metiers[metier]['j'] = item.get('LCR_ECO_IMPACT_LCR_Bn', 0)
-                else:
-                    metiers[metier] = {'j_minus_1': 0, 'j': item.get('LCR_ECO_IMPACT_LCR_Bn', 0)}
-            
-            # Calculer variations et trier
-            variations = [(metier, values['j'] - values['j_minus_1']) for metier, values in metiers.items()]
-            variations.sort(key=lambda x: x[1], reverse=True)
-            
-            total_var = sum([var for _, var in variations])
-            
-            # Même logique que main.js pour positionner TOTAL
-            if total_var >= 0:
-                labels = ['TOTAL GROUP'] + [metier for metier, _ in variations]
-                data = [total_var] + [var for _, var in variations]
-            else:
-                labels = [metier for metier, _ in variations] + ['TOTAL GROUP']
-                data = [var for _, var in variations] + [total_var]
-            
-            return {'labels': labels, 'data': data}
-            
-        except Exception as e:
-            print(f"Erreur préparation données {groupe}: {e}")
-            return None
     
     def generate_export_html(self):
         """Génère le HTML pour export avec CSS inline"""
@@ -684,40 +836,37 @@ class ReportGenerator:
         }
 
         """
-
-async def export_to_pdf(self, output_path):
-    """Génère le PDF avec WeasyPrint (sans Chromium)"""
-    try:
-        # Générer les graphiques statiques
-        self.chart_images = self.generate_static_charts()
+    
+    async def export_to_pdf(self, output_path):
+        """Génère le PDF avec capture des graphiques via Puppeteer"""
+        browser = await launch({
+            'headless': True,
+            'args': ['--no-sandbox', '--disable-setuid-sandbox']
+        })
         
-        # Générer le HTML
-        html_content = self.generate_export_html()
-        
-        # CSS optimisé pour WeasyPrint
-        css_content = """
-        @page { size: A4; margin: 1.5cm 1cm; }
-        body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; }
-        .section { page-break-inside: avoid; margin-bottom: 25px; }
-        .section h2 { color: #76279b; font-size: 16px; border-bottom: 2px solid #ab54d4; }
-        table { width: 100%; border-collapse: collapse; font-size: 9px; }
-        th { background: #bf7cde !important; color: white; padding: 6px; text-align: center; }
-        td { padding: 4px; border: 1px solid #ddd; text-align: right; }
-        .total-row { background: #f3dffc; font-weight: bold; }
-        .variation-positive { color: #28a745; font-weight: bold; }
-        .variation-negative { color: #dc3545; font-weight: bold; }
-        .chart-container-pdf img { max-width: 100%; height: auto; page-break-inside: avoid; }
-        .summary-box { background: #f8f9fa; border-left: 4px solid #ab54d4; padding: 12px; }
-        """
-        
-        # Créer le PDF
-        html_doc = HTML(string=html_content)
-        css_doc = CSS(string=css_content)
-        html_doc.write_pdf(output_path, stylesheets=[css_doc])
+        try:
+            # NOUVEAU : Capturer les graphiques d'abord
+            self.chart_images = await self.capture_charts_with_puppeteer(browser)
+            
+            # Ensuite générer le HTML avec les images intégrées
+            html_content = self.generate_export_html()
+            
+            # Créer une nouvelle page pour le PDF
+            page = await browser.newPage()
+            await page.setContent(html_content)
+            await page.pdf({
+                'path': output_path,
+                'format': 'A4',
+                'margin': {
+                    'top': '1cm',
+                    'right': '1cm',
+                    'bottom': '1cm',
+                    'left': '1cm'
+                },
+                'printBackground': True
+            })
+            
+        finally:
+            await browser.close()
         
         return output_path
-        
-    except ImportError:
-        raise ImportError("WeasyPrint non installé. Exécutez: pip install weasyprint")
-    except Exception as e:
-        raise Exception(f"Erreur génération PDF: {str(e)}")
