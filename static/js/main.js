@@ -117,9 +117,12 @@ async function uploadFile(file, type) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('file_type', type);
-        
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        const timeoutId = setTimeout(() => {
+            console.log('Upload timeout après 5 minutes');
+            controller.abort();
+        }, 300000);
 
         // Envoi à l'API
         const response = await fetch('/api/upload', {
@@ -127,6 +130,8 @@ async function uploadFile(file, type) {
             body: formData,
             signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
             const result = await response.json();
@@ -164,8 +169,23 @@ async function uploadFile(file, type) {
         }
         
     } catch (error) {
-        console.error(`❌ Erreur upload ${type}:`, error);
-        
+    clearTimeout(timeoutId); // Ajouter cette ligne
+    console.error(`❌ Erreur upload ${type}:`, error);
+    
+    // Gestion spécifique pour les timeouts/abort
+    if (error.name === 'AbortError') {
+        statusDiv.innerHTML = `
+            <div class="alert alert-warning fade-in-up">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-clock me-2"></i>
+                    <div>
+                        <strong>Upload timeout</strong><br>
+                        <small>Le fichier est trop volumineux ou la connexion trop lente</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
         statusDiv.innerHTML = `
             <div class="alert alert-danger fade-in-up">
                 <div class="d-flex align-items-center">
@@ -177,10 +197,11 @@ async function uploadFile(file, type) {
                 </div>
             </div>
         `;
-        
-        filesReady[type === 'j' ? 'j' : 'j1'] = false;
-        checkAnalyzeButtonState();
     }
+    
+    filesReady[type === 'j' ? 'j' : 'j1'] = false;
+    checkAnalyzeButtonState();
+}
 }
 
 /**

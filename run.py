@@ -1692,7 +1692,7 @@ if __name__ == "__main__":
     port=8000,
     reload=False,
     log_level="info",
-    timeout_keep_alive=600,  # 10 minutes
+    timeout_keep_alive=900,  # 15 minutes
     limit_max_requests=100,  # Réduire pour forcer le recyclage
     workers=1  # Une seule instance pour éviter la duplication mémoire
     )
