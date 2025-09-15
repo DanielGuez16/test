@@ -7,8 +7,6 @@ import tempfile
 import os
 import json
 import base64
-import logger
-
 
 class ReportGenerator:
     def __init__(self, analysis_results, last_ai_response=None):
@@ -401,6 +399,22 @@ class ReportGenerator:
                 <p>{cons['analysis_text']}</p>
             </div>
             """
+
+        if hasattr(self, 'chart_images') and self.chart_images:
+            html += '<h3>Details by Group</h3>'
+            html += '<div class="charts-grid">'
+            
+            for groupe, image_base64 in self.chart_images.items():
+                html += f"""
+                <div class="chart-item">
+                    <div class="chart-container-pdf-small">
+                        <img src="data:image/png;base64,{image_base64}" 
+                            style="max-width: 100%; height: auto;" 
+                            alt="Chart for {groupe}">
+                    </div>
+                </div>
+                """
+
         if cons.get("metier_detailed_analysis"):
             html += f"""
             <div class="summary-box">
@@ -498,16 +512,6 @@ class ReportGenerator:
     def _get_inline_css(self):
         """CSS optimisé pour l'impression PDF avec support des graphiques"""
         return """
-        @page { 
-            size: A4; 
-            margin: 1cm; 
-        }
-        
-        /* Masquer les graphiques pour WeasyPrint */
-        .charts-grid,
-        .chart-container-pdf-small {
-            display: none !important;
-        }
         body { 
             font-family: 'Segoe UI', Arial, sans-serif; 
             margin: 0; 
@@ -831,42 +835,38 @@ class ReportGenerator:
             max-width: 60%;
         }
 
-        """ 
-    def export_to_pdf(self, output_path):
-        """Génère le PDF avec WeasyPrint (méthode synchrone)"""
+        """
+    
+    async def export_to_pdf(self, output_path):
+        """Génère le PDF avec capture des graphiques via Puppeteer"""
+        browser = await launch({
+            'headless': True,
+            'args': ['--no-sandbox', '--disable-setuid-sandbox']
+        })
+        
         try:
-            from weasyprint import HTML, CSS
-            import logging
-            logger = logging.getLogger(__name__)
+            # NOUVEAU : Capturer les graphiques d'abord
+            self.chart_images = await self.capture_charts_with_puppeteer(browser)
             
-            logger.info("Génération HTML pour WeasyPrint")
+            # Ensuite générer le HTML avec les images intégrées
             html_content = self.generate_export_html()
             
-            # CSS spécifique pour l'impression PDF
-            pdf_css = CSS(string="""
-                @page { 
-                    size: A4; 
-                    margin: 1cm; 
-                }
-                body {
-                    font-size: 11px !important;
-                }
-                .charts-grid {
-                    display: none !important;
-                }
-            """)
+            # Créer une nouvelle page pour le PDF
+            page = await browser.newPage()
+            await page.setContent(html_content)
+            await page.pdf({
+                'path': output_path,
+                'format': 'A4',
+                'margin': {
+                    'top': '1cm',
+                    'right': '1cm',
+                    'bottom': '1cm',
+                    'left': '1cm'
+                },
+                'printBackground': True
+            })
             
-            logger.info(f"Écriture PDF vers : {output_path}")
-            HTML(string=html_content).write_pdf(
-                output_path, 
-                stylesheets=[pdf_css]
-            )
-            
-            logger.info("PDF généré avec succès")
-            return output_path
-            
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Erreur WeasyPrint : {str(e)}")
-            raise Exception(f"Erreur WeasyPrint : {str(e)}")
+        finally:
+            await browser.close()
+        
+        return output_path

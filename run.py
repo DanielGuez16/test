@@ -1052,16 +1052,22 @@ def generate_executive_summary(variations):
 
 @app.post("/api/export-pdf")
 async def export_pdf(session_token: Optional[str] = Cookie(None)):
+    # Vérifier l'authentification
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        logger.info("Début génération PDF avec WeasyPrint")
+        logger.info("Début génération PDF")
+
+        # NOUVEAU LOG : Début génération PDF
         log_activity(current_user["username"], "PDF_EXPORT_START", "Started PDF report generation")
         
+        # Récupérer les données d'analyse
         if not chatbot_session.get("context_data"):
             raise HTTPException(status_code=400, detail="Aucune analyse disponible")
+        
+        logger.info("Données d'analyse trouvées")
         
         # Récupérer la dernière réponse IA
         last_ai_response = None
@@ -1069,6 +1075,8 @@ async def export_pdf(session_token: Optional[str] = Cookie(None)):
             ai_messages = [msg for msg in chatbot_session["messages"] if msg["type"] == "assistant"]
             if ai_messages:
                 last_ai_response = ai_messages[-1]["message"]
+        
+        logger.info(f"Dernière réponse IA: {bool(last_ai_response)}")
         
         # Générer le rapport
         generator = ReportGenerator(
@@ -1079,18 +1087,25 @@ async def export_pdf(session_token: Optional[str] = Cookie(None)):
             last_ai_response=last_ai_response
         )
         
+        logger.info("ReportGenerator créé")
+        
         # Créer fichier temporaire
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"LCR_Analysis_{timestamp}.pdf"
         
+        # Utiliser un chemin compatible macOS
         import tempfile
         temp_dir = tempfile.gettempdir()
         output_path = os.path.join(temp_dir, output_filename)
         
-        # Générer PDF avec WeasyPrint
-        generator.export_to_pdf(output_path)
+        logger.info(f"Chemin de sortie: {output_path}")
+        
+        # Générer PDF
+        await generator.export_to_pdf(output_path)
         
         logger.info("PDF généré avec succès")
+
+        # NOUVEAU LOG : PDF téléchargé avec succès
         log_activity(current_user["username"], "PDF_EXPORT_SUCCESS", f"PDF report downloaded: {output_filename}")
         
         return FileResponse(
@@ -1100,8 +1115,13 @@ async def export_pdf(session_token: Optional[str] = Cookie(None)):
         )
         
     except Exception as e:
+
+        # NOUVEAU LOG : Erreur génération PDF
         log_activity(current_user["username"], "PDF_EXPORT_ERROR", f"PDF generation failed: {str(e)}")
+        
         logger.error(f"Erreur export PDF: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Erreur export PDF: {str(e)}")
     
 #######################################################################################################################################
