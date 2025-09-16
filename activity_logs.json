@@ -1372,5 +1372,83 @@
     "username": "user.alm@natixis.com",
     "action": "DOCUMENT_UPLOAD",
     "details": "Uploaded context document: billet_thaïlande.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T11:17:33.141365",
+    "username": "user.alm@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T11:17:33.154242",
+    "username": "user.alm@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T11:17:49.682355",
+    "username": "user.alm@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as j"
+  },
+  {
+    "timestamp": "2025-09-16T11:17:51.942410",
+    "username": "user.alm@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T11:17:52.827783",
+    "username": "user.alm@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T11:17:59.218725",
+    "username": "user.alm@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-16T11:18:03.072176",
+    "username": "user.alm@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T11:18:10.489271",
+    "username": "user.alm@natixis.com",
+    "action": "PDF_EXPORT_SUCCESS",
+    "details": "PDF report downloaded: LCR_Analysis_20250916_111803.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T11:19:47.492919",
+    "username": "user.alm@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T11:19:47.505911",
+    "username": "user.alm@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T11:19:50.462093",
+    "username": "user.alm@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T11:19:51.670286",
+    "username": "user.alm@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T11:19:52.192837",
+    "username": "user.alm@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
   }
 ]

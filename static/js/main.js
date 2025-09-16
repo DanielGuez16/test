@@ -382,15 +382,20 @@ function displayCompleteResults(analysisResults) {
             html += generateConsumptionSection(analysisResults.consumption);
         }
 
-        // AJOUTER LE BOUTON D'EXPORT ICI
-        html += `
-            <div class="text-center my-4">
-                <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
-                    <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
-                </button>
-            </div>
-        `;
-
+    html += `
+    <div class="text-center my-4">
+        <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
+            <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
+        </button>
+        <div class="mt-2">
+            <small class="text-muted">
+                <i class="fas fa-lightbulb me-1"></i>
+                Report includes analysis results and the latest AI response
+            </small>
+        </div>
+    </div>
+    `;
+        
         document.getElementById('results').innerHTML = html;
         
         // Attendre que le DOM soit mis à jour
