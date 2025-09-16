@@ -614,7 +614,7 @@ class ReportGenerator:
             
             # Initialiser Html2Image
             hti = Html2Image()
-            hti.size = (1200, 700)
+            hti.size = (1400, 900)
             
             chart_images = {}
             
@@ -634,7 +634,7 @@ class ReportGenerator:
                     screenshot_files = hti.screenshot(
                         html_file=temp_file_path,
                         save_as=f'chart_{i}_{groupe.replace(" ", "_")}.png',
-                        size=(1200, 700)
+                        size=(1400, 900)
                     )
                     
                     # Encoder en base64
@@ -774,56 +774,274 @@ class ReportGenerator:
             height: auto;
         }
 
+        /* GRAPHIQUES PLUS GRANDS ET MIEUX PROPORTIONNÉS */
         .charts-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;  /* 2 colonnes */
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: 1fr;  /* UN SEUL graphique par ligne */
+            gap: 40px;  /* Plus d'espace entre graphiques */
+            margin: 40px 0;
             page-break-inside: avoid;
         }
         
         .chart-item {
             page-break-inside: avoid;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            width: 100%;  /* Prend toute la largeur */
         }
         
         .chart-container-pdf-small {
             background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            padding: 25px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
         
         .chart-container-pdf-small img {
-            width: 100%;      /* Prend toute la largeur disponible */
-            height: auto;     /* Garde les proportions */
-            max-height: 350px; /* Limite la hauteur */
-            border-radius: 4px;
+            width: 100%;
+            height: auto;
+            min-height: 400px;  /* Hauteur minimum pour éviter l'écrasement */
+            max-height: 600px;  /* Hauteur maximum */
+            border-radius: 8px;
             display: block;
             margin: 0 auto;
         }
         
-        /* Si un seul graphique, le centrer et le rendre plus grand */
-        .charts-grid:has(.chart-item:only-child) {
-            grid-template-columns: 1fr;
-            justify-items: center;
-        }
-        
-        .charts-grid:has(.chart-item:only-child) .chart-item {
-            max-width: 70%;
-        }
-        
-        /* Pour l'impression, assurer que les graphiques restent lisibles */
+        /* Pour l'impression, assurer de belles proportions */
         @media print {
             .chart-container-pdf-small img {
-                max-height: 300px;
+                min-height: 350px;
+                max-height: 500px;
                 width: 100%;
+            }
+            
+            /* Un graphique par page si nécessaire */
+            .chart-item {
+                page-break-before: auto;
+                page-break-after: auto;
             }
         }
         
         """ + self._get_inline_css()
+
+
+    def _generate_single_chart_html(self, groupe, metier_details, index):
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+            <style>
+                body {{ margin: 0; padding: 30px; background: white; }}
+                .chart-container {{ 
+                    width: 1340px;   /* Plus large */
+                    height: 840px;   /* Beaucoup plus haut pour éviter l'écrasement */
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 30px;
+                }}
+                h3 {{ 
+                    color: #76279b; 
+                    text-align: center; 
+                    margin-bottom: 30px; 
+                    font-size: 24px;  /* Titre plus gros */
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="chart-container">
+                <h3>{groupe}</h3>
+                <canvas id="chart_{index}" width="1280" height="750"></canvas>
+            </div>
+            
+            <script>
+                const metierDetails = {json.dumps(metier_details)};
+                
+                // LOGIQUE COMPLÈTE POUR CRÉER LE GRAPHIQUE
+                function prepareMetierChartData(groupe, metierDetails) {{
+                    try {{
+                        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+                        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+                        
+                        if (dataJ.length === 0 && dataJ1.length === 0) {{
+                            return null;
+                        }}
+                        
+                        const metiersMap = new Map();
+                        
+                        // Ajouter les données J-1
+                        dataJ1.forEach(item => {{
+                            metiersMap.set(item.Métier, {{
+                                metier: item.Métier,
+                                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
+                                j: 0
+                            }});
+                        }});
+                        
+                        // Ajouter/mettre à jour avec les données J
+                        dataJ.forEach(item => {{
+                            if (metiersMap.has(item.Métier)) {{
+                                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
+                            }} else {{
+                                metiersMap.set(item.Métier, {{
+                                    metier: item.Métier,
+                                    j_minus_1: 0,
+                                    j: item.LCR_ECO_IMPACT_LCR_Bn
+                                }});
+                            }}
+                        }});
+                        
+                        // Calculer les variations et trier
+                        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({{
+                            metier: metier,
+                            variation: data.j - data.j_minus_1,
+                            j: data.j,
+                            j_minus_1: data.j_minus_1
+                        }}));
+                        
+                        metierVariations.sort((a, b) => b.variation - a.variation);
+                        
+                        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
+                        
+                        let labels = [];
+                        let variations = [];
+                        
+                        if (totalVariation >= 0) {{
+                            labels.push('TOTAL GROUP');
+                            variations.push(totalVariation);
+                            
+                            metierVariations.forEach(item => {{
+                                labels.push(item.metier);
+                                variations.push(item.variation);
+                            }});
+                        }} else {{
+                            metierVariations.forEach(item => {{
+                                labels.push(item.metier);
+                                variations.push(item.variation);
+                            }});
+                            
+                            labels.push('TOTAL GROUP');
+                            variations.push(totalVariation);
+                        }}
+                        
+                        return {{
+                            labels: labels,
+                            datasets: [{{
+                                label: 'Variation (D - D-1)',
+                                data: variations,
+                                backgroundColor: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    if (isTotalBar) {{
+                                        return '#6B218D';
+                                    }}
+                                    return v >= 0 ? '#51A0A2' : '#805bed';
+                                }}),
+                                borderColor: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    if (isTotalBar) {{
+                                        return '#6B218D';
+                                    }}
+                                    return v >= 0 ? '#51A0A2' : '#805bed';
+                                }}),
+                                borderWidth: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    return isTotalBar ? 3 : 2;
+                                }})
+                            }}]
+                        }};
+                        
+                    }} catch (error) {{
+                        console.error('Erreur préparation données pour', groupe, ':', error);
+                        return null;
+                    }}
+                }}
+                
+                // CRÉER LE GRAPHIQUE
+                const chartData = prepareMetierChartData('{groupe}', metierDetails);
+                
+                if (chartData) {{
+                    new Chart(document.getElementById('chart_{index}'), {{
+                        type: 'bar',
+                        data: chartData,
+                        options: {{
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            plugins: {{
+                                title: {{
+                                    display: true,
+                                    text: 'LCR variations detailed for - {groupe}',
+                                    font: {{ size: 20, weight: 'bold' }}  /* Titre encore plus gros */
+                                }},
+                                legend: {{
+                                    display: true,
+                                    position: 'top',
+                                    labels: {{ 
+                                        font: {{ size: 16 }},  /* Labels plus gros */
+                                        padding: 20
+                                    }}
+                                }}
+                            }},
+                            scales: {{
+                                y: {{
+                                    beginAtZero: false,
+                                    title: {{
+                                        display: true,
+                                        text: 'LCR Impact (Bn €)',
+                                        font: {{ size: 16, weight: 'bold' }}  /* Titre axe plus gros */
+                                    }},
+                                    ticks: {{ 
+                                        font: {{ size: 14 }},  /* Valeurs plus grosses */
+                                        padding: 10
+                                    }},
+                                    grid: {{ color: 'rgba(0,0,0,0.1)' }}
+                                }},
+                                x: {{
+                                    title: {{
+                                        display: true,
+                                        text: 'Business Lines',
+                                        font: {{ size: 16, weight: 'bold' }}
+                                    }},
+                                    ticks: {{ 
+                                        font: {{ size: 13 }},  /* Labels plus gros */
+                                        maxRotation: 45,
+                                        minRotation: 0,
+                                        padding: 10
+                                    }}
+                                }}
+                            }},
+                            elements: {{
+                                bar: {{ 
+                                    borderWidth: 2  /* Bordures plus épaisses */
+                                }}
+                            }},
+                            layout: {{
+                                padding: {{
+                                    top: 20,
+                                    bottom: 20,
+                                    left: 20,
+                                    right: 20
+                                }}
+                            }}
+                        }}
+                    }});
+                    console.log('Graphique créé pour {groupe}');
+                }} else {{
+                    console.error('Pas de données pour {groupe}');
+                }}
+                
+                // Marquer comme prêt après création
+                setTimeout(() => {{
+                    document.body.classList.add('chart-ready');
+                    console.log('Chart ready for {groupe}');
+                }}, 2000);
+            </script>
+        </body>
+        </html>
+        """
 
     def _generate_single_chart_html(self, groupe, metier_details, index):
         return f"""
