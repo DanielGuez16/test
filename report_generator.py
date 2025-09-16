@@ -694,7 +694,7 @@ class ReportGenerator:
             <!-- Bouton d'impression -->
             <div class="no-print print-controls">
                 <button onclick="window.print()" class="print-btn">
-                    📄 Imprimer en PDF
+                    📄 Export to PDF
                 </button>
             </div>
         </body>
@@ -768,13 +768,6 @@ class ReportGenerator:
             color: white !important; 
             padding: 8px 4px; 
             text-align: center; 
-        }
-        
-        .charts-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            page-break-inside: avoid;
         }
         
         .chart-container-pdf-small img {
