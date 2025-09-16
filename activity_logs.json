@@ -1330,5 +1330,47 @@
     "username": "daniel.guez@natixis.com",
     "action": "PDF_EXPORT_SUCCESS",
     "details": "PDF report downloaded: LCR_Analysis_20250915_170118.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:28.768341",
+    "username": "user.alm@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:28.781852",
+    "username": "user.alm@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:36.913443",
+    "username": "user.alm@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:38.421468",
+    "username": "user.alm@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:38.893480",
+    "username": "user.alm@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:49.241706",
+    "username": "user.alm@natixis.com",
+    "action": "DOCUMENT_UPLOAD",
+    "details": "Uploaded context document: 20250809145727657.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T11:11:54.092150",
+    "username": "user.alm@natixis.com",
+    "action": "DOCUMENT_UPLOAD",
+    "details": "Uploaded context document: billet_thaïlande.pdf"
   }
 ]

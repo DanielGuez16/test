@@ -428,6 +428,26 @@ async def get_users_list(session_token: Optional[str] = Cookie(None)):
         "users": users
     }
 
+@app.get("/api/uploaded-documents")
+async def get_uploaded_documents():
+    """
+    Récupère la liste détaillée des documents uploadés
+    """
+    documents = []
+    for doc in chatbot_session.get("uploaded_documents", []):
+        documents.append({
+            "filename": doc["filename"],
+            "upload_time": doc["upload_time"],
+            "size": doc["size"]
+        })
+    
+    return {
+        "success": True,
+        "documents": documents,
+        "count": len(documents)
+    }
+
+
 def cleanup_session_memory():
     """Nettoie la mémoire des DataFrames de session"""
     try:
@@ -745,15 +765,15 @@ def prepare_conversation_context() -> str:
     # Documents uploadés
     docs_context = prepare_documents_context()
     if docs_context:
-        context_parts.append(f"\n\nDocuments fournis par l'utilisateur:\n{docs_context}")
+        context_parts.append(f"\n\nContext Documents:\n{docs_context}")
     
     # Historique de conversation (derniers 10 messages pour éviter de surcharger)
     if chatbot_session["messages"]:
-        context_parts.append("\n\nHistorique de la conversation précédente:")
+        context_parts.append("\n\nHistory of conversation:")
         for msg in chatbot_session["messages"][-10:]:
             role = "Utilisateur" if msg["type"] == "user" else "Assistant"
             context_parts.append(f"{role}: {msg['message']}")
-        context_parts.append("\n--- Fin de l'historique ---")
+        context_parts.append("\n--- End of history of conversation ---")
     
     return "\n".join(context_parts)
 

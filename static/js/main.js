@@ -677,18 +677,24 @@ async function uploadDocument(file) {
  */
 async function updateUploadedDocsList() {
     try {
-        const response = await fetch('/api/chat-history');
+        const response = await fetch('/api/uploaded-documents');
         const result = await response.json();
         
         const docsContainer = document.getElementById('uploaded-docs');
-        if (result.success && result.documents_count > 0) {
-            docsContainer.innerHTML = `
-                <h6 class="mb-2">Documents (${result.documents_count})</h6>
-                <div class="doc-item">
-                    <i class="fas fa-file-alt me-2"></i>
-                    ${result.documents_count} document(s) in context
-                </div>
-            `;
+        if (result.success && result.count > 0) {
+            let docsHtml = `<h6 class="mb-2">Documents (${result.count})</h6>`;
+            
+            result.documents.forEach(doc => {
+                docsHtml += `
+                    <div class="doc-item">
+                        <i class="fas fa-file-alt me-2"></i>
+                        <strong>${doc.filename}</strong>
+                        <br><small class="text-muted">${formatFileSize(doc.size)} - ${new Date(doc.upload_time).toLocaleTimeString()}</small>
+                    </div>
+                `;
+            });
+            
+            docsContainer.innerHTML = docsHtml;
         } else {
             docsContainer.innerHTML = '';
         }
