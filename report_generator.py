@@ -614,7 +614,7 @@ class ReportGenerator:
             
             # Initialiser Html2Image
             hti = Html2Image()
-            hti.size = (1400, 900)
+            hti.size = (1000, 500)
             
             chart_images = {}
             
@@ -634,7 +634,7 @@ class ReportGenerator:
                     screenshot_files = hti.screenshot(
                         html_file=temp_file_path,
                         save_as=f'chart_{i}_{groupe.replace(" ", "_")}.png',
-                        size=(1400, 900)
+                        size=(1000, 500)
                     )
                     
                     # Encoder en base64
@@ -774,15 +774,17 @@ class ReportGenerator:
         .charts-grid {
             display: flex;
             flex-wrap: wrap;
-            justify-content: center;
+            justify-content: center;  # Centrer les éléments
             gap: 20px;
             margin: 30px 0;
         }
 
         .chart-item {
-            flex: 0 0 calc(50% - 10px);  /* 2 par ligne si ça rentre */
-            min-width: 400px;  /* Taille minimum */
-            max-width: 600px;  /* Taille maximum */
+            flex: 0 0 48%;              # Légèrement moins de 50%
+            display: flex;
+            justify-content: center;
+            align-items: center;        # Centrage vertical aussi
+            margin-bottom: 20px;
         }
 
         .chart-container-pdf-small {
@@ -790,18 +792,16 @@ class ReportGenerator:
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 10px;
-            text-align: center;
-            width: fit-content;  /* S'adapte au contenu */
-            margin: 0 auto;
+            display: inline-block;
+            max-width: 100%;   
         }
 
         .chart-container-pdf-small img {
-            width: auto;
+            width: 100%;               # Remplit le conteneur
             height: auto;
-            max-width: 100%;  /* Ne déborde pas */
             display: block;
-            margin: 0 auto;
         }
+
 
         /* WARNING TRÈS VISIBLE */
         .print-warning {
@@ -863,7 +863,7 @@ class ReportGenerator:
         <body>
             <div class="chart-container">
                 <h3>{groupe}</h3>
-                <canvas id="chart_{index}" width="920" height="400"></canvas>
+                <canvas id="chart_{index}" width="920" height="420"></canvas>
             </div>
             
             <script>
