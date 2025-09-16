@@ -769,59 +769,38 @@ class ReportGenerator:
             padding: 8px 4px; 
             text-align: center; 
         }
-        
-        .chart-container-pdf-small img {
-            max-width: 100%;
-            height: auto;
+
+        /* GRAPHIQUES FLEXIBLES */
+        .charts-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
         }
 
-        /* GRAPHIQUES PLUS GRANDS ET MIEUX PROPORTIONNÉS */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr;  /* UN SEUL graphique par ligne */
-            gap: 40px;  /* Plus d'espace entre graphiques */
-            margin: 40px 0;
-            page-break-inside: avoid;
-        }
-        
         .chart-item {
-            page-break-inside: avoid;
-            margin-bottom: 30px;
-            width: 100%;  /* Prend toute la largeur */
+            flex: 0 0 calc(50% - 10px);  /* 2 par ligne si ça rentre */
+            min-width: 400px;  /* Taille minimum */
+            max-width: 600px;  /* Taille maximum */
         }
-        
+
         .chart-container-pdf-small {
             background: white;
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        }
-        
-        .chart-container-pdf-small img {
-            width: 100%;
-            height: auto;
-            min-height: 400px;  /* Hauteur minimum pour éviter l'écrasement */
-            max-height: 600px;  /* Hauteur maximum */
+            border: 1px solid #ddd;
             border-radius: 8px;
-            display: block;
+            padding: 10px;
+            text-align: center;
+            width: fit-content;  /* S'adapte au contenu */
             margin: 0 auto;
         }
-        
-        /* Pour l'impression, assurer de belles proportions */
-        @media print {
-            .chart-container-pdf-small img {
-                min-height: 350px;
-                max-height: 500px;
-                width: 100%;
-            }
-            
-            /* Un graphique par page si nécessaire */
-            .chart-item {
-                page-break-before: auto;
-                page-break-after: auto;
-            }
+
+        .chart-container-pdf-small img {
+            width: auto;
+            height: auto;
+            max-width: 100%;  /* Ne déborde pas */
+            display: block;
+            margin: 0 auto;
         }
 
         /* WARNING TRÈS VISIBLE */
@@ -864,227 +843,10 @@ class ReportGenerator:
             <meta charset="UTF-8">
             <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
             <style>
-                body {{ margin: 0; padding: 30px; background: white; }}
-                .chart-container {{ 
-                    width: 1340px;   /* Plus large */
-                    height: 840px;   /* Beaucoup plus haut pour éviter l'écrasement */
-                    margin: 0 auto; 
-                    background: white; 
-                    padding: 30px;
-                }}
-                h3 {{ 
-                    color: #76279b; 
-                    text-align: center; 
-                    margin-bottom: 30px; 
-                    font-size: 24px;  /* Titre plus gros */
-                    font-weight: bold;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="chart-container">
-                <h3>{groupe}</h3>
-                <canvas id="chart_{index}" width="1280" height="750"></canvas>
-            </div>
-            
-            <script>
-                const metierDetails = {json.dumps(metier_details)};
-                
-                // LOGIQUE COMPLÈTE POUR CRÉER LE GRAPHIQUE
-                function prepareMetierChartData(groupe, metierDetails) {{
-                    try {{
-                        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
-                        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
-                        
-                        if (dataJ.length === 0 && dataJ1.length === 0) {{
-                            return null;
-                        }}
-                        
-                        const metiersMap = new Map();
-                        
-                        // Ajouter les données J-1
-                        dataJ1.forEach(item => {{
-                            metiersMap.set(item.Métier, {{
-                                metier: item.Métier,
-                                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
-                                j: 0
-                            }});
-                        }});
-                        
-                        // Ajouter/mettre à jour avec les données J
-                        dataJ.forEach(item => {{
-                            if (metiersMap.has(item.Métier)) {{
-                                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
-                            }} else {{
-                                metiersMap.set(item.Métier, {{
-                                    metier: item.Métier,
-                                    j_minus_1: 0,
-                                    j: item.LCR_ECO_IMPACT_LCR_Bn
-                                }});
-                            }}
-                        }});
-                        
-                        // Calculer les variations et trier
-                        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({{
-                            metier: metier,
-                            variation: data.j - data.j_minus_1,
-                            j: data.j,
-                            j_minus_1: data.j_minus_1
-                        }}));
-                        
-                        metierVariations.sort((a, b) => b.variation - a.variation);
-                        
-                        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
-                        
-                        let labels = [];
-                        let variations = [];
-                        
-                        if (totalVariation >= 0) {{
-                            labels.push('TOTAL GROUP');
-                            variations.push(totalVariation);
-                            
-                            metierVariations.forEach(item => {{
-                                labels.push(item.metier);
-                                variations.push(item.variation);
-                            }});
-                        }} else {{
-                            metierVariations.forEach(item => {{
-                                labels.push(item.metier);
-                                variations.push(item.variation);
-                            }});
-                            
-                            labels.push('TOTAL GROUP');
-                            variations.push(totalVariation);
-                        }}
-                        
-                        return {{
-                            labels: labels,
-                            datasets: [{{
-                                label: 'Variation (D - D-1)',
-                                data: variations,
-                                backgroundColor: variations.map((v, index) => {{
-                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
-                                    if (isTotalBar) {{
-                                        return '#6B218D';
-                                    }}
-                                    return v >= 0 ? '#51A0A2' : '#805bed';
-                                }}),
-                                borderColor: variations.map((v, index) => {{
-                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
-                                    if (isTotalBar) {{
-                                        return '#6B218D';
-                                    }}
-                                    return v >= 0 ? '#51A0A2' : '#805bed';
-                                }}),
-                                borderWidth: variations.map((v, index) => {{
-                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
-                                    return isTotalBar ? 3 : 2;
-                                }})
-                            }}]
-                        }};
-                        
-                    }} catch (error) {{
-                        console.error('Erreur préparation données pour', groupe, ':', error);
-                        return null;
-                    }}
-                }}
-                
-                // CRÉER LE GRAPHIQUE
-                const chartData = prepareMetierChartData('{groupe}', metierDetails);
-                
-                if (chartData) {{
-                    new Chart(document.getElementById('chart_{index}'), {{
-                        type: 'bar',
-                        data: chartData,
-                        options: {{
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            animation: false,
-                            plugins: {{
-                                title: {{
-                                    display: true,
-                                    text: 'LCR variations detailed for - {groupe}',
-                                    font: {{ size: 20, weight: 'bold' }}  /* Titre encore plus gros */
-                                }},
-                                legend: {{
-                                    display: true,
-                                    position: 'top',
-                                    labels: {{ 
-                                        font: {{ size: 16 }},  /* Labels plus gros */
-                                        padding: 20
-                                    }}
-                                }}
-                            }},
-                            scales: {{
-                                y: {{
-                                    beginAtZero: false,
-                                    title: {{
-                                        display: true,
-                                        text: 'LCR Impact (Bn €)',
-                                        font: {{ size: 16, weight: 'bold' }}  /* Titre axe plus gros */
-                                    }},
-                                    ticks: {{ 
-                                        font: {{ size: 14 }},  /* Valeurs plus grosses */
-                                        padding: 10
-                                    }},
-                                    grid: {{ color: 'rgba(0,0,0,0.1)' }}
-                                }},
-                                x: {{
-                                    title: {{
-                                        display: true,
-                                        text: 'Business Lines',
-                                        font: {{ size: 16, weight: 'bold' }}
-                                    }},
-                                    ticks: {{ 
-                                        font: {{ size: 13 }},  /* Labels plus gros */
-                                        maxRotation: 45,
-                                        minRotation: 0,
-                                        padding: 10
-                                    }}
-                                }}
-                            }},
-                            elements: {{
-                                bar: {{ 
-                                    borderWidth: 2  /* Bordures plus épaisses */
-                                }}
-                            }},
-                            layout: {{
-                                padding: {{
-                                    top: 20,
-                                    bottom: 20,
-                                    left: 20,
-                                    right: 20
-                                }}
-                            }}
-                        }}
-                    }});
-                    console.log('Graphique créé pour {groupe}');
-                }} else {{
-                    console.error('Pas de données pour {groupe}');
-                }}
-                
-                // Marquer comme prêt après création
-                setTimeout(() => {{
-                    document.body.classList.add('chart-ready');
-                    console.log('Chart ready for {groupe}');
-                }}, 2000);
-            </script>
-        </body>
-        </html>
-        """
-
-    def _generate_single_chart_html(self, groupe, metier_details, index):
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-            <style>
                 body {{ margin: 0; padding: 20px; background: white; }}
                 .chart-container {{ 
-                    width: 1160px;
-                    height: 660px;
+                    width: 960px;
+                    height: 460px;
                     margin: 0 auto; 
                     background: white; 
                     padding: 20px;
@@ -1094,19 +856,19 @@ class ReportGenerator:
                     text-align: center; 
                     margin-bottom: 20px; 
                     font-size: 18px;
+                    font-weight: bold;
                 }}
             </style>
         </head>
         <body>
             <div class="chart-container">
                 <h3>{groupe}</h3>
-                <canvas id="chart_{index}" width="1120" height="580"></canvas>
+                <canvas id="chart_{index}" width="920" height="400"></canvas>
             </div>
             
             <script>
                 const metierDetails = {json.dumps(metier_details)};
                 
-                // LOGIQUE COMPLÈTE POUR CRÉER LE GRAPHIQUE
                 function prepareMetierChartData(groupe, metierDetails) {{
                     try {{
                         const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
@@ -1118,7 +880,6 @@ class ReportGenerator:
                         
                         const metiersMap = new Map();
                         
-                        // Ajouter les données J-1
                         dataJ1.forEach(item => {{
                             metiersMap.set(item.Métier, {{
                                 metier: item.Métier,
@@ -1127,7 +888,6 @@ class ReportGenerator:
                             }});
                         }});
                         
-                        // Ajouter/mettre à jour avec les données J
                         dataJ.forEach(item => {{
                             if (metiersMap.has(item.Métier)) {{
                                 metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
@@ -1140,7 +900,6 @@ class ReportGenerator:
                             }}
                         }});
                         
-                        // Calculer les variations et trier
                         const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({{
                             metier: metier,
                             variation: data.j - data.j_minus_1,
@@ -1205,7 +964,6 @@ class ReportGenerator:
                     }}
                 }}
                 
-                // CRÉER LE GRAPHIQUE
                 const chartData = prepareMetierChartData('{groupe}', metierDetails);
                 
                 if (chartData) {{
@@ -1233,34 +991,29 @@ class ReportGenerator:
                                     beginAtZero: false,
                                     title: {{
                                         display: true,
-                                        text: 'LCR Impact (Bn €)'
+                                        text: 'LCR Impact (Bn €)',
+                                        font: {{ size: 14 }}
                                     }},
-                                    ticks: {{ font: {{ size: 11 }} }},
+                                    ticks: {{ font: {{ size: 12 }} }},
                                     grid: {{ color: 'rgba(0,0,0,0.1)' }}
                                 }},
                                 x: {{
                                     ticks: {{ 
-                                        font: {{ size: 10 }},
+                                        font: {{ size: 11 }},
                                         maxRotation: 45,
                                         minRotation: 0
                                     }}
                                 }}
                             }},
                             elements: {{
-                                bar: {{ borderWidth: 1 }}
+                                bar: {{ borderWidth: 2 }}
                             }}
                         }}
                     }});
-                    
-                    console.log('Graphique créé pour {groupe}');
-                }} else {{
-                    console.error('Pas de données pour {groupe}');
                 }}
                 
-                // Marquer comme prêt après création
                 setTimeout(() => {{
                     document.body.classList.add('chart-ready');
-                    console.log('Chart ready for {groupe}');
                 }}, 2000);
             </script>
         </body>
