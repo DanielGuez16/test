@@ -1170,19 +1170,19 @@ async def export_pdf(session_token: Optional[str] = Cookie(None)):
         logger.info(f"Chemin de sortie: {output_path}")
         
         # Générer PDF
-        await generator.export_to_pdf(output_path)
-        
+        html_path = generator.export_to_html_for_print(output_path)
+
         logger.info("PDF généré avec succès")
 
         # NOUVEAU LOG : PDF téléchargé avec succès
         log_activity(current_user["username"], "PDF_EXPORT_SUCCESS", f"PDF report downloaded: {output_filename}")
-        
+
+        # Retourner le fichier HTML au lieu du PDF
         return FileResponse(
-            output_path,
-            filename=output_filename,
-            media_type="application/pdf"
+            html_path,
+            filename=output_filename.replace('.pdf', '.html'),
+            media_type="text/html"
         )
-        
     except Exception as e:
 
         # NOUVEAU LOG : Erreur génération PDF

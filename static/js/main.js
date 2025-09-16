@@ -1442,19 +1442,17 @@ async function exportToPDF() {
         exportButton.disabled = true;
         exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>GENERATING PDF...';
         
-        showNotification('Generating PDF report...', 'info');
+        showNotification('Generating printable report...', 'info');
         
         const response = await fetch('/api/export-pdf', { method: 'POST' });
         
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `LCR_Analysis_${new Date().toISOString().slice(0,10)}.pdf`;
-            a.click();
+            // Ouvrir dans un nouvel onglet au lieu de télécharger
+            window.open(url, '_blank');
             
-            showNotification('PDF downloaded successfully!', 'success');
+            showNotification('Report ready! Use Ctrl+P to save as PDF', 'success');
         } else {
             throw new Error('Export failed');
         }
