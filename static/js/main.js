@@ -1433,34 +1433,36 @@ function addExportButton() {
     document.getElementById('results').insertAdjacentHTML('beforeend', exportButton);
 }
 
+
 async function exportToPDF() {
     const exportButton = document.querySelector('button[onclick="exportToPDF()"]');
     const originalContent = exportButton.innerHTML;
     
     try {
-        // Changer le bouton en mode loading
         exportButton.disabled = true;
-        exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>GENERATING PDF...';
+        exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>GENERATING REPORT...';
         
-        showNotification('Generating printable report...', 'info');
+        showNotification('Generating report...', 'info');
         
         const response = await fetch('/api/export-pdf', { method: 'POST' });
         
         if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            // Ouvrir dans un nouvel onglet au lieu de télécharger
-            window.open(url, '_blank');
+            const result = await response.json();
             
-            showNotification('Report ready! Use Ctrl+P to save as PDF', 'success');
+            const link = document.createElement('a');
+            link.href = result.report_url;
+            link.target = '_blank';
+            link.click();
+
+            showNotification('Report opened! Use Ctrl+P to save as PDF', 'success');
+            
         } else {
             throw new Error('Export failed');
         }
     } catch (error) {
         console.error('Export error:', error);
-        showNotification('Error exporting PDF', 'error');
+        showNotification('Error generating report', 'error');
     } finally {
-        // Restaurer le bouton
         exportButton.disabled = false;
         exportButton.innerHTML = originalContent;
     }

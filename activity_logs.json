@@ -1960,5 +1960,95 @@
     "username": "daniel.guez@natixis.com",
     "action": "PDF_EXPORT_SUCCESS",
     "details": "PDF report downloaded: LCR_Analysis_20250916_163614.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T17:00:55.324749",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T17:00:55.339346",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:14.583313",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:16.015333",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:16.438071",
+    "username": "daniel.guez@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:20.364161",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:29.485916",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_SUCCESS",
+    "details": "PDF report downloaded: LCR_Analysis_20250916_170120.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:49.383338",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T17:01:52.335016",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_SUCCESS",
+    "details": "PDF report downloaded: LCR_Analysis_20250916_170149.pdf"
+  },
+  {
+    "timestamp": "2025-09-16T17:05:26.005599",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T17:05:26.020301",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T17:05:28.148819",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T17:05:29.761850",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T17:05:30.938797",
+    "username": "daniel.guez@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T17:05:35.767177",
+    "username": "daniel.guez@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
   }
 ]

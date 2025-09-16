@@ -707,6 +707,44 @@ async def upload_document(file: UploadFile = File(...), session_token: Optional[
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 
+@app.get("/view-report")
+async def view_current_report(session_token: Optional[str] = Cookie(None)):
+    """Affiche le dernier rapport généré"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Vérifier qu'une analyse existe
+        if not chatbot_session.get("context_data"):
+            raise HTTPException(status_code=400, detail="No analysis available")
+        
+        # Générer le rapport à la volée
+        last_ai_response = None
+        if chatbot_session.get("messages"):
+            ai_messages = [msg for msg in chatbot_session["messages"] if msg["type"] == "assistant"]
+            if ai_messages:
+                last_ai_response = ai_messages[-1]["message"]
+        
+        generator = ReportGenerator(
+            analysis_results={
+                "balance_sheet": chatbot_session["context_data"].get("balance_sheet"),
+                "consumption": chatbot_session["context_data"].get("consumption")
+            },
+            last_ai_response=last_ai_response
+        )
+        
+        # Capturer graphiques et générer HTML
+        generator.chart_images = generator.capture_charts_with_html2image()
+        html_content = generator.generate_print_html()
+        
+        # Retourner directement le HTML
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        return HTMLResponse(content=f"<h1>Erreur génération rapport</h1><p>{str(e)}</p>")
+    
+
 def prepare_analysis_context() -> str:
     """
     Prépare le contexte détaillé depuis les données sauvegardées
@@ -1121,78 +1159,19 @@ def generate_executive_summary(variations):
 
 @app.post("/api/export-pdf")
 async def export_pdf(session_token: Optional[str] = Cookie(None)):
-    # Vérifier l'authentification
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    try:
-        logger.info("Début génération PDF")
-
-        # NOUVEAU LOG : Début génération PDF
-        log_activity(current_user["username"], "PDF_EXPORT_START", "Started PDF report generation")
-        
-        # Récupérer les données d'analyse
-        if not chatbot_session.get("context_data"):
-            raise HTTPException(status_code=400, detail="Aucune analyse disponible")
-        
-        logger.info("Données d'analyse trouvées")
-        
-        # Récupérer la dernière réponse IA
-        last_ai_response = None
-        if chatbot_session["messages"]:
-            ai_messages = [msg for msg in chatbot_session["messages"] if msg["type"] == "assistant"]
-            if ai_messages:
-                last_ai_response = ai_messages[-1]["message"]
-        
-        logger.info(f"Dernière réponse IA: {bool(last_ai_response)}")
-        
-        # Générer le rapport
-        generator = ReportGenerator(
-            analysis_results={
-                "balance_sheet": chatbot_session["context_data"].get("balance_sheet"),
-                "consumption": chatbot_session["context_data"].get("consumption")
-            },
-            last_ai_response=last_ai_response
-        )
-        
-        logger.info("ReportGenerator créé")
-        
-        # Créer fichier temporaire
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"LCR_Analysis_{timestamp}.pdf"
-        
-        # Utiliser un chemin compatible macOS
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        output_path = os.path.join(temp_dir, output_filename)
-        
-        logger.info(f"Chemin de sortie: {output_path}")
-        
-        # Générer PDF
-        html_path = generator.export_to_html_for_print(output_path)
-
-        logger.info("PDF généré avec succès")
-
-        # NOUVEAU LOG : PDF téléchargé avec succès
-        log_activity(current_user["username"], "PDF_EXPORT_SUCCESS", f"PDF report downloaded: {output_filename}")
-
-        # Retourner le fichier HTML au lieu du PDF
-        return FileResponse(
-            html_path,
-            filename=output_filename.replace('.pdf', '.html'),
-            media_type="text/html"
-        )
-    except Exception as e:
-
-        # NOUVEAU LOG : Erreur génération PDF
-        log_activity(current_user["username"], "PDF_EXPORT_ERROR", f"PDF generation failed: {str(e)}")
-        
-        logger.error(f"Erreur export PDF: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Erreur export PDF: {str(e)}")
+    # Vérifier qu'une analyse existe
+    if not chatbot_session.get("context_data"):
+        raise HTTPException(status_code=400, detail="No analysis available")
     
+    # Retourner juste l'URL de visualisation
+    return JSONResponse({
+        "success": True,
+        "report_url": "/view-report"
+    })  
 #######################################################################################################################################
 
 #                           CONSUMPTION
