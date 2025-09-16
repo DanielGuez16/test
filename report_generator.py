@@ -660,8 +660,7 @@ class ReportGenerator:
         except Exception as e:
             print(f"Erreur Html2Image: {e}")
             return {}
-
-
+    
     def generate_print_html(self):
         """HTML avec CSS optimisé pour impression navigateur"""
         print_css = self._get_print_css()
@@ -675,6 +674,15 @@ class ReportGenerator:
             <style>{print_css}</style>
         </head>
         <body>
+            <!-- WARNING EN HAUT DE PAGE -->
+            <div class="print-warning no-print">
+                <div class="warning-content">
+                    <h3>⚠️ IMPORTANT - Pour imprimer en PDF</h3>
+                    <p><strong>Appuyez sur Ctrl+P puis cochez obligatoirement "Graphiques d'arrière-plan"</strong><br>
+                    Sinon les tableaux et graphiques n'apparaîtront pas dans votre PDF.</p>
+                </div>
+            </div>
+            
             <div class="report-container">
                 {self._generate_header()}
                 {self._generate_balance_sheet_section()}
@@ -688,13 +696,13 @@ class ReportGenerator:
                 <button onclick="window.print()" class="print-btn">
                     📄 Imprimer en PDF
                 </button>
-                <p><small>Utilisez Ctrl+P puis "Enregistrer en PDF" dans votre navigateur</small></p>
             </div>
         </body>
         </html>
         """
         return html
-    
+
+
     def _get_print_css(self):
         """CSS optimisé pour impression PDF navigateur"""
         return """
@@ -821,6 +829,35 @@ class ReportGenerator:
                 page-break-before: auto;
                 page-break-after: auto;
             }
+        }
+
+        /* WARNING TRÈS VISIBLE */
+        .print-warning {
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 4px solid #dc3545;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .warning-content h3 {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .warning-content p {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .report-container {
+            margin-top: 20px;
         }
         
         """ + self._get_inline_css()
