@@ -215,12 +215,42 @@ function checkAnalyzeButtonState() {
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.add('pulse');
         
-        // Notification visuelle
+        // NOUVEAU: Ajouter bouton de nettoyage si pas déjà présent
+        if (!document.getElementById('cleanup-btn')) {
+            const cleanupBtn = document.createElement('button');
+            cleanupBtn.id = 'cleanup-btn';
+            cleanupBtn.className = 'btn btn-outline-warning btn-sm ms-3';
+            cleanupBtn.innerHTML = '<i class="fas fa-trash"></i> Clean Memory';
+            cleanupBtn.onclick = cleanupMemory;
+            analyzeBtn.parentNode.appendChild(cleanupBtn);
+        }
+        
         showNotification('Both files are loaded! You can start the analysis.', 'success');
     } else {
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.remove('pulse');
+        
+        // Supprimer le bouton de nettoyage si présent
+        const cleanupBtn = document.getElementById('cleanup-btn');
+        if (cleanupBtn) {
+            cleanupBtn.remove();
+        }
+    }
+}
+
+// NOUVELLE FONCTION
+async function cleanupMemory() {
+    try {
+        showNotification('Cleaning memory...', 'info');
+        const response = await fetch('/api/cleanup-memory', { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification(result.message, 'success');
+        }
+    } catch (error) {
+        showNotification('Memory cleanup failed', 'error');
     }
 }
 

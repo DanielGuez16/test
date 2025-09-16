@@ -298,10 +298,8 @@ async def upload_file(file: UploadFile = File(...),
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # Ajouter au début de la fonction
     log_activity(current_user["username"], "FILE_UPLOAD", f"Uploaded {file.filename} as {file_type}")
     try:
-
         # MONITORING INITIAL
         process = psutil.Process(os.getpid())
         memory_start = process.memory_info().rss / 1024 / 1024
@@ -323,7 +321,7 @@ async def upload_file(file: UploadFile = File(...),
 
         # Lire le contenu en mémoire
         contents = await file.read()
-        file_size = len(contents)  # Sauvegarder la taille AVANT suppression
+        file_size = len(contents)
         
         # TRAITEMENT DIRECT EN MÉMOIRE
         try:
@@ -341,32 +339,46 @@ async def upload_file(file: UploadFile = File(...),
         # Vérifier les colonnes
         missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
 
-        # Filtrer et stocker seulement les données utiles
+        # Filtrer seulement les lignes nécessaires
         df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
 
-        # Stocker les métadonnées avec DataFrame filtré
+        # OPTIMISATION MÉMOIRE - Ne garder que les colonnes utiles
+        required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
+                        "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
+        available_cols = [col for col in required_cols if col in df_filtered.columns]
+        df_minimal = df_filtered[available_cols].copy()
+
+        # Optimiser les types de données
+        for col in df_minimal.select_dtypes(include=['float64']):
+            df_minimal[col] = pd.to_numeric(df_minimal[col], downcast='float')
+
+        # LIBÉRATION MÉMOIRE IMMÉDIATE
+        del df_filtered
+        del df
+        del contents
+        import gc
+        gc.collect()
+
+        # Diagnostic mémoire
+        logger.info(f"DataFrame optimisé: {df_minimal.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
+        logger.info(f"Shape finale: {df_minimal.shape}")
+
+        # Stocker le DataFrame optimisé
         file_session["files"][file_type] = {
-            "dataframe": df_filtered,
+            "dataframe": df_minimal,  # DataFrame optimisé
             "original_name": file.filename,
             "file_format": file_info['format'],
             "encoding": file_info.get('encoding'),
             "delimiter": file_info.get('delimiter'),
-            "rows": len(df_filtered),  # Utiliser df_filtered
-            "columns": len(df_filtered.columns),  # Utiliser df_filtered
+            "rows": len(df_minimal),
+            "columns": len(df_minimal.columns),
             "upload_time": datetime.now().isoformat(),
             "missing_columns": missing_columns
         }
 
-        # MAINTENANT libérer la mémoire
-        del contents
-        del df
-        import gc
-        gc.collect()
-
         # MONITORING FINAL
         memory_end = process.memory_info().rss / 1024 / 1024
         logger.info(f"Mémoire après upload {file_type}: {memory_end:.1f} MB (diff: +{memory_end-memory_start:.1f} MB)")
-        
         
         return {
             "success": True,
@@ -375,11 +387,11 @@ async def upload_file(file: UploadFile = File(...),
             "format": file_info['format'],
             "encoding": file_info.get('encoding'),
             "delimiter": file_info.get('delimiter'),
-            "rows": original_rows,  # Utiliser les valeurs sauvegardées
-            "columns": original_columns,  # Utiliser les valeurs sauvegardées
+            "rows": original_rows,
+            "columns": original_columns,
             "missing_columns": missing_columns,
-            "file_size": file_size,  # Utiliser la valeur sauvegardée
-            "processing": "in_memory_only"
+            "file_size": file_size,
+            "processing": "in_memory_optimized"
         }
         
     except HTTPException:
@@ -387,6 +399,7 @@ async def upload_file(file: UploadFile = File(...),
     except Exception as e:
         logger.error(f"Erreur upload: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+    
 
 @app.get("/api/logs")
 async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
@@ -448,6 +461,34 @@ async def get_uploaded_documents():
     }
 
 
+@app.post("/api/cleanup-memory")
+async def cleanup_memory_endpoint(session_token: Optional[str] = Cookie(None)):
+    """Endpoint pour nettoyer la mémoire manuellement"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        process = psutil.Process(os.getpid())
+        memory_before = process.memory_info().rss / 1024 / 1024
+        
+        cleanup_session_memory()
+        
+        memory_after = process.memory_info().rss / 1024 / 1024
+        memory_freed = memory_before - memory_after
+        
+        log_activity(current_user["username"], "MEMORY_CLEANUP", f"Freed {memory_freed:.1f} MB")
+        
+        return {
+            "success": True,
+            "message": f"Memory cleaned: {memory_freed:.1f} MB freed",
+            "memory_before": memory_before,
+            "memory_after": memory_after
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup error: {str(e)}")
+    
+    
 def cleanup_session_memory():
     """Nettoie la mémoire des DataFrames de session"""
     try:
@@ -457,9 +498,17 @@ def cleanup_session_memory():
                     del file_session["files"][file_type]["dataframe"]
                     logger.info(f"DataFrame {file_type} supprimé de la session")
         
+        # Nettoyage complet
+        file_session["files"].clear()
+        
         import gc
         gc.collect()
-        logger.info("Mémoire de session nettoyée")
+        
+        # Vérifier la mémoire après nettoyage
+        process = psutil.Process(os.getpid())
+        memory_after = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire après nettoyage complet: {memory_after:.1f} MB")
+        
     except Exception as e:
         logger.warning(f"Erreur nettoyage mémoire: {e}")
 
