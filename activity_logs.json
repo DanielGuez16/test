@@ -1558,5 +1558,161 @@
     "username": "daniel.guez@natixis.com",
     "action": "CHAT_MESSAGE",
     "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:28.819857",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:28.828690",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:36.650306",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:38.157404",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:39.665038",
+    "username": "daniel.guez@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:46.380080",
+    "username": "daniel.guez@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:48.160637",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started comprehensive PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T14:28:48.165822",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_ERROR",
+    "details": "PDF generation failed: error() missing 1 required positional argument: 'msg'"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:23.233665",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:23.243651",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:30.537293",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:32.492795",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:33.874704",
+    "username": "daniel.guez@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:38.584641",
+    "username": "daniel.guez@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:42.711918",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started comprehensive PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T15:08:54.046627",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_ERROR",
+    "details": "PDF generation failed: cannot load library 'libgobject-2.0-0': dlopen(libgobject-2.0-0, 0x0002): tried: 'libgobject-2.0-0' (no such file), '/System/Volumes/Preboot/Cryptexes/OSlibgobject-2.0-0' (no such file), '/opt/anaconda3/envs/ia_env/lib/python3.10/site-packages/../../libgobject-2.0-0' (no such file), '/opt/anaconda3/envs/ia_env/bin/../lib/libgobject-2.0-0' (no such file), '/usr/lib/libgobject-2.0-0' (no such file, not in dyld cache), 'libgobject-2.0-0' (no such file), '/usr/local/lib/libgobject-2.0-0' (no such file), '/usr/lib/libgobject-2.0-0' (no such file, not in dyld cache).  Additionally, ctypes.util.find_library() did not manage to locate a library called 'libgobject-2.0-0'"
+  },
+  {
+    "timestamp": "2025-09-16T15:09:06.228082",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started comprehensive PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T15:09:10.608175",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_ERROR",
+    "details": "PDF generation failed: cannot load library 'libgobject-2.0-0': dlopen(libgobject-2.0-0, 0x0002): tried: 'libgobject-2.0-0' (no such file), '/System/Volumes/Preboot/Cryptexes/OSlibgobject-2.0-0' (no such file), '/opt/anaconda3/envs/ia_env/lib/python3.10/site-packages/../../libgobject-2.0-0' (no such file), '/opt/anaconda3/envs/ia_env/bin/../lib/libgobject-2.0-0' (no such file), '/usr/lib/libgobject-2.0-0' (no such file, not in dyld cache), 'libgobject-2.0-0' (no such file), '/usr/local/lib/libgobject-2.0-0' (no such file), '/usr/lib/libgobject-2.0-0' (no such file, not in dyld cache).  Additionally, ctypes.util.find_library() did not manage to locate a library called 'libgobject-2.0-0'"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:21.921166",
+    "username": "daniel.guez@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:21.935353",
+    "username": "daniel.guez@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:24.314826",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:25.906660",
+    "username": "daniel.guez@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:27.019227",
+    "username": "daniel.guez@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:31.410534",
+    "username": "daniel.guez@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:33.607220",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started comprehensive PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-16T15:11:42.650958",
+    "username": "daniel.guez@natixis.com",
+    "action": "PDF_EXPORT_ERROR",
+    "details": "PDF generation failed: cannot load library 'libgobject-2.0-0': dlopen(libgobject-2.0-0, 0x0002): tried: 'libgobject-2.0-0' (no such file), '/System/Volumes/Preboot/Cryptexes/OSlibgobject-2.0-0' (no such file), '/opt/anaconda3/envs/ia_env/lib/python3.10/site-packages/../../libgobject-2.0-0' (no such file), '/opt/anaconda3/envs/ia_env/bin/../lib/libgobject-2.0-0' (no such file), '/usr/lib/libgobject-2.0-0' (no such file, not in dyld cache), 'libgobject-2.0-0' (no such file), '/usr/local/lib/libgobject-2.0-0' (no such file), '/usr/lib/libgobject-2.0-0' (no such file, not in dyld cache).  Additionally, ctypes.util.find_library() did not manage to locate a library called 'libgobject-2.0-0'"
   }
 ]
