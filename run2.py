@@ -109,6 +109,119 @@ ALL_REQUIRED_COLUMNS = list(set(
     REQUIRED_COLUMNS["consumption"]
 ))
 
+def get_files_by_date(target_date: str):
+    """
+    Récupère les fichiers J et J-1 depuis SharePoint pour une date donnée
+    
+    Args:
+        target_date: Date au format 'YYYY-MM-DD'
+    
+    Returns:
+        Dict contenant les DataFrames j et jMinus1
+    """
+    from datetime import datetime, timedelta
+    import re
+    
+    try:
+        # Parser la date
+        date_obj = datetime.strptime(target_date, '%Y-%m-%d')
+        date_j_minus_1 = date_obj - timedelta(days=1)
+        
+        # Formatter les noms de fichiers
+        file_j = f"D_PA_{date_obj.strftime('%Y%m%d')}0150.csv"
+        file_j_minus_1 = f"D_PA_{date_j_minus_1.strftime('%Y%m%d')}0150.csv"
+        
+        # Chemins SharePoint
+        sharepoint_path_j = f"ALM_Metrics/sources/{file_j}"
+        sharepoint_path_j_minus_1 = f"ALM_Metrics/sources/{file_j_minus_1}"
+        
+        logger.info(f"Recherche des fichiers : {file_j} et {file_j_minus_1}")
+        
+        # Initialiser le client SharePoint
+        client = SharePointClient()
+        
+        dataframes = {}
+        
+        # Récupérer le fichier J
+        try:
+            binary_content_j = client.read_binary_file(sharepoint_path_j)
+            df_j, file_info_j = convert_binary_to_dataframe(binary_content_j, file_j)
+            dataframes['j'] = df_j
+            logger.info(f"✅ Fichier J récupéré : {file_j} ({len(df_j)} lignes)")
+        except Exception as e:
+            raise ValueError(f"Impossible de récupérer le fichier J ({file_j}): {str(e)}")
+        
+        # Récupérer le fichier J-1
+        try:
+            binary_content_j_minus_1 = client.read_binary_file(sharepoint_path_j_minus_1)
+            df_j_minus_1, file_info_j_minus_1 = convert_binary_to_dataframe(binary_content_j_minus_1, file_j_minus_1)
+            dataframes['jMinus1'] = df_j_minus_1
+            logger.info(f"✅ Fichier J-1 récupéré : {file_j_minus_1} ({len(df_j_minus_1)} lignes)")
+        except Exception as e:
+            raise ValueError(f"Impossible de récupérer le fichier J-1 ({file_j_minus_1}): {str(e)}")
+        
+        return {
+            "dataframes": dataframes,
+            "files_info": {
+                "j": {"filename": file_j, "rows": len(df_j), "columns": len(df_j.columns)},
+                "jMinus1": {"filename": file_j_minus_1, "rows": len(df_j_minus_1), "columns": len(df_j_minus_1.columns)}
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération fichiers par date : {e}")
+        raise
+
+def convert_binary_to_dataframe(binary_content: bytes, filename: str):
+    """
+    Convertit le contenu binaire d'un fichier SharePoint en DataFrame
+    """
+    try:
+        extension = Path(filename).suffix.lower()
+        
+        if extension == '.csv':
+            # Détecter l'encodage
+            encoding = chardet.detect(binary_content[:10000])['encoding'] or 'utf-8'
+            
+            # Décoder en string
+            text_content = binary_content.decode(encoding)
+            
+            # Détecter le délimiteur
+            first_line = text_content.split('\n')[0]
+            if ';' in first_line:
+                delimiter = ';'
+            elif '\t' in first_line:
+                delimiter = '\t'
+            else:
+                delimiter = ','
+            
+            # Lire directement depuis StringIO
+            df = pd.read_csv(
+                io.StringIO(text_content),
+                delimiter=delimiter,
+                low_memory=False,
+                dtype=str,
+                na_filter=False
+            )
+            
+            # Nettoyer les colonnes
+            df.columns = df.columns.astype(str).str.strip()
+            
+            # Convertir les colonnes numériques
+            numeric_columns = ['Nominal Value', 'LCR_ECO_IMPACT_LCR']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')
+            
+            return df, {'format': extension, 'encoding': encoding, 'delimiter': delimiter}
+            
+        else:
+            raise ValueError(f"Format non supporté: {extension}")
+            
+    except Exception as e:
+        raise ValueError(f"Erreur lecture fichier SharePoint: {str(e)}")
+    
+
 def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     """
     Convertit le contenu d'un fichier directement en DataFrame
@@ -707,6 +820,44 @@ async def upload_document(file: UploadFile = File(...), session_token: Optional[
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 
+@app.get("/view-report")
+async def view_current_report(session_token: Optional[str] = Cookie(None)):
+    """Affiche le dernier rapport généré"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Vérifier qu'une analyse existe
+        if not chatbot_session.get("context_data"):
+            raise HTTPException(status_code=400, detail="No analysis available")
+        
+        # Générer le rapport à la volée
+        last_ai_response = None
+        if chatbot_session.get("messages"):
+            ai_messages = [msg for msg in chatbot_session["messages"] if msg["type"] == "assistant"]
+            if ai_messages:
+                last_ai_response = ai_messages[-1]["message"]
+        
+        generator = ReportGenerator(
+            analysis_results={
+                "balance_sheet": chatbot_session["context_data"].get("balance_sheet"),
+                "consumption": chatbot_session["context_data"].get("consumption")
+            },
+            last_ai_response=last_ai_response
+        )
+        
+        # Capturer graphiques et générer HTML
+        generator.chart_images = generator.capture_charts_with_html2image()
+        html_content = generator.generate_print_html()
+        
+        # Retourner directement le HTML
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        return HTMLResponse(content=f"<h1>Erreur génération rapport</h1><p>{str(e)}</p>")
+    
+
 def prepare_analysis_context() -> str:
     """
     Prépare le contexte détaillé depuis les données sauvegardées
@@ -786,6 +937,68 @@ def prepare_analysis_context() -> str:
         context_parts.append("\nAucune analyse disponible - les analyses doivent être lancées d'abord.")
     
     return "\n".join(context_parts)
+
+
+@app.post("/api/load-by-date")
+async def load_files_by_date(request: Request, session_token: Optional[str] = Cookie(None)):
+    """Charge automatiquement les fichiers J et J-1 pour une date donnée"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        data = await request.json()
+        target_date = data.get("date")
+        
+        if not target_date:
+            raise HTTPException(status_code=400, detail="Date requise")
+        
+        log_activity(current_user["username"], "AUTO_LOAD", f"Loading files for date {target_date}")
+        
+        # Récupérer les fichiers depuis SharePoint
+        result = get_files_by_date(target_date)
+        dataframes = result["dataframes"]
+        files_info = result["files_info"]
+        
+        # Optimiser les DataFrames comme dans l'upload classique
+        for file_type, df in dataframes.items():
+            # Filtrer et optimiser
+            df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
+            
+            # Garder seulement les colonnes utiles
+            required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
+                            "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
+            available_cols = [col for col in required_cols if col in df_filtered.columns]
+            df_minimal = df_filtered[available_cols].copy()
+            
+            # Optimiser les types
+            for col in df_minimal.select_dtypes(include=['float64']):
+                df_minimal[col] = pd.to_numeric(df_minimal[col], downcast='float')
+            
+            # Stocker dans la session
+            file_session["files"][file_type] = {
+                "dataframe": df_minimal,
+                "original_name": files_info[file_type]["filename"],
+                "file_format": "csv",
+                "rows": len(df_minimal),
+                "columns": len(df_minimal.columns),
+                "upload_time": datetime.now().isoformat(),
+                "missing_columns": [col for col in ALL_REQUIRED_COLUMNS if col not in df_minimal.columns]
+            }
+        
+        return {
+            "success": True,
+            "message": f"Fichiers chargés automatiquement pour le {target_date}",
+            "files": files_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur chargement automatique: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+    
+    
 
 def prepare_documents_context() -> str:
     """
@@ -1118,102 +1331,22 @@ def generate_executive_summary(variations):
     else:
         return f"Balance Sheet on {date_str} - Small variations observed (< 100M€)."
 
+
 @app.post("/api/export-pdf")
 async def export_pdf(session_token: Optional[str] = Cookie(None)):
-    """Export PDF complet avec Html2Image - TOUS les éléments inclus"""
-    # Vérifier l'authentification
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    try:
-        logger.info("Début génération PDF complète avec Html2Image")
-
-        # Log de début
-        log_activity(current_user["username"], "PDF_EXPORT_START", "Started comprehensive PDF report generation")
-        
-        # Vérifier la disponibilité des données d'analyse
-        if not chatbot_session.get("context_data"):
-            raise HTTPException(status_code=400, detail="Aucune analyse disponible pour l'export")
-        
-        context_data = chatbot_session["context_data"]
-        logger.info(f"Données contexte trouvées: {list(context_data.keys())}")
-        
-        # Récupérer la dernière réponse IA si disponible
-        last_ai_response = None
-        if chatbot_session.get("messages"):
-            ai_messages = [msg for msg in chatbot_session["messages"] if msg["type"] == "assistant"]
-            if ai_messages:
-                last_ai_response = ai_messages[-1]["message"]
-                logger.info("Dernière réponse IA récupérée pour inclusion dans le PDF")
-        
-        # Créer le générateur de rapport avec TOUTES les données
-        generator = ReportGenerator(
-            analysis_results={
-                "balance_sheet": context_data.get("balance_sheet"),  # Tableaux + variations + résumé
-                "consumption": context_data.get("consumption")       # Tableaux + graphiques + analyses
-            },
-            last_ai_response=last_ai_response  # Réponse IA complète
-        )
-        
-        logger.info("ReportGenerator initialisé avec toutes les données")
-        
-        # Générer nom de fichier unique
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"LCR_Analysis_Complete_{timestamp}.pdf"
-        
-        # Chemin de sortie temporaire
-        temp_dir = tempfile.gettempdir()
-        output_path = os.path.join(temp_dir, output_filename)
-        
-        logger.info(f"Génération PDF vers: {output_path}")
-        
-        # GÉNÉRATION PDF SYNCHRONE avec Html2Image
-        # Cette méthode va inclure :
-        # 1. Header avec métadonnées
-        # 2. Balance Sheet : tableau pivot + variations + résumé
-        # 3. Consumption : tableau groupé + métriques + graphiques capturés
-        # 4. Analyses textuelles détaillées
-        # 5. Réponse IA complète formatée
-        # 6. Footer avec informations de génération
-        generator.export_to_pdf(output_path)
-        
-        # Vérifier que le fichier a été créé
-        if not os.path.exists(output_path):
-            raise HTTPException(status_code=500, detail="Échec de génération du fichier PDF")
-        
-        file_size = os.path.getsize(output_path)
-        logger.info(f"PDF généré avec succès : {output_filename} ({file_size} bytes)")
-
-        # Log de succès
-        log_activity(current_user["username"], "PDF_EXPORT_SUCCESS", f"Complete PDF report generated: {output_filename} ({file_size} bytes)")
-        
-        # Retourner le fichier pour téléchargement
-        return FileResponse(
-            output_path,
-            filename=output_filename,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename={output_filename}",
-                "Content-Length": str(file_size)
-            }
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Log d'erreur détaillé
-        log_activity(current_user["username"], "PDF_EXPORT_ERROR", f"PDF generation failed: {str(e)}")
-        
-        logger.error(f"Erreur complète export PDF: {e}")
-        import traceback
-        logger.error(f"Traceback détaillé: {traceback.format_exc()}")
-        
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Erreur génération PDF complète: {str(e)}"
-        )
+    # Vérifier qu'une analyse existe
+    if not chatbot_session.get("context_data"):
+        raise HTTPException(status_code=400, detail="No analysis available")
     
+    # Retourner juste l'URL de visualisation
+    return JSONResponse({
+        "success": True,
+        "report_url": "/view-report"
+    })  
 #######################################################################################################################################
 
 #                           CONSUMPTION

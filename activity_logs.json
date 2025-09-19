@@ -2434,5 +2434,149 @@
     "username": "daniel.guez@natixis.com",
     "action": "CHAT_MESSAGE",
     "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-17T15:09:03.927614",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-17T15:09:03.941177",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-17T15:09:11.125674",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-17T15:09:12.473049",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-17T15:09:12.919484",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-17T15:29:23.690693",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-17T15:29:23.706292",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-17T15:29:26.380391",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-17T15:29:27.680519",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.csv as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-17T15:29:29.231839",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-19T11:51:37.760652",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-19T11:51:37.776268",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-19T11:52:08.019532",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-19T11:52:10.279171",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-19T11:52:11.895976",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-19T11:52:17.039478",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:38.737142",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:38.753391",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:41.067826",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:43.342743",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:44.365843",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:50.001754",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Sent message to AI: test"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:51.650577",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "PDF_EXPORT_START",
+    "details": "Started comprehensive PDF report generation"
+  },
+  {
+    "timestamp": "2025-09-19T11:54:51.656303",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "PDF_EXPORT_ERROR",
+    "details": "PDF generation failed: 'ReportGenerator' object has no attribute 'export_to_pdf'"
   }
 ]
