@@ -17,15 +17,54 @@ async function loadAvailableFiles() {
         if (response.ok) {
             const result = await response.json();
             if (result.success && result.files.length > 0) {
-                // Afficher les dernières dates disponibles sous le sélecteur de date
+                // Afficher les infos dans le texte d'aide
+                const availableInfo = document.getElementById('available-files-info');
                 const lastDates = result.files.slice(0, 5).map(f => f.formatted_date).join(', ');
-                const dateHelp = document.querySelector('.text-muted');
-                dateHelp.innerHTML += `<br><small class="text-info">Recent files available: ${lastDates}</small>`;
+                availableInfo.innerHTML = `<strong>Recent files:</strong> ${lastDates}`;
+                
+                // Créer la grille des fichiers disponibles
+                displayAvailableFilesList(result.files.slice(0, 10));
+                
+                // Montrer la liste
+                document.getElementById('available-files-list').style.display = 'block';
             }
         }
     } catch (error) {
-        console.log('Could not load available files list');
+        console.error('Could not load available files list:', error);
+        const availableInfo = document.getElementById('available-files-info');
+        availableInfo.innerHTML = '<span class="text-warning">Could not load file list</span>';
     }
+}
+
+function displayAvailableFilesList(files) {
+    const grid = document.getElementById('files-grid');
+    grid.innerHTML = '';
+    
+    files.forEach(file => {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4 col-lg-3 mb-2';
+        
+        const isToday = new Date().toISOString().split('T')[0] === file.date;
+        const badgeClass = isToday ? 'bg-success' : 'bg-secondary';
+        
+        col.innerHTML = `
+            <div class="card card-hover" style="cursor: pointer; font-size: 0.8rem;" onclick="selectDate('${file.date}')">
+                <div class="card-body p-2 text-center">
+                    <div class="fw-bold">${file.formatted_date}</div>
+                    <small class="text-muted">${file.filename}</small>
+                    ${isToday ? '<span class="badge bg-success mt-1">Today</span>' : ''}
+                </div>
+            </div>
+        `;
+        
+        grid.appendChild(col);
+    });
+}
+
+function selectDate(dateString) {
+    document.getElementById('analysis-date').value = dateString;
+    document.getElementById('loadFilesBtn').disabled = false;
+    showNotification(`Selected date: ${new Date(dateString).toLocaleDateString()}`, 'info');
 }
 
 // Modifier la partie DOMContentLoaded existante

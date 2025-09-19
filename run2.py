@@ -51,6 +51,7 @@ logger = logging.getLogger(__name__)
 # Création de l'application FastAPI
 app = FastAPI(title="Steering ALM Metrics", version="2.0.0")
 
+from sharepoint_connector import SharePointClient
 
 # Session utilisateur global (en production: vraies sessions)
 active_sessions = {}
@@ -109,57 +110,54 @@ ALL_REQUIRED_COLUMNS = list(set(
     REQUIRED_COLUMNS["consumption"]
 ))
 
+
 def get_files_by_date(target_date: str):
     """
     Récupère les fichiers J et J-1 depuis SharePoint pour une date donnée
-    en recherchant par pattern car XXXX est imprévisible
-    
-    Args:
-        target_date: Date au format 'YYYY-MM-DD'
-    
-    Returns:
-        Dict contenant les DataFrames j et jMinus1
+    IMPORTANT: D_PA_20250917xxxx.csv = fichier du 16/09/2025 (J+1 dans le nom)
     """
     from datetime import datetime, timedelta
-    import re
     
     try:
-        # Parser la date
+        # Parser la date sélectionnée (date réelle d'analyse)
         date_obj = datetime.strptime(target_date, '%Y-%m-%d')
-        date_j_plus_1 = date_obj + timedelta(days=1)
+        date_j_minus_1 = date_obj - timedelta(days=1)
         
-        # Patterns de recherche (XXXX peut être n'importe quoi)
-        pattern_j = f"D_PA_{date_obj.strftime('%Y%m%d')}"
-        pattern_j_plus_1 = f"D_PA_{date_j_plus_1.strftime('%Y%m%d')}"
+        # CORRECTION: Les fichiers ont J+1 dans leur nom
+        # Si on veut analyser le 16/09, il faut chercher D_PA_20250917 et D_PA_20250916
+        file_pattern_j = f"D_PA_{(date_obj + timedelta(days=1)).strftime('%Y%m%d')}"
+        file_pattern_j_minus_1 = f"D_PA_{date_obj.strftime('%Y%m%d')}"
         
-        logger.info(f"Recherche des fichiers avec patterns : {pattern_j}XXXX.csv et {pattern_j_plus_1}XXXX.csv")
+        logger.info(f"Recherche fichiers pour analyse du {target_date}")
+        logger.info(f"Pattern J (today): {file_pattern_j}XXXX.csv")
+        logger.info(f"Pattern J-1 (yesterday): {file_pattern_j_minus_1}XXXX.csv")
         
         # Initialiser le client SharePoint
         client = SharePointClient()
         
-        # Lister tous les fichiers du dossier sources
+        # Utiliser la bonne méthode
         try:
-            files_list = client.list_files("ALM_Metrics/sources/")
+            files_list = client.list_files_in_path("ALM_Metrics/sources/")
             logger.info(f"Fichiers trouvés dans le dossier : {len(files_list)}")
         except Exception as e:
             raise ValueError(f"Impossible d'accéder au dossier SharePoint: {str(e)}")
         
         # Rechercher les fichiers correspondants
         file_j_found = None
-        file_j_plus_1_found = None
+        file_j_minus_1_found = None
         
         for file_name in files_list:
-            if file_name.startswith(pattern_j) and file_name.endswith('.csv'):
+            if file_name.startswith(file_pattern_j) and file_name.endswith('.csv'):
                 file_j_found = file_name
-            elif file_name.startswith(pattern_j_plus_1) and file_name.endswith('.csv'):
-                file_j_plus_1_found = file_name
+            elif file_name.startswith(file_pattern_j_minus_1) and file_name.endswith('.csv'):
+                file_j_minus_1_found = file_name
         
         if not file_j_found:
-            raise ValueError(f"Fichier J non trouvé avec le pattern {pattern_j}XXXX.csv")
-        if not file_j_plus_1_found:
-            raise ValueError(f"Fichier J+1 non trouvé avec le pattern {pattern_j_plus_1}XXXX.csv")
+            raise ValueError(f"Fichier J non trouvé avec le pattern {file_pattern_j}XXXX.csv")
+        if not file_j_minus_1_found:
+            raise ValueError(f"Fichier J-1 non trouvé avec le pattern {file_pattern_j_minus_1}XXXX.csv")
         
-        logger.info(f"Fichiers trouvés : J={file_j_found}, J+1={file_j_plus_1_found}")
+        logger.info(f"Fichiers trouvés : J={file_j_found}, J-1={file_j_minus_1_found}")
         
         dataframes = {}
         
@@ -729,27 +727,34 @@ async def get_available_files(session_token: Optional[str] = Cookie(None)):
     
     try:
         client = SharePointClient()
-        files_list = client.list_files("ALM_Metrics/sources/")
+        # CORRECTION: Utiliser la bonne méthode
+        files_list = client.list_files_in_path("ALM_Metrics/sources/")
         
         # Filtrer seulement les fichiers D_PA
         d_pa_files = [f for f in files_list if f.startswith('D_PA_') and f.endswith('.csv')]
         
-        # Extraire les dates des fichiers pour aider l'utilisateur
+        # Extraire les dates des fichiers
         file_dates = []
         for file_name in d_pa_files:
             try:
                 # Extraire YYYYMMDD du nom de fichier
                 date_part = file_name[5:13]  # D_PA_ fait 5 caractères
-                date_obj = datetime.strptime(date_part, '%Y%m%d')
+                file_date_obj = datetime.strptime(date_part, '%Y%m%d')
+                
+                # CORRECTION: La date réelle = date du fichier - 1 jour
+                real_date_obj = file_date_obj - timedelta(days=1)
+                
                 file_dates.append({
                     "filename": file_name,
-                    "date": date_obj.strftime('%Y-%m-%d'),
-                    "formatted_date": date_obj.strftime('%d/%m/%Y')
+                    "date": real_date_obj.strftime('%Y-%m-%d'),
+                    "formatted_date": real_date_obj.strftime('%d/%m/%Y'),
+                    "file_date": file_date_obj.strftime('%d/%m/%Y')  # Pour debug
                 })
-            except:
+            except Exception as e:
+                logger.warning(f"Erreur parsing date pour {file_name}: {e}")
                 continue
         
-        # Trier par date
+        # Trier par date réelle
         file_dates.sort(key=lambda x: x['date'], reverse=True)
         
         return {
@@ -761,7 +766,6 @@ async def get_available_files(session_token: Optional[str] = Cookie(None)):
         logger.error(f"Erreur listage fichiers: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
     
-
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
     """

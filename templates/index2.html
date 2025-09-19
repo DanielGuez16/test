@@ -314,6 +314,11 @@
             font-family: 'Courier New', monospace;
             text-align: right;
         }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
         
         /* Légende */
         .table-legend {
@@ -577,9 +582,9 @@
                                     <label for="analysis-date" class="form-label">Choose the target date (D)</label>
                                     <input type="date" id="analysis-date" class="form-control form-control-lg" 
                                         max="" style="text-align: center; font-size: 1.2rem;">
-                                    <small class="text-muted mt-2">
-                                        Files D-1 and D will be automatically loaded from SharePoint<br>
-                                        Format: D_PA_YYYYMMDD0150.csv
+                                    <small class="text-muted mt-2" id="date-help-text">
+                                        Files will be automatically loaded from SharePoint<br>
+                                        <span id="available-files-info">Loading available files...</span>
                                     </small>
                                 </div>
                                 <div class="col-md-4">
@@ -589,7 +594,19 @@
                                 </div>
                             </div>
                             
-                            <!-- Status des fichiers chargés -->
+                            <!-- Liste des fichiers disponibles -->
+                            <div id="available-files-list" class="mt-3" style="display: none;">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <small class="fw-bold">Available Files (Recent 10)</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div id="files-grid" class="row"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Status des fichiers chargés (reste identique) -->
                             <div id="files-status" class="mt-4" style="display: none;">
                                 <div class="row">
                                     <div class="col-md-6">
@@ -610,7 +627,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Bouton d'analyse -->
             <div class="text-center mb-4 fade-in-up" style="animation-delay: 0.4s;">
                 <button id="analyzeBtn" class="btn btn-analyze btn-lg" onclick="analyze()" disabled>
