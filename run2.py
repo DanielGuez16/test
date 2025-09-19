@@ -112,6 +112,7 @@ ALL_REQUIRED_COLUMNS = list(set(
 def get_files_by_date(target_date: str):
     """
     Récupère les fichiers J et J-1 depuis SharePoint pour une date donnée
+    en recherchant par pattern car XXXX est imprévisible
     
     Args:
         target_date: Date au format 'YYYY-MM-DD'
@@ -125,46 +126,68 @@ def get_files_by_date(target_date: str):
     try:
         # Parser la date
         date_obj = datetime.strptime(target_date, '%Y-%m-%d')
-        date_j_minus_1 = date_obj - timedelta(days=1)
+        date_j_plus_1 = date_obj + timedelta(days=1)
         
-        # Formatter les noms de fichiers
-        file_j = f"D_PA_{date_obj.strftime('%Y%m%d')}0150.csv"
-        file_j_minus_1 = f"D_PA_{date_j_minus_1.strftime('%Y%m%d')}0150.csv"
+        # Patterns de recherche (XXXX peut être n'importe quoi)
+        pattern_j = f"D_PA_{date_obj.strftime('%Y%m%d')}"
+        pattern_j_plus_1 = f"D_PA_{date_j_plus_1.strftime('%Y%m%d')}"
         
-        # Chemins SharePoint
-        sharepoint_path_j = f"ALM_Metrics/sources/{file_j}"
-        sharepoint_path_j_minus_1 = f"ALM_Metrics/sources/{file_j_minus_1}"
-        
-        logger.info(f"Recherche des fichiers : {file_j} et {file_j_minus_1}")
+        logger.info(f"Recherche des fichiers avec patterns : {pattern_j}XXXX.csv et {pattern_j_plus_1}XXXX.csv")
         
         # Initialiser le client SharePoint
         client = SharePointClient()
+        
+        # Lister tous les fichiers du dossier sources
+        try:
+            files_list = client.list_files("ALM_Metrics/sources/")
+            logger.info(f"Fichiers trouvés dans le dossier : {len(files_list)}")
+        except Exception as e:
+            raise ValueError(f"Impossible d'accéder au dossier SharePoint: {str(e)}")
+        
+        # Rechercher les fichiers correspondants
+        file_j_found = None
+        file_j_plus_1_found = None
+        
+        for file_name in files_list:
+            if file_name.startswith(pattern_j) and file_name.endswith('.csv'):
+                file_j_found = file_name
+            elif file_name.startswith(pattern_j_plus_1) and file_name.endswith('.csv'):
+                file_j_plus_1_found = file_name
+        
+        if not file_j_found:
+            raise ValueError(f"Fichier J non trouvé avec le pattern {pattern_j}XXXX.csv")
+        if not file_j_plus_1_found:
+            raise ValueError(f"Fichier J+1 non trouvé avec le pattern {pattern_j_plus_1}XXXX.csv")
+        
+        logger.info(f"Fichiers trouvés : J={file_j_found}, J+1={file_j_plus_1_found}")
         
         dataframes = {}
         
         # Récupérer le fichier J
         try:
+            sharepoint_path_j = f"ALM_Metrics/sources/{file_j_found}"
             binary_content_j = client.read_binary_file(sharepoint_path_j)
-            df_j, file_info_j = convert_binary_to_dataframe(binary_content_j, file_j)
+            df_j, file_info_j = convert_binary_to_dataframe(binary_content_j, file_j_found)
             dataframes['j'] = df_j
-            logger.info(f"✅ Fichier J récupéré : {file_j} ({len(df_j)} lignes)")
+            logger.info(f"✅ Fichier J récupéré : {file_j_found} ({len(df_j)} lignes)")
         except Exception as e:
-            raise ValueError(f"Impossible de récupérer le fichier J ({file_j}): {str(e)}")
+            raise ValueError(f"Impossible de récupérer le fichier J ({file_j_found}): {str(e)}")
         
-        # Récupérer le fichier J-1
+        # Récupérer le fichier J+1 (qui sera traité comme J-1 dans l'analyse)
         try:
-            binary_content_j_minus_1 = client.read_binary_file(sharepoint_path_j_minus_1)
-            df_j_minus_1, file_info_j_minus_1 = convert_binary_to_dataframe(binary_content_j_minus_1, file_j_minus_1)
-            dataframes['jMinus1'] = df_j_minus_1
-            logger.info(f"✅ Fichier J-1 récupéré : {file_j_minus_1} ({len(df_j_minus_1)} lignes)")
+            sharepoint_path_j_plus_1 = f"ALM_Metrics/sources/{file_j_plus_1_found}"
+            binary_content_j_plus_1 = client.read_binary_file(sharepoint_path_j_plus_1)
+            df_j_plus_1, file_info_j_plus_1 = convert_binary_to_dataframe(binary_content_j_plus_1, file_j_plus_1_found)
+            dataframes['jMinus1'] = df_j_plus_1  # Attention : logique inversée pour l'analyse
+            logger.info(f"✅ Fichier J+1 récupéré : {file_j_plus_1_found} ({len(df_j_plus_1)} lignes)")
         except Exception as e:
-            raise ValueError(f"Impossible de récupérer le fichier J-1 ({file_j_minus_1}): {str(e)}")
+            raise ValueError(f"Impossible de récupérer le fichier J+1 ({file_j_plus_1_found}): {str(e)}")
         
         return {
             "dataframes": dataframes,
             "files_info": {
-                "j": {"filename": file_j, "rows": len(df_j), "columns": len(df_j.columns)},
-                "jMinus1": {"filename": file_j_minus_1, "rows": len(df_j_minus_1), "columns": len(df_j_minus_1.columns)}
+                "j": {"filename": file_j_found, "rows": len(df_j), "columns": len(df_j.columns)},
+                "jMinus1": {"filename": file_j_plus_1_found, "rows": len(df_j_plus_1), "columns": len(df_j_plus_1.columns)}
             }
         }
         
@@ -696,6 +719,47 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
+
+@app.get("/api/available-files")
+async def get_available_files(session_token: Optional[str] = Cookie(None)):
+    """Liste les fichiers disponibles dans le dossier SharePoint"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = SharePointClient()
+        files_list = client.list_files("ALM_Metrics/sources/")
+        
+        # Filtrer seulement les fichiers D_PA
+        d_pa_files = [f for f in files_list if f.startswith('D_PA_') and f.endswith('.csv')]
+        
+        # Extraire les dates des fichiers pour aider l'utilisateur
+        file_dates = []
+        for file_name in d_pa_files:
+            try:
+                # Extraire YYYYMMDD du nom de fichier
+                date_part = file_name[5:13]  # D_PA_ fait 5 caractères
+                date_obj = datetime.strptime(date_part, '%Y%m%d')
+                file_dates.append({
+                    "filename": file_name,
+                    "date": date_obj.strftime('%Y-%m-%d'),
+                    "formatted_date": date_obj.strftime('%d/%m/%Y')
+                })
+            except:
+                continue
+        
+        # Trier par date
+        file_dates.sort(key=lambda x: x['date'], reverse=True)
+        
+        return {
+            "success": True,
+            "files": file_dates[:20]  # Limiter aux 20 plus récents
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur listage fichiers: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
     
 
 @app.post("/api/chat")
@@ -998,7 +1062,7 @@ async def load_files_by_date(request: Request, session_token: Optional[str] = Co
         logger.error(f"Erreur chargement automatique: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
     
-    
+
 
 def prepare_documents_context() -> str:
     """

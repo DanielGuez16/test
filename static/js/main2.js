@@ -10,11 +10,44 @@
 // Variables globales
 let filesReady = { j: false, j1: false };
 
-// Initialisation
+// Ajouter cette fonction
+async function loadAvailableFiles() {
+    try {
+        const response = await fetch('/api/available-files');
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.files.length > 0) {
+                // Afficher les dernières dates disponibles sous le sélecteur de date
+                const lastDates = result.files.slice(0, 5).map(f => f.formatted_date).join(', ');
+                const dateHelp = document.querySelector('.text-muted');
+                dateHelp.innerHTML += `<br><small class="text-info">Recent files available: ${lastDates}</small>`;
+            }
+        }
+    } catch (error) {
+        console.log('Could not load available files list');
+    }
+}
+
+// Modifier la partie DOMContentLoaded existante
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Interface ALM initialisée');
-    initializeFileUploads();
-    initializeDragAndDrop();
+    const dateInput = document.getElementById('analysis-date');
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.max = today;
+    
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    dateInput.value = yesterday.toISOString().split('T')[0];
+    
+    dateInput.addEventListener('change', function() {
+        document.getElementById('loadFilesBtn').disabled = !this.value;
+    });
+    
+    if (dateInput.value) {
+        document.getElementById('loadFilesBtn').disabled = false;
+    }
+    
+    // Charger la liste des fichiers disponibles
+    loadAvailableFiles();
 });
 
 function initializeDragAndDrop() {
@@ -87,8 +120,26 @@ async function loadFilesByDate() {
     try {
         const originalText = loadBtn.innerHTML;
         loadBtn.disabled = true;
-        loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>LOADING FROM SHAREPOINT...';
+        loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>CHECKING FILES...';
         
+        // D'abord vérifier si les fichiers existent
+        const availableResponse = await fetch('/api/available-files');
+        if (availableResponse.ok) {
+            const availableResult = await availableResponse.json();
+            const selectedDate = dateInput.value;
+            const nextDay = new Date(selectedDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDayStr = nextDay.toISOString().split('T')[0];
+            
+            const hasSelectedDate = availableResult.files.some(f => f.date === selectedDate);
+            const hasNextDate = availableResult.files.some(f => f.date === nextDayStr);
+            
+            if (!hasSelectedDate || !hasNextDate) {
+                throw new Error(`Files not found for ${selectedDate} or ${nextDayStr}. Please check available dates.`);
+            }
+        }
+        
+        loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>LOADING FROM SHAREPOINT...';
         showNotification('Loading files from SharePoint...', 'info');
         
         const response = await fetch('/api/load-by-date', {
@@ -102,15 +153,12 @@ async function loadFilesByDate() {
         if (response.ok) {
             const result = await response.json();
             
-            // Afficher le statut des fichiers
             displayFilesStatus(result.files);
             filesStatus.style.display = 'block';
             
-            // Marquer les fichiers comme prêts
             filesReady.j = true;
             filesReady.j1 = true;
             
-            // Activer le bouton d'analyse
             checkAnalyzeButtonState();
             
             showNotification(result.message, 'success');
