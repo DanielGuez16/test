@@ -43,6 +43,7 @@ chatbot_session = {
 
 # Initialiser le connecteur LLM
 llm_connector = LLMConnector()
+from sharepoint_connector import SharePointClient
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -51,7 +52,6 @@ logger = logging.getLogger(__name__)
 # Création de l'application FastAPI
 app = FastAPI(title="Steering ALM Metrics", version="2.0.0")
 
-from sharepoint_connector import SharePointClient
 
 # Session utilisateur global (en production: vraies sessions)
 active_sessions = {}
@@ -110,139 +110,69 @@ ALL_REQUIRED_COLUMNS = list(set(
     REQUIRED_COLUMNS["consumption"]
 ))
 
-
-def get_files_by_date(target_date: str):
+def get_sharepoint_files_by_date(selected_date: str):
     """
-    Récupère les fichiers J et J-1 depuis SharePoint pour une date donnée
-    IMPORTANT: D_PA_20250917xxxx.csv = fichier du 16/09/2025 (J+1 dans le nom)
+    Récupère les deux fichiers correspondant à une date depuis SharePoint
+    selected_date: format YYYY-MM-DD
+    Retourne les fichiers J et J-1 selon la logique métier
     """
-    from datetime import datetime, timedelta
-    
     try:
-        # Parser la date sélectionnée (date réelle d'analyse)
-        date_obj = datetime.strptime(target_date, '%Y-%m-%d')
-        date_j_minus_1 = date_obj - timedelta(days=1)
+        from datetime import datetime, timedelta
         
-        # CORRECTION: Les fichiers ont J+1 dans leur nom
-        # Si on veut analyser le 16/09, il faut chercher D_PA_20250917 et D_PA_20250916
-        file_pattern_j = f"D_PA_{(date_obj + timedelta(days=1)).strftime('%Y%m%d')}"
-        file_pattern_j_minus_1 = f"D_PA_{date_obj.strftime('%Y%m%d')}"
+        # Convertir la date sélectionnée
+        date_obj = datetime.strptime(selected_date, "%Y-%m-%d")
         
-        logger.info(f"Recherche fichiers pour analyse du {target_date}")
-        logger.info(f"Pattern J (today): {file_pattern_j}XXXX.csv")
-        logger.info(f"Pattern J-1 (yesterday): {file_pattern_j_minus_1}XXXX.csv")
+        # Calculer les dates des fichiers (décalage d'1 jour)
+        # Si on sélectionne le 15/09, on veut :
+        # - J : fichier du 16/09 (qui correspond aux données du 15/09)  
+        # - J-1 : fichier du 15/09 (qui correspond aux données du 14/09)
+        date_j = date_obj + timedelta(days=1)
+        date_j_minus_1 = date_obj
         
-        # Initialiser le client SharePoint
+        # Formater les dates pour les noms de fichiers
+        date_j_str = date_j.strftime("%Y%m%d")
+        date_j_minus_1_str = date_j_minus_1.strftime("%Y%m%d")
+        
         client = SharePointClient()
         
-        # Utiliser la bonne méthode
-        try:
-            files_list = client.list_files_in_path("ALM_Metrics/sources/")
-            logger.info(f"Fichiers trouvés dans le dossier : {len(files_list)}")
-        except Exception as e:
-            raise ValueError(f"Impossible d'accéder au dossier SharePoint: {str(e)}")
+        # Lister les fichiers dans le dossier sources
+        files_list = client.list_files("ALM_Metrics/sources/")
         
-        # Rechercher les fichiers correspondants
-        file_j_found = None
-        file_j_minus_1_found = None
+        # Filtrer pour trouver les fichiers correspondants
+        file_j = None
+        file_j_minus_1 = None
         
-        for file_name in files_list:
-            if file_name.startswith(file_pattern_j) and file_name.endswith('.csv'):
-                file_j_found = file_name
-            elif file_name.startswith(file_pattern_j_minus_1) and file_name.endswith('.csv'):
-                file_j_minus_1_found = file_name
+        for file_info in files_list:
+            filename = file_info.get("name", "")
+            if filename.startswith(f"D_PA_{date_j_str}") and filename.endswith(".csv"):
+                file_j = filename
+            elif filename.startswith(f"D_PA_{date_j_minus_1_str}") and filename.endswith(".csv"):
+                file_j_minus_1 = filename
         
-        if not file_j_found:
-            raise ValueError(f"Fichier J non trouvé avec le pattern {file_pattern_j}XXXX.csv")
-        if not file_j_minus_1_found:
-            raise ValueError(f"Fichier J-1 non trouvé avec le pattern {file_pattern_j_minus_1}XXXX.csv")
+        if not file_j:
+            raise ValueError(f"Fichier J non trouvé pour la date {date_j_str}")
+        if not file_j_minus_1:
+            raise ValueError(f"Fichier J-1 non trouvé pour la date {date_j_minus_1_str}")
         
-        logger.info(f"Fichiers trouvés : J={file_j_found}, J-1={file_j_minus_1_found}")
-        
-        dataframes = {}
-        
-        # Récupérer le fichier J
-        try:
-            sharepoint_path_j = f"ALM_Metrics/sources/{file_j_found}"
-            binary_content_j = client.read_binary_file(sharepoint_path_j)
-            df_j, file_info_j = convert_binary_to_dataframe(binary_content_j, file_j_found)
-            dataframes['j'] = df_j
-            logger.info(f"✅ Fichier J récupéré : {file_j_found} ({len(df_j)} lignes)")
-        except Exception as e:
-            raise ValueError(f"Impossible de récupérer le fichier J ({file_j_found}): {str(e)}")
-        
-        # Récupérer le fichier J+1 (qui sera traité comme J-1 dans l'analyse)
-        try:
-            sharepoint_path_j_plus_1 = f"ALM_Metrics/sources/{file_j_plus_1_found}"
-            binary_content_j_plus_1 = client.read_binary_file(sharepoint_path_j_plus_1)
-            df_j_plus_1, file_info_j_plus_1 = convert_binary_to_dataframe(binary_content_j_plus_1, file_j_plus_1_found)
-            dataframes['jMinus1'] = df_j_plus_1  # Attention : logique inversée pour l'analyse
-            logger.info(f"✅ Fichier J+1 récupéré : {file_j_plus_1_found} ({len(df_j_plus_1)} lignes)")
-        except Exception as e:
-            raise ValueError(f"Impossible de récupérer le fichier J+1 ({file_j_plus_1_found}): {str(e)}")
+        # Télécharger les fichiers
+        content_j = client.read_binary_file(f"ALM_Metrics/sources/{file_j}")
+        content_j_minus_1 = client.read_binary_file(f"ALM_Metrics/sources/{file_j_minus_1}")
         
         return {
-            "dataframes": dataframes,
-            "files_info": {
-                "j": {"filename": file_j_found, "rows": len(df_j), "columns": len(df_j.columns)},
-                "jMinus1": {"filename": file_j_plus_1_found, "rows": len(df_j_plus_1), "columns": len(df_j_plus_1.columns)}
+            "j": {
+                "filename": file_j,
+                "content": content_j
+            },
+            "jMinus1": {
+                "filename": file_j_minus_1,
+                "content": content_j_minus_1
             }
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur récupération fichiers par date : {e}")
-        raise
-
-def convert_binary_to_dataframe(binary_content: bytes, filename: str):
-    """
-    Convertit le contenu binaire d'un fichier SharePoint en DataFrame
-    """
-    try:
-        extension = Path(filename).suffix.lower()
-        
-        if extension == '.csv':
-            # Détecter l'encodage
-            encoding = chardet.detect(binary_content[:10000])['encoding'] or 'utf-8'
-            
-            # Décoder en string
-            text_content = binary_content.decode(encoding)
-            
-            # Détecter le délimiteur
-            first_line = text_content.split('\n')[0]
-            if ';' in first_line:
-                delimiter = ';'
-            elif '\t' in first_line:
-                delimiter = '\t'
-            else:
-                delimiter = ','
-            
-            # Lire directement depuis StringIO
-            df = pd.read_csv(
-                io.StringIO(text_content),
-                delimiter=delimiter,
-                low_memory=False,
-                dtype=str,
-                na_filter=False
-            )
-            
-            # Nettoyer les colonnes
-            df.columns = df.columns.astype(str).str.strip()
-            
-            # Convertir les colonnes numériques
-            numeric_columns = ['Nominal Value', 'LCR_ECO_IMPACT_LCR']
-            for col in numeric_columns:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')
-            
-            return df, {'format': extension, 'encoding': encoding, 'delimiter': delimiter}
-            
-        else:
-            raise ValueError(f"Format non supporté: {extension}")
-            
-    except Exception as e:
-        raise ValueError(f"Erreur lecture fichier SharePoint: {str(e)}")
+        logger.error(f"Erreur récupération fichiers SharePoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SharePoint: {str(e)}")
     
-
 def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     """
     Convertit le contenu d'un fichier directement en DataFrame
@@ -717,55 +647,8 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
+    
 
-@app.get("/api/available-files")
-async def get_available_files(session_token: Optional[str] = Cookie(None)):
-    """Liste les fichiers disponibles dans le dossier SharePoint"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        client = SharePointClient()
-        # CORRECTION: Utiliser la bonne méthode
-        files_list = client.list_files_in_path("ALM_Metrics/sources/")
-        
-        # Filtrer seulement les fichiers D_PA
-        d_pa_files = [f for f in files_list if f.startswith('D_PA_') and f.endswith('.csv')]
-        
-        # Extraire les dates des fichiers
-        file_dates = []
-        for file_name in d_pa_files:
-            try:
-                # Extraire YYYYMMDD du nom de fichier
-                date_part = file_name[5:13]  # D_PA_ fait 5 caractères
-                file_date_obj = datetime.strptime(date_part, '%Y%m%d')
-                
-                # CORRECTION: La date réelle = date du fichier - 1 jour
-                real_date_obj = file_date_obj - timedelta(days=1)
-                
-                file_dates.append({
-                    "filename": file_name,
-                    "date": real_date_obj.strftime('%Y-%m-%d'),
-                    "formatted_date": real_date_obj.strftime('%d/%m/%Y'),
-                    "file_date": file_date_obj.strftime('%d/%m/%Y')  # Pour debug
-                })
-            except Exception as e:
-                logger.warning(f"Erreur parsing date pour {file_name}: {e}")
-                continue
-        
-        # Trier par date réelle
-        file_dates.sort(key=lambda x: x['date'], reverse=True)
-        
-        return {
-            "success": True,
-            "files": file_dates[:20]  # Limiter aux 20 plus récents
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur listage fichiers: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-    
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
     """
@@ -924,7 +807,74 @@ async def view_current_report(session_token: Optional[str] = Cookie(None)):
         
     except Exception as e:
         return HTMLResponse(content=f"<h1>Erreur génération rapport</h1><p>{str(e)}</p>")
+
+
+@app.post("/api/analyze-by-date")
+async def analyze_by_date(request: Request, session_token: Optional[str] = Cookie(None)):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
+    try:
+        data = await request.json()
+        selected_date = data.get("date")
+        
+        if not selected_date:
+            raise HTTPException(status_code=400, detail="Date requise")
+        
+        log_activity(current_user["username"], "ANALYSIS_BY_DATE", f"Analysis for date: {selected_date}")
+        
+        logger.info(f"Début analyse par date: {selected_date}")
+        
+        # Récupérer les fichiers depuis SharePoint
+        sharepoint_files = get_sharepoint_files_by_date(selected_date)
+        
+        # Traiter les fichiers en mémoire
+        dataframes = {}
+        for file_type, file_info in sharepoint_files.items():
+            df, processing_info = convert_file_content_to_dataframe(
+                file_info["content"], 
+                file_info["filename"]
+            )
+            dataframes[file_type] = df
+            logger.info(f"{file_type}: {len(df)} lignes depuis {file_info['filename']}")
+        
+        # Faire les analyses
+        balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
+        consumption_results = create_consumption_analysis_grouped_only(dataframes)
+        
+        # Sauvegarder le contexte chatbot
+        chatbot_session["context_data"] = {
+            "balance_sheet": balance_sheet_results,
+            "consumption": consumption_results,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "selected_date": selected_date,
+            "files_used": {
+                "j": sharepoint_files["j"]["filename"],
+                "jMinus1": sharepoint_files["jMinus1"]["filename"]
+            }
+        }
+        
+        logger.info("Analyse par date terminée avec contexte chatbot prêt")
+        
+        return {
+            "success": True,
+            "message": f"Analyse terminée pour le {selected_date}",
+            "selected_date": selected_date,
+            "files_used": chatbot_session["context_data"]["files_used"],
+            "context_ready": True,
+            "results": {
+                "balance_sheet": balance_sheet_results,
+                "consumption": consumption_results
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur analyse par date: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+       
 
 def prepare_analysis_context() -> str:
     """
@@ -1005,68 +955,6 @@ def prepare_analysis_context() -> str:
         context_parts.append("\nAucune analyse disponible - les analyses doivent être lancées d'abord.")
     
     return "\n".join(context_parts)
-
-
-@app.post("/api/load-by-date")
-async def load_files_by_date(request: Request, session_token: Optional[str] = Cookie(None)):
-    """Charge automatiquement les fichiers J et J-1 pour une date donnée"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        data = await request.json()
-        target_date = data.get("date")
-        
-        if not target_date:
-            raise HTTPException(status_code=400, detail="Date requise")
-        
-        log_activity(current_user["username"], "AUTO_LOAD", f"Loading files for date {target_date}")
-        
-        # Récupérer les fichiers depuis SharePoint
-        result = get_files_by_date(target_date)
-        dataframes = result["dataframes"]
-        files_info = result["files_info"]
-        
-        # Optimiser les DataFrames comme dans l'upload classique
-        for file_type, df in dataframes.items():
-            # Filtrer et optimiser
-            df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
-            
-            # Garder seulement les colonnes utiles
-            required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
-                            "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
-            available_cols = [col for col in required_cols if col in df_filtered.columns]
-            df_minimal = df_filtered[available_cols].copy()
-            
-            # Optimiser les types
-            for col in df_minimal.select_dtypes(include=['float64']):
-                df_minimal[col] = pd.to_numeric(df_minimal[col], downcast='float')
-            
-            # Stocker dans la session
-            file_session["files"][file_type] = {
-                "dataframe": df_minimal,
-                "original_name": files_info[file_type]["filename"],
-                "file_format": "csv",
-                "rows": len(df_minimal),
-                "columns": len(df_minimal.columns),
-                "upload_time": datetime.now().isoformat(),
-                "missing_columns": [col for col in ALL_REQUIRED_COLUMNS if col not in df_minimal.columns]
-            }
-        
-        return {
-            "success": True,
-            "message": f"Fichiers chargés automatiquement pour le {target_date}",
-            "files": files_info
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur chargement automatique: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-    
-
 
 def prepare_documents_context() -> str:
     """

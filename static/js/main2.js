@@ -10,83 +10,10 @@
 // Variables globales
 let filesReady = { j: false, j1: false };
 
-// Ajouter cette fonction
-async function loadAvailableFiles() {
-    try {
-        const response = await fetch('/api/available-files');
-        if (response.ok) {
-            const result = await response.json();
-            if (result.success && result.files.length > 0) {
-                // Afficher les infos dans le texte d'aide
-                const availableInfo = document.getElementById('available-files-info');
-                const lastDates = result.files.slice(0, 5).map(f => f.formatted_date).join(', ');
-                availableInfo.innerHTML = `<strong>Recent files:</strong> ${lastDates}`;
-                
-                // Créer la grille des fichiers disponibles
-                displayAvailableFilesList(result.files.slice(0, 10));
-                
-                // Montrer la liste
-                document.getElementById('available-files-list').style.display = 'block';
-            }
-        }
-    } catch (error) {
-        console.error('Could not load available files list:', error);
-        const availableInfo = document.getElementById('available-files-info');
-        availableInfo.innerHTML = '<span class="text-warning">Could not load file list</span>';
-    }
-}
-
-function displayAvailableFilesList(files) {
-    const grid = document.getElementById('files-grid');
-    grid.innerHTML = '';
-    
-    files.forEach(file => {
-        const col = document.createElement('div');
-        col.className = 'col-6 col-md-4 col-lg-3 mb-2';
-        
-        const isToday = new Date().toISOString().split('T')[0] === file.date;
-        const badgeClass = isToday ? 'bg-success' : 'bg-secondary';
-        
-        col.innerHTML = `
-            <div class="card card-hover" style="cursor: pointer; font-size: 0.8rem;" onclick="selectDate('${file.date}')">
-                <div class="card-body p-2 text-center">
-                    <div class="fw-bold">${file.formatted_date}</div>
-                    <small class="text-muted">${file.filename}</small>
-                    ${isToday ? '<span class="badge bg-success mt-1">Today</span>' : ''}
-                </div>
-            </div>
-        `;
-        
-        grid.appendChild(col);
-    });
-}
-
-function selectDate(dateString) {
-    document.getElementById('analysis-date').value = dateString;
-    document.getElementById('loadFilesBtn').disabled = false;
-    showNotification(`Selected date: ${new Date(dateString).toLocaleDateString()}`, 'info');
-}
-
-// Modifier la partie DOMContentLoaded existante
+// Initialisation
 document.addEventListener('DOMContentLoaded', function() {
-    const dateInput = document.getElementById('analysis-date');
-    const today = new Date().toISOString().split('T')[0];
-    dateInput.max = today;
-    
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    dateInput.value = yesterday.toISOString().split('T')[0];
-    
-    dateInput.addEventListener('change', function() {
-        document.getElementById('loadFilesBtn').disabled = !this.value;
-    });
-    
-    if (dateInput.value) {
-        document.getElementById('loadFilesBtn').disabled = false;
-    }
-    
-    // Charger la liste des fichiers disponibles
-    loadAvailableFiles();
+    console.log('🚀 Interface ALM initialisée');
+    initializeDateSelection(); 
 });
 
 function initializeDragAndDrop() {
@@ -126,127 +53,51 @@ function handleDrop(e) {
 }
 
 
-/**
- * Initialise les listeners pour les uploads de fichiers
- */
-function initializeFileUploads() {
-    document.getElementById('fileJ').addEventListener('change', function() {
-        if (this.files[0]) {
-            uploadFile(this.files[0], 'j');
-        }
-    });
-    
-    document.getElementById('fileJ1').addEventListener('change', function() {
-        if (this.files[0]) {
-            uploadFile(this.files[0], 'jMinus1');
-        }
-    });
-}
-
-/**
- * Charge les fichiers automatiquement depuis SharePoint pour une date donnée
- */
-async function loadFilesByDate() {
+function initializeDateSelection() {
     const dateInput = document.getElementById('analysis-date');
-    const loadBtn = document.getElementById('loadFilesBtn');
-    const filesStatus = document.getElementById('files-status');
+    const today = new Date();
     
-    if (!dateInput.value) {
-        showNotification('Please select a date', 'error');
-        return;
-    }
+    // Définir la date max à aujourd'hui
+    dateInput.max = today.toISOString().split('T')[0];
     
-    try {
-        const originalText = loadBtn.innerHTML;
-        loadBtn.disabled = true;
-        loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>CHECKING FILES...';
-        
-        // D'abord vérifier si les fichiers existent
-        const availableResponse = await fetch('/api/available-files');
-        if (availableResponse.ok) {
-            const availableResult = await availableResponse.json();
-            const selectedDate = dateInput.value;
-            const nextDay = new Date(selectedDate);
-            nextDay.setDate(nextDay.getDate() + 1);
-            const nextDayStr = nextDay.toISOString().split('T')[0];
-            
-            const hasSelectedDate = availableResult.files.some(f => f.date === selectedDate);
-            const hasNextDate = availableResult.files.some(f => f.date === nextDayStr);
-            
-            if (!hasSelectedDate || !hasNextDate) {
-                throw new Error(`Files not found for ${selectedDate} or ${nextDayStr}. Please check available dates.`);
-            }
-        }
-        
-        loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>LOADING FROM SHAREPOINT...';
-        showNotification('Loading files from SharePoint...', 'info');
-        
-        const response = await fetch('/api/load-by-date', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ date: dateInput.value })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            
-            displayFilesStatus(result.files);
-            filesStatus.style.display = 'block';
-            
-            filesReady.j = true;
-            filesReady.j1 = true;
-            
+    // Définir une date par défaut (hier)
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    dateInput.value = yesterday.toISOString().split('T')[0];
+    
+    // Listener pour le changement de date
+    dateInput.addEventListener('change', function() {
+        if (this.value) {
             checkAnalyzeButtonState();
-            
-            showNotification(result.message, 'success');
-            
-        } else {
-            const errorData = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
-            throw new Error(errorData.detail || errorData.message || `Erreur HTTP ${response.status}`);
+            showSelectedDateInfo(this.value);
         }
-        
-    } catch (error) {
-        console.error('❌ Erreur chargement automatique:', error);
-        showNotification(`Erreur: ${error.message}`, 'error');
-        filesReady.j = false;
-        filesReady.j1 = false;
-        checkAnalyzeButtonState();
-    } finally {
-        loadBtn.disabled = false;
-        loadBtn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>LOAD FILES';
-    }
+    });
+    
+    // Afficher les infos pour la date par défaut
+    showSelectedDateInfo(dateInput.value);
 }
 
-/**
- * Affiche le statut des fichiers chargés
- */
-function displayFilesStatus(filesInfo) {
-    // Statut fichier J
-    const statusJ = document.querySelector('#status-j .status-content');
-    statusJ.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <div class="fw-bold text-success">${filesInfo.j.filename}</div>
-                <small class="text-muted">${filesInfo.j.rows.toLocaleString()} rows • ${filesInfo.j.columns} columns</small>
-            </div>
-            <i class="fas fa-check-circle text-success fa-lg"></i>
-        </div>
-    `;
+function showSelectedDateInfo(selectedDate) {
+    const statusDiv = document.getElementById('date-status');
+    const dateObj = new Date(selectedDate);
+    const nextDay = new Date(dateObj);
+    nextDay.setDate(nextDay.getDate() + 1);
     
-    // Statut fichier J-1
-    const statusJ1 = document.querySelector('#status-j-1 .status-content');
-    statusJ1.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <div class="fw-bold text-success">${filesInfo.jMinus1.filename}</div>
-                <small class="text-muted">${filesInfo.jMinus1.rows.toLocaleString()} rows • ${filesInfo.jMinus1.columns} columns</small>
+    const formatDate = (date) => date.toLocaleDateString('fr-FR');
+    
+    statusDiv.innerHTML = `
+        <div class="alert alert-info fade-in-up">
+            <div class="text-start">
+                <strong>Files to be retrieved:</strong><br>
+                <small>
+                    • File J-1: D_PA_${selectedDate.replace(/-/g, '')}xxxx.csv (data for ${formatDate(new Date(dateObj.getTime() - 24*60*60*1000))})<br>
+                    • File J: D_PA_${nextDay.toISOString().split('T')[0].replace(/-/g, '')}xxxx.csv (data for ${formatDate(dateObj)})
+                </small>
             </div>
-            <i class="fas fa-check-circle text-success fa-lg"></i>
         </div>
     `;
 }
+
 
 async function logout() {
     if (confirm('Are you sure you want to logout?')) {
@@ -386,33 +237,17 @@ async function uploadFile(file, type) {
  */
 function checkAnalyzeButtonState() {
     const analyzeBtn = document.getElementById('analyzeBtn');
+    const dateInput = document.getElementById('analysis-date');
     
-    if (filesReady.j && filesReady.j1) {
+    if (dateInput.value) {
         analyzeBtn.disabled = false;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.add('pulse');
         
-        // NOUVEAU: Ajouter bouton de nettoyage si pas déjà présent
-        if (!document.getElementById('cleanup-btn')) {
-            const cleanupBtn = document.createElement('button');
-            cleanupBtn.id = 'cleanup-btn';
-            cleanupBtn.className = 'btn btn-outline-warning btn-sm ms-3';
-            cleanupBtn.innerHTML = '<i class="fas fa-trash"></i> Clean Memory';
-            cleanupBtn.onclick = cleanupMemory;
-            analyzeBtn.parentNode.appendChild(cleanupBtn);
-        }
-        
-        showNotification('Both files are loaded! You can start the analysis.', 'success');
+        showNotification('Date selected! You can start the analysis.', 'success');
     } else {
         analyzeBtn.disabled = true;
-        analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.remove('pulse');
-        
-        // Supprimer le bouton de nettoyage si présent
-        const cleanupBtn = document.getElementById('cleanup-btn');
-        if (cleanupBtn) {
-            cleanupBtn.remove();
-        }
     }
 }
 
@@ -435,7 +270,14 @@ async function cleanupMemory() {
  * Lance l'analyse des fichiers
  */
 async function analyze() {
-    console.log('🔍 Lancement de l\'analyse TCD');
+    const selectedDate = document.getElementById('analysis-date').value;
+    
+    if (!selectedDate) {
+        showNotification('Please select a date first', 'error');
+        return;
+    }
+    
+    console.log('🔍 Lancement de l\'analyse pour la date:', selectedDate);
     
     // Affichage du statut d'analyse
     document.getElementById('results').innerHTML = `
@@ -443,10 +285,10 @@ async function analyze() {
             <div class="card border-0">
                 <div class="card-body text-center py-5">
                     <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
-                    <h4 class="text-primary">Generating analyses...</h4>
+                    <h4 class="text-primary">Retrieving files from SharePoint...</h4>
                     <p class="text-muted">
-                        Balance Sheet + Consumption + Ressources <br>
-                        <small>ACTIF/PASSIF • LCR par métier • Top Conso = "O"</small>
+                        Date: ${selectedDate}<br>
+                        <small>Loading D_PA files and generating analysis</small>
                     </p>
                     <div class="progress mt-3" style="height: 6px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
@@ -458,71 +300,47 @@ async function analyze() {
     `;
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 600000);
-
-        const response = await fetch('/api/analyze', { 
+        const response = await fetch('/api/analyze-by-date', {
             method: 'POST',
-            signal: controller.signal 
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ date: selectedDate })
         });
-        
-        clearTimeout(timeoutId);
         
         if (response.ok) {
             const result = await response.json();
-            console.log('📊 Résultats de l\'analyse:', result);
+            console.log('📊 Résultats de l\'analyse par date:', result);
             
             if (result.success) {
-                // Attendre que l'affichage soit complètement terminé
                 await displayCompleteResults(result.results);
                 
-                // AFFICHER L'INDICATEUR DE CHARGEMENT CONTEXTE
                 document.getElementById('context-loading').style.display = 'block';
                 
-                // Vérifier que le contexte est prêt côté serveur
                 if (result.context_ready) {
-                    showNotification('Analyses successfully completed!', 'success');
+                    showNotification(`Analysis completed for ${selectedDate}!`, 'success');
                     
-                    // Double vérification avec un petit délai pour l'effet visuel
                     setTimeout(async () => {
-                        const contextStatus = await verifyContextReady();
-                        
-                        // MASQUER L'INDICATEUR DE CHARGEMENT
                         document.getElementById('context-loading').style.display = 'none';
-                        
-                        if (contextStatus) {
-                            console.log('✅ Contexte vérifié, affichage du chatbot');
-                            showNotification('AI Assistant ready!', 'success');
-                            showChatbot();
-                        } else {
-                            console.warn('⚠️ Contexte pas encore prêt');
-                            showNotification('AI Assistant loading...', 'info');
-                            setTimeout(() => {
-                                document.getElementById('context-loading').style.display = 'none';
-                                showChatbot();
-                            }, 1000);
-                        }
-                    }, 1000); // Délai pour montrer le chargement
-                } else {
-                    // Fallback
-                    showNotification('Analysis completed, preparing chatbot...', 'info');
-                    setTimeout(() => {
-                        document.getElementById('context-loading').style.display = 'none';
+                        showNotification('AI Assistant ready!', 'success');
                         showChatbot();
-                    }, 3000);
+                        
+                        // Afficher les fichiers utilisés
+                        if (result.files_used) {
+                            showNotification(`Files used: ${result.files_used.jMinus1} & ${result.files_used.j}`, 'info');
+                        }
+                    }, 1000);
                 }
             } else {
                 throw new Error(result.message || 'Erreur dans l\'analyse');
             }
-
         } else {
             const errorText = await response.text();
             throw new Error(`Erreur serveur ${response.status}: ${errorText}`);
         }
     } catch (error) {
-        console.error('❌ Erreur analyse:', error);
+        console.error('❌ Erreur analyse par date:', error);
         
-        // MASQUER L'INDICATEUR EN CAS D'ERREUR
         document.getElementById('context-loading').style.display = 'none';
         
         document.getElementById('results').innerHTML = `
@@ -539,7 +357,7 @@ async function analyze() {
             </div>
         `;
         
-        showNotification('Erreur lors de l\'analyse', 'error');
+        showNotification('Erreur lors de l\'analyse SharePoint', 'error');
     }
 }
 

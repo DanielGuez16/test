@@ -314,11 +314,6 @@
             font-family: 'Courier New', monospace;
             text-align: right;
         }
-        .card-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            transition: all 0.2s ease;
-        }
         
         /* Légende */
         .table-legend {
@@ -569,60 +564,31 @@
             </div>
             </div>
             
-            <!-- Section Sélection Date -->
-            <div class="row mb-4">
-                <div class="col-lg-8 mx-auto">
+            <!-- Section Sélection de Date -->
+            <div class="row mb-4 justify-content-center">
+                <div class="col-lg-8">
                     <div class="card h-100 border-0 fade-in-up">
                         <div class="card-header bg-secondary text-white">
                             <h5 class="mb-0">Select Analysis Date</h5>
                         </div>
                         <div class="card-body text-center">
-                            <div class="row align-items-center">
-                                <div class="col-md-8">
-                                    <label for="analysis-date" class="form-label">Choose the target date (D)</label>
-                                    <input type="date" id="analysis-date" class="form-control form-control-lg" 
-                                        max="" style="text-align: center; font-size: 1.2rem;">
-                                    <small class="text-muted mt-2" id="date-help-text">
-                                        Files will be automatically loaded from SharePoint<br>
-                                        <span id="available-files-info">Loading available files...</span>
-                                    </small>
-                                </div>
-                                <div class="col-md-4">
-                                    <button id="loadFilesBtn" class="btn btn-analyze btn-lg" onclick="loadFilesByDate()" disabled>
-                                        <i class="fas fa-cloud-download-alt me-2"></i>LOAD FILES
-                                    </button>
+                            <div class="mb-3">
+                                <i class="fas fa-calendar-alt fa-3x text-primary mb-3"></i>
+                                <h5>Choose the LCR date to analyze</h5>
+                                <p class="text-muted">
+                                    Files will be automatically retrieved from SharePoint<br>
+                                    <small>Format: D_PA_YYYYMMDDXXXX.csv</small>
+                                </p>
+                            </div>
+                            
+                            <div class="row justify-content-center">
+                                <div class="col-md-6">
+                                    <input type="date" id="analysis-date" class="form-control form-control-lg mb-3" 
+                                        max="" style="border-radius: 10px;">
                                 </div>
                             </div>
                             
-                            <!-- Liste des fichiers disponibles -->
-                            <div id="available-files-list" class="mt-3" style="display: none;">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <small class="fw-bold">Available Files (Recent 10)</small>
-                                    </div>
-                                    <div class="card-body p-2">
-                                        <div id="files-grid" class="row"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Status des fichiers chargés (reste identique) -->
-                            <div id="files-status" class="mt-4" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div id="status-j" class="p-3 border rounded bg-light">
-                                            <strong>File D (Today)</strong>
-                                            <div class="status-content"></div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div id="status-j-1" class="p-3 border rounded bg-light">
-                                            <strong>File D-1 (Yesterday)</strong>
-                                            <div class="status-content"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <div id="date-status" class="mt-3"></div>
                         </div>
                     </div>
                 </div>
@@ -753,30 +719,6 @@
         </div>
     </div>
     {% endif %}
-
-    <script>
-    // Initialiser la date max à aujourd'hui
-    document.addEventListener('DOMContentLoaded', function() {
-        const dateInput = document.getElementById('analysis-date');
-        const today = new Date().toISOString().split('T')[0];
-        dateInput.max = today;
-        
-        // Mettre la date d'hier par défaut
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        dateInput.value = yesterday.toISOString().split('T')[0];
-        
-        // Activer le bouton quand une date est sélectionnée
-        dateInput.addEventListener('change', function() {
-            document.getElementById('loadFilesBtn').disabled = !this.value;
-        });
-        
-        // Activer le bouton si une date est déjà présente
-        if (dateInput.value) {
-            document.getElementById('loadFilesBtn').disabled = false;
-        }
-    });
-    </script>
 
 </body>
 </html>
