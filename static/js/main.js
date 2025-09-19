@@ -122,7 +122,7 @@ async function uploadFile(file, type) {
         const timeoutId = setTimeout(() => {
             console.log('Upload timeout après 5 minutes');
             controller.abort();
-        }, 300000);
+        }, 1800000);
 
         // Envoi à l'API
         const response = await fetch('/api/upload', {

@@ -677,9 +677,9 @@ class ReportGenerator:
             <!-- WARNING EN HAUT DE PAGE -->
             <div class="print-warning no-print">
                 <div class="warning-content">
-                    <h3>⚠️ IMPORTANT - Pour imprimer en PDF</h3>
-                    <p><strong>Appuyez sur Ctrl+P puis cochez obligatoirement "Graphiques d'arrière-plan"</strong><br>
-                    Sinon les tableaux et graphiques n'apparaîtront pas dans votre PDF.</p>
+                    <h3>⚠️ IMPORTANT - To export to PDF</h3>
+                    <p><strong>Press Ctrl+P then check "Background Graphics"</strong><br>
+                    Otherwise, tables and graphs will not have the right visual in the PDF.</p>
                 </div>
             </div>
             
