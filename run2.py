@@ -310,13 +310,16 @@ async def load_files_by_date(request: Request, session_token: Optional[str] = Co
         from datetime import datetime, timedelta
         date_obj = datetime.strptime(selected_date, "%Y-%m-%d")
         
-        # Calcul des dates pour les fichiers (décalage +1 jour)
-        j_date = date_obj + timedelta(days=1)  # J correspond à date+1
-        j_minus_1_date = date_obj  # J-1 correspond à la date sélectionnée
-        
+        # Calcul des dates pour les fichiers (CORRECTION du décalage)
+        # Si user veut analyser le 10/09, il faut :
+        # - D_PA_20250910xxxx.csv (données du 09/09) → J-1
+        # - D_PA_20250911xxxx.csv (données du 10/09) → J
+        j_minus_1_date = date_obj  # Le fichier J-1 porte la date sélectionnée
+        j_date = date_obj + timedelta(days=1)  # Le fichier J porte la date+1
+
         # Format des noms de fichiers
-        j_date_str = j_date.strftime("%Y%m%d")
         j_minus_1_date_str = j_minus_1_date.strftime("%Y%m%d")
+        j_date_str = j_date.strftime("%Y%m%d")
         
         # Connexion SharePoint
         sharepoint_client = SharePointClient()
@@ -328,20 +331,19 @@ async def load_files_by_date(request: Request, session_token: Optional[str] = Co
         # Rechercher les fichiers correspondants
         j_file = None
         j_minus_1_file = None
-        
-        for file_info in all_files:
-            filename = file_info['name']
-            if filename.startswith(f"D_PA_{j_date_str}") and filename.endswith('.csv'):
-                j_file = filename
-            elif filename.startswith(f"D_PA_{j_minus_1_date_str}") and filename.endswith('.csv'):
-                j_minus_1_file = filename
+
+        for filename in all_files:
+            if filename.startswith(f"D_PA_{j_minus_1_date_str}") and filename.endswith('.csv'):
+                j_minus_1_file = filename  # Fichier avec date sélectionnée → données J-1
+            elif filename.startswith(f"D_PA_{j_date_str}") and filename.endswith('.csv'):
+                j_file = filename  # Fichier avec date+1 → données J
         
         if not j_file or not j_minus_1_file:
             missing = []
-            if not j_file:
-                missing.append(f"D_PA_{j_date_str}xxxx.csv")
             if not j_minus_1_file:
-                missing.append(f"D_PA_{j_minus_1_date_str}xxxx.csv")
+                missing.append(f"D_PA_{j_minus_1_date_str}xxxx.csv (for J-1 data)")
+            if not j_file:
+                missing.append(f"D_PA_{j_date_str}xxxx.csv (for J data)")
             raise HTTPException(status_code=404, detail=f"Files not found: {', '.join(missing)}")
         
         # Charger les deux fichiers
@@ -399,7 +401,7 @@ async def load_files_by_date(request: Request, session_token: Optional[str] = Co
     except Exception as e:
         logger.error(f"Error loading files by date: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    
+       
 @app.get("/api/logs")
 async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
     current_user = get_current_user_from_session(session_token)

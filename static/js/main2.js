@@ -69,9 +69,17 @@ function initializeDateSelection() {
     const dateInput = document.getElementById('analysisDate');
     if (dateInput) {
         dateInput.value = yesterday.toISOString().split('T')[0];
+        
+        // Ajouter une animation au focus
+        dateInput.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        dateInput.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
     }
 }
-
 // Nouvelle fonction pour charger les fichiers par date
 async function loadFilesByDate() {
     const dateInput = document.getElementById('analysisDate');
