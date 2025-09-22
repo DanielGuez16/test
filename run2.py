@@ -33,6 +33,7 @@ import secrets
 
 from llm_connector import LLMConnector
 from report_generator import ReportGenerator
+from sharepoint_connector import SharePointClient
 
 # Variables globales pour la session chatbot
 chatbot_session = {
@@ -43,7 +44,6 @@ chatbot_session = {
 
 # Initialiser le connecteur LLM
 llm_connector = LLMConnector()
-from sharepoint_connector import SharePointClient
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -110,69 +110,6 @@ ALL_REQUIRED_COLUMNS = list(set(
     REQUIRED_COLUMNS["consumption"]
 ))
 
-def get_sharepoint_files_by_date(selected_date: str):
-    """
-    Récupère les deux fichiers correspondant à une date depuis SharePoint
-    selected_date: format YYYY-MM-DD
-    Retourne les fichiers J et J-1 selon la logique métier
-    """
-    try:
-        from datetime import datetime, timedelta
-        
-        # Convertir la date sélectionnée
-        date_obj = datetime.strptime(selected_date, "%Y-%m-%d")
-        
-        # Calculer les dates des fichiers (décalage d'1 jour)
-        # Si on sélectionne le 15/09, on veut :
-        # - J : fichier du 16/09 (qui correspond aux données du 15/09)  
-        # - J-1 : fichier du 15/09 (qui correspond aux données du 14/09)
-        date_j = date_obj + timedelta(days=1)
-        date_j_minus_1 = date_obj
-        
-        # Formater les dates pour les noms de fichiers
-        date_j_str = date_j.strftime("%Y%m%d")
-        date_j_minus_1_str = date_j_minus_1.strftime("%Y%m%d")
-        
-        client = SharePointClient()
-        
-        # Lister les fichiers dans le dossier sources
-        files_list = client.list_files("ALM_Metrics/sources/")
-        
-        # Filtrer pour trouver les fichiers correspondants
-        file_j = None
-        file_j_minus_1 = None
-        
-        for file_info in files_list:
-            filename = file_info.get("name", "")
-            if filename.startswith(f"D_PA_{date_j_str}") and filename.endswith(".csv"):
-                file_j = filename
-            elif filename.startswith(f"D_PA_{date_j_minus_1_str}") and filename.endswith(".csv"):
-                file_j_minus_1 = filename
-        
-        if not file_j:
-            raise ValueError(f"Fichier J non trouvé pour la date {date_j_str}")
-        if not file_j_minus_1:
-            raise ValueError(f"Fichier J-1 non trouvé pour la date {date_j_minus_1_str}")
-        
-        # Télécharger les fichiers
-        content_j = client.read_binary_file(f"ALM_Metrics/sources/{file_j}")
-        content_j_minus_1 = client.read_binary_file(f"ALM_Metrics/sources/{file_j_minus_1}")
-        
-        return {
-            "j": {
-                "filename": file_j,
-                "content": content_j
-            },
-            "jMinus1": {
-                "filename": file_j_minus_1,
-                "content": content_j_minus_1
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur récupération fichiers SharePoint: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur SharePoint: {str(e)}")
-    
 def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     """
     Convertit le contenu d'un fichier directement en DataFrame
@@ -354,117 +291,115 @@ async def get_logs_statistics(session_token: Optional[str] = Cookie(None)):
         "stats": stats
     }
 
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), 
-                     file_type: str = Form(...),
-                     session_token: Optional[str] = Cookie(None)):
+@app.post("/api/load-files-by-date")
+async def load_files_by_date(request: Request, session_token: Optional[str] = Cookie(None)):
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    log_activity(current_user["username"], "FILE_UPLOAD", f"Uploaded {file.filename} as {file_type}")
     try:
-        # MONITORING INITIAL
-        process = psutil.Process(os.getpid())
-        memory_start = process.memory_info().rss / 1024 / 1024
-        logger.info(f"Mémoire avant upload {file_type}: {memory_start:.1f} MB")
-
-        logger.info(f"Upload reçu: {file.filename}, type: {file_type}")
+        data = await request.json()
+        selected_date = data.get("date")  # Format YYYY-MM-DD
         
-        # Validation du fichier
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+        if not selected_date:
+            raise HTTPException(status_code=400, detail="Date is required")
         
-        file_extension = Path(file.filename).suffix.lower()
+        log_activity(current_user["username"], "FILE_LOAD_DATE", f"Loading files for date {selected_date}")
         
-        if file_extension not in SUPPORTED_EXTENSIONS:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Format non supporté: {file_extension}"
-            )
-
-        # Lire le contenu en mémoire
-        contents = await file.read()
-        file_size = len(contents)
+        # Conversion de la date sélectionnée
+        from datetime import datetime, timedelta
+        date_obj = datetime.strptime(selected_date, "%Y-%m-%d")
         
-        # TRAITEMENT DIRECT EN MÉMOIRE
-        try:
-            df, file_info = convert_file_content_to_dataframe(contents, file.filename)
-            logger.info(f"Fichier traité en mémoire: {file_info}")
+        # Calcul des dates pour les fichiers (décalage +1 jour)
+        j_date = date_obj + timedelta(days=1)  # J correspond à date+1
+        j_minus_1_date = date_obj  # J-1 correspond à la date sélectionnée
+        
+        # Format des noms de fichiers
+        j_date_str = j_date.strftime("%Y%m%d")
+        j_minus_1_date_str = j_minus_1_date.strftime("%Y%m%d")
+        
+        # Connexion SharePoint
+        sharepoint_client = SharePointClient()
+        base_path = "ALM_Metrics/sources"
+        
+        # Lister tous les fichiers du dossier
+        all_files = sharepoint_client.list_files_in_path(base_path)
+        
+        # Rechercher les fichiers correspondants
+        j_file = None
+        j_minus_1_file = None
+        
+        for file_info in all_files:
+            filename = file_info['name']
+            if filename.startswith(f"D_PA_{j_date_str}") and filename.endswith('.csv'):
+                j_file = filename
+            elif filename.startswith(f"D_PA_{j_minus_1_date_str}") and filename.endswith('.csv'):
+                j_minus_1_file = filename
+        
+        if not j_file or not j_minus_1_file:
+            missing = []
+            if not j_file:
+                missing.append(f"D_PA_{j_date_str}xxxx.csv")
+            if not j_minus_1_file:
+                missing.append(f"D_PA_{j_minus_1_date_str}xxxx.csv")
+            raise HTTPException(status_code=404, detail=f"Files not found: {', '.join(missing)}")
+        
+        # Charger les deux fichiers
+        results = {}
+        for file_type, filename in [("j", j_file), ("jMinus1", j_minus_1_file)]:
+            file_path = f"{base_path}/{filename}"
             
-        except Exception as e:
-            del contents
-            raise HTTPException(status_code=422, detail=f"Erreur lecture: {str(e)}")
-        
-        # Sauvegarder les infos AVANT filtrage
-        original_rows = len(df)
-        original_columns = len(df.columns)
-        
-        # Vérifier les colonnes
-        missing_columns = [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
-
-        # Filtrer seulement les lignes nécessaires
-        df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
-
-        # OPTIMISATION MÉMOIRE - Ne garder que les colonnes utiles
-        required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
-                        "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
-        available_cols = [col for col in required_cols if col in df_filtered.columns]
-        df_minimal = df_filtered[available_cols].copy()
-
-        # Optimiser les types de données
-        for col in df_minimal.select_dtypes(include=['float64']):
-            df_minimal[col] = pd.to_numeric(df_minimal[col], downcast='float')
-
-        # LIBÉRATION MÉMOIRE IMMÉDIATE
-        del df_filtered
-        del df
-        del contents
-        import gc
-        gc.collect()
-
-        # Diagnostic mémoire
-        logger.info(f"DataFrame optimisé: {df_minimal.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
-        logger.info(f"Shape finale: {df_minimal.shape}")
-
-        # Stocker le DataFrame optimisé
-        file_session["files"][file_type] = {
-            "dataframe": df_minimal,  # DataFrame optimisé
-            "original_name": file.filename,
-            "file_format": file_info['format'],
-            "encoding": file_info.get('encoding'),
-            "delimiter": file_info.get('delimiter'),
-            "rows": len(df_minimal),
-            "columns": len(df_minimal.columns),
-            "upload_time": datetime.now().isoformat(),
-            "missing_columns": missing_columns
-        }
-
-        # MONITORING FINAL
-        memory_end = process.memory_info().rss / 1024 / 1024
-        logger.info(f"Mémoire après upload {file_type}: {memory_end:.1f} MB (diff: +{memory_end-memory_start:.1f} MB)")
+            # Lire le fichier depuis SharePoint
+            binary_content = sharepoint_client.read_binary_file(file_path)
+            
+            # Convertir en DataFrame
+            df, file_info = convert_file_content_to_dataframe(binary_content, filename)
+            
+            # Filtrer et optimiser comme dans l'ancien upload
+            original_rows = len(df)
+            df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
+            
+            required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
+                            "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
+            available_cols = [col for col in required_cols if col in df_filtered.columns]
+            df_minimal = df_filtered[available_cols].copy()
+            
+            # Optimiser les types
+            for col in df_minimal.select_dtypes(include=['float64']):
+                df_minimal[col] = pd.to_numeric(df_minimal[col], downcast='float')
+            
+            # Stocker en session
+            file_session["files"][file_type] = {
+                "dataframe": df_minimal,
+                "original_name": filename,
+                "file_format": file_info['format'],
+                "rows": len(df_minimal),
+                "columns": len(df_minimal.columns),
+                "upload_time": datetime.now().isoformat(),
+                "missing_columns": [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
+            }
+            
+            results[file_type] = {
+                "filename": filename,
+                "rows": original_rows,
+                "columns": len(df.columns),
+                "filtered_rows": len(df_minimal)
+            }
         
         return {
             "success": True,
-            "message": f"Fichier {file_type} traité en mémoire ({file_info['format']})",
-            "filename": file.filename,
-            "format": file_info['format'],
-            "encoding": file_info.get('encoding'),
-            "delimiter": file_info.get('delimiter'),
-            "rows": original_rows,
-            "columns": original_columns,
-            "missing_columns": missing_columns,
-            "file_size": file_size,
-            "processing": "in_memory_optimized"
+            "message": f"Files loaded for {selected_date}",
+            "files": results,
+            "j_file": j_file,
+            "j_minus_1_file": j_minus_1_file
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Erreur upload: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+        logger.error(f"Error loading files by date: {e}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     
-
 @app.get("/api/logs")
 async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
     current_user = get_current_user_from_session(session_token)
@@ -807,74 +742,7 @@ async def view_current_report(session_token: Optional[str] = Cookie(None)):
         
     except Exception as e:
         return HTMLResponse(content=f"<h1>Erreur génération rapport</h1><p>{str(e)}</p>")
-
-
-@app.post("/api/analyze-by-date")
-async def analyze_by_date(request: Request, session_token: Optional[str] = Cookie(None)):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
     
-    try:
-        data = await request.json()
-        selected_date = data.get("date")
-        
-        if not selected_date:
-            raise HTTPException(status_code=400, detail="Date requise")
-        
-        log_activity(current_user["username"], "ANALYSIS_BY_DATE", f"Analysis for date: {selected_date}")
-        
-        logger.info(f"Début analyse par date: {selected_date}")
-        
-        # Récupérer les fichiers depuis SharePoint
-        sharepoint_files = get_sharepoint_files_by_date(selected_date)
-        
-        # Traiter les fichiers en mémoire
-        dataframes = {}
-        for file_type, file_info in sharepoint_files.items():
-            df, processing_info = convert_file_content_to_dataframe(
-                file_info["content"], 
-                file_info["filename"]
-            )
-            dataframes[file_type] = df
-            logger.info(f"{file_type}: {len(df)} lignes depuis {file_info['filename']}")
-        
-        # Faire les analyses
-        balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
-        consumption_results = create_consumption_analysis_grouped_only(dataframes)
-        
-        # Sauvegarder le contexte chatbot
-        chatbot_session["context_data"] = {
-            "balance_sheet": balance_sheet_results,
-            "consumption": consumption_results,
-            "analysis_timestamp": datetime.now().isoformat(),
-            "selected_date": selected_date,
-            "files_used": {
-                "j": sharepoint_files["j"]["filename"],
-                "jMinus1": sharepoint_files["jMinus1"]["filename"]
-            }
-        }
-        
-        logger.info("Analyse par date terminée avec contexte chatbot prêt")
-        
-        return {
-            "success": True,
-            "message": f"Analyse terminée pour le {selected_date}",
-            "selected_date": selected_date,
-            "files_used": chatbot_session["context_data"]["files_used"],
-            "context_ready": True,
-            "results": {
-                "balance_sheet": balance_sheet_results,
-                "consumption": consumption_results
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur analyse par date: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-       
 
 def prepare_analysis_context() -> str:
     """
