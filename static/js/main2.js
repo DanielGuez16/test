@@ -516,15 +516,15 @@ function displayCompleteResults(analysisResults) {
         }
         
         let html = '';
-        
-        // Section Balance Sheet
-        if (analysisResults.balance_sheet) {
-            html += generateBalanceSheetSection(analysisResults.balance_sheet);
+
+        // Section Buffer
+        if (analysisResults.buffer) {
+            html += generateBufferSection(analysisResults.buffer);
         }
-        
-        // Section Consumption
+
+        // Section Consumption LCR
         if (analysisResults.consumption) {
-            html += generateConsumptionSection(analysisResults.consumption);
+            html += generateConsumptionLCRSection(analysisResults.consumption);
         }
 
     html += `
@@ -876,152 +876,32 @@ async function clearChat() {
     }
 }
 
-/**
- * Génère la section Balance Sheet
- */
-function generateBalanceSheetSection(balanceSheetData) {
-    if (balanceSheetData.error) {
+function generateBufferSection(bufferData) {
+    if (bufferData.error) {
         return `
             <div class="analysis-section">
                 <div class="alert alert-danger">
-                    <h5>Erreur Balance Sheet</h5>
-                    <p>${balanceSheetData.error}</p>
+                    <h5>Erreur BUFFER</h5>
+                    <p>${bufferData.error}</p>
                 </div>
             </div>
         `;
     }
     
-    let html = `
+    return `
         <div class="analysis-section fade-in-up">
             <div class="card border-0">
                 <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h2>
-                        </div>
-                    </div>
+                    <h2 style="color: #76279b;" class="mb-1">${bufferData.title || '1. BUFFER'}</h2>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-container">
-                        ${balanceSheetData.pivot_table_html || '<p class="p-3">Données non disponibles</p>'}
+                        ${bufferData.buffer_table_html || '<p class="p-3">Données non disponibles</p>'}
                     </div>
                 </div>
             </div>
         </div>
     `;
-
-        
-    // Résumé Balance Sheet
-    if (balanceSheetData.summary) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="summary-box">
-                    <div class="d-flex align-items-start">
-                        <div>
-                            <p class="mb-0">${balanceSheetData.summary}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    
-    // Variations Balance Sheet
-    if (balanceSheetData.variations) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="row justify-content-center">
-        `;
-
-        const variations = balanceSheetData.variations;
-
-        // Carte ACTIF
-        if (variations.ACTIF) {
-            const actif = variations.ACTIF;
-            const isPositive = actif.variation >= 0;
-            
-            html += `
-                <div class="col-md-5 mb-3">
-                    <div class="metric-card p-3">
-                        <div class="text-center">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">ASSET</h6>
-                                <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                    ${isPositive ? '📈 Increase' : '📉 Decrease'}
-                                </span>
-                            </div>
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <small class="opacity-75">D-1</small>
-                                    <h4>${actif.j_minus_1} Bn €</h4>
-                                </div>
-                                <div class="col-6">
-                                    <small class="opacity-75">D</small>
-                                    <h4>${actif.j} Bn €</h4>
-                                </div>
-                            </div>
-                            <hr class="my-3 opacity-50">
-                            <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
-                                ${isPositive ? '+' : ''}${actif.variation} Bn €
-                            </h3>
-                            <small class="opacity-75">Variation</small>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Carte PASSIF
-        if (variations.PASSIF) {
-            const passif = variations.PASSIF;
-            const isPositive = passif.variation >= 0;
-            
-            html += `
-                <div class="col-md-5 mb-3">
-                    <div class="metric-card p-3">
-                        <div class="text-center">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">LIABILITY</h6>
-                                <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                    ${isPositive ? '📈 Increase' : '📉 Decrease'}
-                                </span>
-                            </div>
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <small class="opacity-75">D-1</small>
-                                    <h4>${passif.j_minus_1} Bn €</h4>
-                                </div>
-                                <div class="col-6">
-                                    <small class="opacity-75">D</small>
-                                    <h4>${passif.j} Bn €</h4>
-                                </div>
-                            </div>
-                            <hr class="my-3 opacity-50">
-                            <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
-                                ${isPositive ? '+' : ''}${passif.variation} Bn €
-                            </h3>
-                            <small class="opacity-75">Variation</small>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        html += `
-                </div>
-            </div>
-        `;
-
-        // Trait de séparation à la fin 
-        html += `
-            <div class="analysis-section">
-                <hr class="balance-sheet-separator">
-            </div>
-        `;
-    }
-    
-    return html;
 }
 
 /**

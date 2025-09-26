@@ -2710,5 +2710,65 @@
     "username": "franck.pokou-ext@natixis.com",
     "action": "ANALYSIS",
     "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-26T16:16:03.137884",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-26T16:16:03.151610",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-26T16:16:05.641894",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-26T16:16:06.975742",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-26T16:16:07.646233",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-26T16:26:09.020047",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-26T16:26:09.035835",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-26T16:26:15.338073",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-26T16:26:16.528598",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-26T16:26:17.157381",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
   }
 ]
