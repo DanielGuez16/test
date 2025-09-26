@@ -93,7 +93,7 @@ def log_activity(username: str, action: str, details: str = ""):
             logs_df = logs_df.tail(1000)
         
         # Sauvegarder dans SharePoint
-        client.save_dataframe_in_sharepoint(logs_df, SHAREPOINT_LOGS_PATH)
+        client.save_dataframe_in_sharepoint(logs_df, SHAREPOINT_LOGS_PATH, False)
         
         print(f"LOG: {username} - {action} - {details}")
         

@@ -33,7 +33,7 @@ import secrets
 
 from llm_connector import LLMConnector
 from report_generator import ReportGenerator
-from sharepoint_connector import SharePointClient
+#from sharepoint_connector import SharePointClient
 
 # Variables globales pour la session chatbot
 chatbot_session = {

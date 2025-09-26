@@ -2578,5 +2578,137 @@
     "username": "franck.pokou-ext@natixis.com",
     "action": "PDF_EXPORT_ERROR",
     "details": "PDF generation failed: 'ReportGenerator' object has no attribute 'export_to_pdf'"
+  },
+  {
+    "timestamp": "2025-09-22T09:27:57.309192",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-22T09:27:57.323199",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-22T09:28:06.636200",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-22T09:28:08.322616",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-22T09:28:09.028893",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-25T16:35:25.916622",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-25T16:35:25.931668",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-25T16:35:33.382550",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-25T16:35:34.816934",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-25T16:35:36.338108",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-25T16:46:10.003776",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-25T16:46:10.019688",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-25T16:46:56.490928",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-25T16:46:56.503014",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-25T16:46:58.992389",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-25T16:47:00.477438",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-25T16:47:01.864684",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-26T15:59:40.692053",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-26T15:59:40.705762",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-26T15:59:51.907744",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060152.csv as j"
+  },
+  {
+    "timestamp": "2025-09-26T15:59:53.291185",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded D_PA_202505060153.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-26T15:59:54.420376",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
   }
 ]
