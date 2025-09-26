@@ -1,6 +1,5 @@
 # report_generator.py
 import asyncio
-from pyppeteer import launch
 from pathlib import Path
 from datetime import datetime
 import tempfile
