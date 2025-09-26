@@ -669,6 +669,96 @@
             transform: translateY(-5px);
         }
 
+        /* Styles pour les nouveaux tableaux */
+        .buffer-table, .consumption-filtered-table {
+            font-size: 13px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .buffer-table th, .consumption-filtered-table th {
+            background: #76279b;
+            color: white;
+            font-weight: 600;
+            text-align: center;
+            padding: 12px 8px;
+            border: none;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .buffer-table td, .consumption-filtered-table td {
+            padding: 8px;
+            border: 1px solid #e0e6ed;
+            vertical-align: middle;
+        }
+
+        .buffer-table tbody tr:hover, .consumption-filtered-table tbody tr:hover {
+            background-color: rgba(118, 39, 155, 0.05);
+            transition: background-color 0.2s ease;
+        }
+
+        /* Styles spécifiques pour BUFFER */
+        .section-cell {
+            background: linear-gradient(135deg, #f8f6ff, #f0ebff);
+            font-weight: bold;
+            color: #76279b;
+            border-left: 4px solid #ab54d4 !important;
+        }
+
+        .client-cell {
+            background: #fefefe;
+            font-weight: 500;
+            padding-left: 20px;
+        }
+
+        .subtotal-row {
+            background: linear-gradient(135deg, #f3dffc, #f3dffc);
+            border-top: 2px solid #ab54d4;
+        }
+
+        .subtotal-row td {
+            font-weight: bold;
+            border-top: 2px solid #ab54d4;
+        }
+
+        /* Styles spécifiques pour CONSUMPTION */
+        .group-cell {
+            background: linear-gradient(135deg, #f8f6ff, #f0ebff);
+            font-weight: bold;
+            color: #76279b;
+            border-left: 4px solid #ab54d4 !important;
+        }
+
+        /* En-têtes spécialisés */
+        .header-current {
+            background: linear-gradient(135deg, #76279b, #76279b) !important;
+        }
+
+        .header-variation {
+            background: linear-gradient(135deg, #ab54d4, #ab54d4) !important;
+        }
+
+        /* Ligne de total */
+        .total-row {
+            background: linear-gradient(135deg, #f3dffc, #f3dffc);
+            font-weight: bold;
+            border-top: 2px solid #76279b;
+        }
+
+        .total-row td {
+            font-weight: 700;
+            border-top: 2px solid #76279b;
+        }
+
+        /* Styles pour les valeurs numériques */
+        .numeric-value {
+            font-family: 'Courier New', monospace;
+            text-align: right;
+        }
+
 
     </style>
 </head>

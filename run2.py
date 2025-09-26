@@ -33,7 +33,7 @@ import secrets
 
 from llm_connector import LLMConnector
 from report_generator import ReportGenerator
-#from sharepoint_connector import SharePointClient
+from sharepoint_connector import SharePointClient
 
 # Variables globales pour la session chatbot
 chatbot_session = {
@@ -522,10 +522,11 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     
     # Logger l'activité
     log_activity(current_user["username"], "ANALYSIS", "Started LCR analysis")
+    
     try:
         logger.info("Début de l'analyse depuis DataFrames en mémoire")
-        
-        # Vérification de la présence des deux fichiers
+
+                # Vérification de la présence des deux fichiers
         if len(file_session.get("files", {})) < 2:
             raise HTTPException(status_code=400, detail="Les deux fichiers sont requis")
         
@@ -535,20 +536,20 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
         # Récupérer les DataFrames directement depuis la session
         dataframes = {}
         for file_type, file_info in file_session["files"].items():
-            df = file_info["dataframe"]  # DataFrame déjà en mémoire
+            df = file_info["dataframe"]
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
         
-        # Analyses
+        # NOUVELLES ANALYSES
         buffer_results = create_buffer_analysis(dataframes)
-        consumption_results = create_consumption_lcr_analysis(dataframes)
+        consumption_filtered_results = create_consumption_filtered_analysis(dataframes)
         
-        logger.info("Analyses terminées (traitement mémoire)")
+        logger.info("Nouvelles analyses terminées (traitement mémoire)")
 
-        # SAUVEGARDER LE CONTEXTE CHATBOT AVANT LA RÉPONSE
+        # SAUVEGARDER LE CONTEXTE CHATBOT
         chatbot_session["context_data"] = {
-            "balance_sheet": balance_sheet_results,
-            "consumption": consumption_results,
+            "buffer": buffer_results,
+            "consumption_filtered": consumption_filtered_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -570,12 +571,12 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
 
         return {
             "success": True,
-            "message": "Analyses terminées avec contexte chatbot prêt",
+            "message": "Nouvelles analyses terminées avec contexte chatbot prêt",
             "timestamp": datetime.now().isoformat(),
             "context_ready": True,  
             "results": {
-                "balance_sheet": balance_sheet_results,
-                "consumption": consumption_results
+                "buffer": buffer_results,
+                "consumption_filtered": consumption_filtered_results
             }
         }
         
@@ -584,7 +585,7 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
-    
+ 
 
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
@@ -904,6 +905,390 @@ async def get_chatbot_context():
 #                           BALANCE SHEET
 
 #######################################################################################################################################
+
+def create_buffer_analysis(dataframes):
+    """
+    Crée l'analyse BUFFER avec filtres spécifiques
+    """
+    try:
+        logger.info("📊 Création de l'analyse BUFFER")
+        
+        buffer_data = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement BUFFER pour {file_type}")
+            
+            # Vérification des colonnes requises
+            required_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", "Libellé Client", "LCR_Assiette Pondérée"]
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour BUFFER {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage des données
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            df_filtered = df_filtered[df_filtered["LCR_Catégorie"] == "1- Buffer"].copy()
+            
+            logger.info(f"📋 Après filtrage BUFFER: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée BUFFER pour {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage des champs texte
+            df_filtered["LCR_Template Section 1"] = df_filtered["LCR_Template Section 1"].astype(str).str.strip()
+            df_filtered["Libellé Client"] = df_filtered["Libellé Client"].astype(str).str.strip()
+            
+            buffer_data[file_type] = df_filtered
+            
+            logger.info(f"✅ BUFFER {file_type} préparé: {len(df_filtered)} lignes")
+        
+        # Génération du HTML
+        buffer_html = generate_buffer_table_html(buffer_data)
+        
+        return {
+            "title": "BUFFER Analysis",
+            "buffer_table_html": buffer_html,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "lcr_categorie": "1- Buffer"
+                },
+                "files_analyzed": list(buffer_data.keys())
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création analyse BUFFER: {e}")
+        return {
+            "title": "BUFFER Analysis - Erreur",
+            "error": str(e),
+            "buffer_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse BUFFER</p>"
+        }
+
+def create_consumption_filtered_analysis(dataframes):
+    """
+    Crée l'analyse CONSUMPTION avec filtres spécifiques
+    """
+    try:
+        logger.info("📊 Création de l'analyse CONSUMPTION filtrée")
+        
+        consumption_data = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement CONSUMPTION filtrée pour {file_type}")
+            
+            # Vérification des colonnes requises
+            required_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "Sous-Métier", "Produit", "LCR_ECO_IMPACT_LCR"]
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour CONSUMPTION filtrée {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage des données
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            # Filtre LCR_ECO_GROUPE_METIERS
+            allowed_groups = ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"]
+            df_filtered = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(allowed_groups)].copy()
+            
+            # Filtre Sous-Métier (exclure certaines valeurs)
+            excluded_sous_metiers = ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"]
+            df_filtered = df_filtered[~df_filtered["Sous-Métier"].isin(excluded_sous_metiers)].copy()
+            
+            # Filtre Produit (exclure certaines valeurs)
+            excluded_produits = ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
+            df_filtered = df_filtered[~df_filtered["Produit"].isin(excluded_produits)].copy()
+            
+            logger.info(f"📋 Après filtrage CONSUMPTION: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée CONSUMPTION filtrée pour {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
+                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage des champs texte
+            df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
+            
+            # Groupement par LCR_ECO_GROUPE_METIERS
+            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
+            
+            consumption_data[file_type] = grouped
+            
+            logger.info(f"✅ CONSUMPTION filtrée {file_type}: {len(grouped)} groupes")
+        
+        # Génération du HTML
+        consumption_html = generate_consumption_filtered_table_html(consumption_data)
+        
+        return {
+            "title": "CONSUMPTION Analysis",
+            "consumption_filtered_table_html": consumption_html,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "allowed_groups": ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"],
+                    "excluded_sous_metiers": ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"],
+                    "excluded_produits": ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
+                },
+                "files_analyzed": list(consumption_data.keys())
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création analyse CONSUMPTION filtrée: {e}")
+        return {
+            "title": "CONSUMPTION Analysis - Erreur",
+            "error": str(e),
+            "consumption_filtered_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse CONSUMPTION filtrée</p>"
+        }
+
+def generate_buffer_table_html(buffer_data):
+    """
+    Génère le HTML du tableau BUFFER
+    """
+    if len(buffer_data) < 2:
+        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse BUFFER</div>"
+    
+    data_j = buffer_data.get("j")
+    data_j1 = buffer_data.get("jMinus1")
+    
+    if data_j is None or data_j1 is None:
+        return "<div class='alert alert-danger'>Erreur: données BUFFER manquantes</div>"
+    
+    # Créer les structures de données avec détail pour "1.1- Cash"
+    def prepare_buffer_structure(df):
+        result = {}
+        
+        for _, row in df.iterrows():
+            section = row["LCR_Template Section 1"]
+            client = row["Libellé Client"]
+            value = row["LCR_Assiette Pondérée"] / 1_000_000_000  # Conversion en milliards
+            
+            if section == "1.1- Cash":
+                # Détail pour 1.1- Cash
+                if section not in result:
+                    result[section] = {"total": 0, "details": {}}
+                result[section]["details"][client] = value
+                result[section]["total"] += value
+            else:
+                # Total seulement pour les autres sections
+                if section not in result:
+                    result[section] = {"total": 0, "details": None}
+                result[section]["total"] += value
+        
+        return result
+    
+    structure_j = prepare_buffer_structure(data_j)
+    structure_j1 = prepare_buffer_structure(data_j1)
+    
+    # Récupérer toutes les sections et clients
+    all_sections = set(structure_j.keys()) | set(structure_j1.keys())
+    
+    html = """
+    <table class="table table-bordered buffer-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="align-middle">LCR Template Section</th>
+                <th rowspan="2" class="align-middle">Libellé Client</th>
+                <th class="text-center header-current">Current (Bn €)</th>
+                <th class="text-center header-variation">Variation (Bn €)</th>
+            </tr>
+            <tr>
+                <th class="text-center header-current">Amount</th>
+                <th class="text-center header-variation">Change</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    # Générer les lignes
+    for section in sorted(all_sections):
+        section_j = structure_j.get(section, {"total": 0, "details": None})
+        section_j1 = structure_j1.get(section, {"total": 0, "details": None})
+        
+        if section == "1.1- Cash" and section_j.get("details"):
+            # Détail pour 1.1- Cash
+            all_clients = set()
+            if section_j.get("details"):
+                all_clients.update(section_j["details"].keys())
+            if section_j1.get("details"):
+                all_clients.update(section_j1["details"].keys())
+            
+            first_client = True
+            for client in sorted(all_clients):
+                value_j = section_j["details"].get(client, 0) if section_j.get("details") else 0
+                value_j1 = section_j1["details"].get(client, 0) if section_j1.get("details") else 0
+                variation = abs(value_j - value_j1)
+                is_positive = value_j >= value_j1
+                
+                html += '<tr>'
+                if first_client:
+                    html += f'<td rowspan="{len(all_clients)+1}" class="section-cell">{section}</td>'
+                    first_client = False
+                else:
+                    # Pas de cellule section pour les lignes suivantes
+                    pass
+                
+                html += f'<td class="client-cell">{client}</td>'
+                html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
+                
+                # Colonne variation avec indicateur coloré
+                if variation > 0.001:  # Seuil de 1M€
+                    icon = "▲" if is_positive else "▼"
+                    color_class = "text-success" if is_positive else "text-danger"
+                    html += f'<td class="text-end numeric-value {color_class}">{variation:.3f} {icon}</td>'
+                else:
+                    html += f'<td class="text-end numeric-value text-muted">0.000 —</td>'
+                
+                html += '</tr>'
+            
+            # Ligne de total pour 1.1- Cash
+            total_j = section_j["total"]
+            total_j1 = section_j1["total"]
+            total_variation = abs(total_j - total_j1)
+            total_is_positive = total_j >= total_j1
+            
+            html += '<tr class="subtotal-row">'
+            html += f'<td class="fw-bold text-end">Total {section}:</td>'
+            html += f'<td class="text-end fw-bold">{total_j:.3f}</td>'
+            
+            if total_variation > 0.001:
+                icon = "▲" if total_is_positive else "▼"
+                color_class = "text-success" if total_is_positive else "text-danger"
+                html += f'<td class="text-end fw-bold {color_class}">{total_variation:.3f} {icon}</td>'
+            else:
+                html += f'<td class="text-end fw-bold text-muted">0.000 —</td>'
+            
+            html += '</tr>'
+        
+        else:
+            # Total seulement pour les autres sections
+            total_j = section_j["total"]
+            total_j1 = section_j1["total"]
+            variation = abs(total_j - total_j1)
+            is_positive = total_j >= total_j1
+            
+            html += '<tr>'
+            html += f'<td class="section-cell">{section}</td>'
+            html += f'<td class="fw-bold">TOTAL</td>'
+            html += f'<td class="text-end numeric-value">{total_j:.3f}</td>'
+            
+            if variation > 0.001:
+                icon = "▲" if is_positive else "▼"
+                color_class = "text-success" if is_positive else "text-danger"
+                html += f'<td class="text-end numeric-value {color_class}">{variation:.3f} {icon}</td>'
+            else:
+                html += f'<td class="text-end numeric-value text-muted">0.000 —</td>'
+            
+            html += '</tr>'
+    
+    html += """
+        </tbody>
+    </table>
+    """
+    
+    return html
+
+def generate_consumption_filtered_table_html(consumption_data):
+    """
+    Génère le HTML du tableau CONSUMPTION filtré
+    """
+    if len(consumption_data) < 2:
+        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse CONSUMPTION</div>"
+    
+    data_j = consumption_data.get("j")
+    data_j1 = consumption_data.get("jMinus1")
+    
+    if data_j is None or data_j1 is None:
+        return "<div class='alert alert-danger'>Erreur: données CONSUMPTION manquantes</div>"
+    
+    # Créer les dictionnaires de lookup
+    lookup_j = data_j.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
+    lookup_j1 = data_j1.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
+    
+    # Récupérer tous les groupes
+    all_groups = set(lookup_j.keys()) | set(lookup_j1.keys())
+    
+    html = """
+    <table class="table table-bordered consumption-filtered-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="align-middle">LCR Groupe Métiers</th>
+                <th class="text-center header-current">Current (Bn €)</th>
+                <th class="text-center header-variation">Variation (Bn €)</th>
+            </tr>
+            <tr>
+                <th class="text-center header-current">Amount</th>
+                <th class="text-center header-variation">Change</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    # Générer les lignes
+    total_j = 0
+    total_j1 = 0
+    
+    for group in sorted(all_groups):
+        value_j = lookup_j.get(group, 0)
+        value_j1 = lookup_j1.get(group, 0)
+        variation = abs(value_j - value_j1)
+        is_positive = value_j >= value_j1
+        
+        total_j += value_j
+        total_j1 += value_j1
+        
+        html += '<tr>'
+        html += f'<td class="group-cell">{group}</td>'
+        html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
+        
+        # Colonne variation avec indicateur coloré
+        if variation > 0.001:  # Seuil de 1M€
+            icon = "▲" if is_positive else "▼"
+            color_class = "text-success" if is_positive else "text-danger"
+            html += f'<td class="text-end numeric-value {color_class}">{variation:.3f} {icon}</td>'
+        else:
+            html += f'<td class="text-end numeric-value text-muted">0.000 —</td>'
+        
+        html += '</tr>'
+    
+    # Ligne de total
+    total_variation = abs(total_j - total_j1)
+    total_is_positive = total_j >= total_j1
+    
+    html += '<tr class="total-row">'
+    html += f'<td class="fw-bold">TOTAL GÉNÉRAL:</td>'
+    html += f'<td class="text-end fw-bold">{total_j:.3f}</td>'
+    
+    if total_variation > 0.001:
+        icon = "▲" if total_is_positive else "▼"
+        color_class = "text-success" if total_is_positive else "text-danger"
+        html += f'<td class="text-end fw-bold {color_class}">{total_variation:.3f} {icon}</td>'
+    else:
+        html += f'<td class="text-end fw-bold text-muted">0.000 —</td>'
+    
+    html += '</tr>'
+    
+    html += """
+        </tbody>
+    </table>
+    """
+    
+    return html
 
 def create_balance_sheet_pivot_table(dataframes):
     """
@@ -1726,300 +2111,6 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
         return f"At the detailed level: {full_text}."
     
     return ""
-
-def create_buffer_analysis(dataframes):
-    """Analyse BUFFER avec LCR_Template Section 1 et variations"""
-    try:
-        logger.info("Création de l'analyse BUFFER")
-        
-        buffer_data = {}
-        
-        for file_type, df in dataframes.items():
-            # Filtres
-            df_filtered = df[
-                (df["Top Conso"] == "O") & 
-                (df["LCR_Catégorie"] == "1- Buffer")
-            ].copy()
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"Aucune donnée Buffer pour {file_type}")
-                continue
-            
-            # Conversion en numérique
-            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
-                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
-            ).fillna(0)
-            
-            # Groupement selon la logique demandée
-            def group_buffer_data(df):
-                results = []
-                
-                # 1.1- Cash avec détail par Libellé Client
-                cash_data = df[df["LCR_Template Section 1"] == "1.1- Cash"]
-                if not cash_data.empty:
-                    cash_grouped = cash_data.groupby("Libellé Client")["LCR_Assiette Pondérée"].sum()
-                    for libelle, value in cash_grouped.items():
-                        results.append({
-                            "section": "1.1- Cash",
-                            "libelle": libelle,
-                            "value": value / 1_000_000_000  # Conversion en milliards
-                        })
-                
-                # Autres sections : totaux uniquement
-                other_sections = df[df["LCR_Template Section 1"] != "1.1- Cash"]
-                if not other_sections.empty:
-                    section_totals = other_sections.groupby("LCR_Template Section 1")["LCR_Assiette Pondérée"].sum()
-                    for section, value in section_totals.items():
-                        results.append({
-                            "section": section,
-                            "libelle": "TOTAL",
-                            "value": value / 1_000_000_000
-                        })
-                
-                return results
-            
-            buffer_data[file_type] = group_buffer_data(df_filtered)
-        
-        # Génération HTML
-        buffer_html = generate_buffer_table_html(buffer_data)
-        
-        return {
-            "title": "1. BUFFER Analysis",
-            "buffer_table_html": buffer_html,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {"top_conso": "O", "lcr_categorie": "1- Buffer"}
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur analyse BUFFER: {e}")
-        return {
-            "title": "BUFFER - Erreur",
-            "error": str(e),
-            "buffer_table_html": f"<p class='text-danger'>Erreur: {str(e)}</p>"
-        }
-
-def create_consumption_lcr_analysis(dataframes):
-    """Analyse CONSUMPTION LCR avec filtres spécifiques et variations"""
-    try:
-        logger.info("Création de l'analyse CONSUMPTION LCR")
-        
-        consumption_data = {}
-        
-        # Valeurs autorisées pour les filtres
-        allowed_groupes = ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"]
-        excluded_sous_metiers = ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"]
-        excluded_produits = ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
-        
-        for file_type, df in dataframes.items():
-            # Application des filtres
-            df_filtered = df[
-                (df["Top Conso"] == "O") & 
-                (df["LCR_ECO_GROUPE_METIERS"].isin(allowed_groupes)) &
-                (~df["Sous-Métier"].isin(excluded_sous_metiers)) &
-                (~df["Produit"].isin(excluded_produits))
-            ].copy()
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"Aucune donnée Consumption pour {file_type}")
-                continue
-            
-            # Conversion en numérique
-            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
-                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
-            ).fillna(0)
-            
-            # Groupement par LCR_ECO_GROUPE_METIERS
-            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum()
-            consumption_data[file_type] = (grouped / 1_000_000_000).round(3)  # En milliards
-        
-        # Génération HTML
-        consumption_html = generate_consumption_lcr_table_html(consumption_data)
-        
-        return {
-            "title": "2. CONSUMPTION LCR",
-            "consumption_table_html": consumption_html,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "groupes_inclus": allowed_groupes,
-                    "sous_metiers_exclus": excluded_sous_metiers,
-                    "produits_exclus": excluded_produits
-                }
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur analyse CONSUMPTION LCR: {e}")
-        return {
-            "title": "CONSUMPTION LCR - Erreur", 
-            "error": str(e),
-            "consumption_table_html": f"<p class='text-danger'>Erreur: {str(e)}</p>"
-        }
-
-def generate_buffer_table_html(buffer_data):
-    """Génère le HTML du tableau BUFFER"""
-    if len(buffer_data) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour BUFFER</div>"
-    
-    data_j = buffer_data.get("j", [])
-    data_j1 = buffer_data.get("jMinus1", [])
-    
-    # Créer un mapping pour faciliter les variations
-    mapping_j = {(item["section"], item["libelle"]): item["value"] for item in data_j}
-    mapping_j1 = {(item["section"], item["libelle"]): item["value"] for item in data_j1}
-    
-    # Toutes les clés uniques
-    all_keys = set(mapping_j.keys()) | set(mapping_j1.keys())
-    
-    html = """
-    <table class="table table-bordered buffer-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">LCR Template Section 1</th>
-                <th rowspan="2" class="align-middle">Libellé Client</th>
-                <th colspan="2" class="text-center header-j-minus-1">D-1 (Yesterday)</th>
-                <th colspan="2" class="text-center header-j">D (Today)</th>
-                <th colspan="2" class="text-center header-variation">Variation</th>
-            </tr>
-            <tr>
-                <th class="text-center header-j-minus-1">Value (Bn €)</th>
-                <th class="text-center header-j-minus-1">%</th>
-                <th class="text-center header-j">Value (Bn €)</th>
-                <th class="text-center header-j">%</th>
-                <th class="text-center header-variation">Abs Value</th>
-                <th class="text-center header-variation">Trend</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Calculer les totaux pour les pourcentages
-    total_j1 = sum(mapping_j1.values())
-    total_j = sum(mapping_j.values())
-    
-    # Trier les clés par section puis libellé
-    sorted_keys = sorted(all_keys, key=lambda x: (x[0], x[1]))
-    
-    for section, libelle in sorted_keys:
-        value_j1 = mapping_j1.get((section, libelle), 0)
-        value_j = mapping_j.get((section, libelle), 0)
-        variation = value_j - value_j1
-        
-        # Pourcentages
-        pct_j1 = (value_j1 / total_j1 * 100) if total_j1 != 0 else 0
-        pct_j = (value_j / total_j * 100) if total_j != 0 else 0
-        
-        # Indicateur de tendance
-        if abs(variation) < 0.001:  # Variation négligeable
-            trend_icon = '<span class="text-muted">—</span>'
-        elif variation > 0:
-            trend_icon = '<span class="text-success">↗️</span>'
-        else:
-            trend_icon = '<span class="text-danger">↘️</span>'
-        
-        html += f'''
-        <tr>
-            <td class="fw-bold">{section}</td>
-            <td>{libelle}</td>
-            <td class="text-end numeric-value">{value_j1:.3f}</td>
-            <td class="text-end numeric-value">{pct_j1:.1f}%</td>
-            <td class="text-end numeric-value">{value_j:.3f}</td>
-            <td class="text-end numeric-value">{pct_j:.1f}%</td>
-            <td class="text-end numeric-value">{abs(variation):.3f}</td>
-            <td class="text-center">{trend_icon}</td>
-        </tr>
-        '''
-    
-    html += "</tbody></table>"
-    return html
-
-def generate_consumption_lcr_table_html(consumption_data):
-    """Génère le HTML du tableau CONSUMPTION LCR"""
-    if len(consumption_data) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour CONSUMPTION LCR</div>"
-    
-    data_j = consumption_data.get("j", pd.Series())
-    data_j1 = consumption_data.get("jMinus1", pd.Series())
-    
-    # Toutes les clés uniques
-    all_groups = sorted(set(data_j.index) | set(data_j1.index))
-    
-    html = """
-    <table class="table table-bordered consumption-lcr-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-                <th colspan="2" class="text-center header-j-minus-1">D-1 (Yesterday)</th>
-                <th colspan="2" class="text-center header-j">D (Today)</th>
-                <th colspan="2" class="text-center header-variation">Variation</th>
-            </tr>
-            <tr>
-                <th class="text-center header-j-minus-1">Value (Bn €)</th>
-                <th class="text-center header-j-minus-1">%</th>
-                <th class="text-center header-j">Value (Bn €)</th>
-                <th class="text-center header-j">%</th>
-                <th class="text-center header-variation">Abs Value</th>
-                <th class="text-center header-variation">Trend</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Calculer les totaux
-    total_j1 = data_j1.sum()
-    total_j = data_j.sum()
-    
-    for group in all_groups:
-        value_j1 = data_j1.get(group, 0)
-        value_j = data_j.get(group, 0)
-        variation = value_j - value_j1
-        
-        # Pourcentages
-        pct_j1 = (value_j1 / total_j1 * 100) if total_j1 != 0 else 0
-        pct_j = (value_j / total_j * 100) if total_j != 0 else 0
-        
-        # Indicateur de tendance
-        if abs(variation) < 0.001:
-            trend_icon = '<span class="text-muted">—</span>'
-        elif variation > 0:
-            trend_icon = '<span class="text-success">↗️</span>'
-        else:
-            trend_icon = '<span class="text-danger">↘️</span>'
-        
-        html += f'''
-        <tr>
-            <td class="fw-bold">{group}</td>
-            <td class="text-end numeric-value">{value_j1:.3f}</td>
-            <td class="text-end numeric-value">{pct_j1:.1f}%</td>
-            <td class="text-end numeric-value">{value_j:.3f}</td>
-            <td class="text-end numeric-value">{pct_j:.1f}%</td>
-            <td class="text-end numeric-value">{abs(variation):.3f}</td>
-            <td class="text-center">{trend_icon}</td>
-        </tr>
-        '''
-    
-    # Ligne de total
-    total_variation = total_j - total_j1
-    total_trend = '<span class="text-success">↗️</span>' if total_variation > 0 else '<span class="text-danger">↘️</span>' if total_variation < 0 else '<span class="text-muted">—</span>'
-    
-    html += f'''
-        <tr class="total-row">
-            <td class="text-end fw-bold">TOTAL:</td>
-            <td class="text-end fw-bold">{total_j1:.3f}</td>
-            <td class="text-end fw-bold">100.0%</td>
-            <td class="text-end fw-bold">{total_j:.3f}</td>
-            <td class="text-end fw-bold">100.0%</td>
-            <td class="text-end fw-bold">{abs(total_variation):.3f}</td>
-            <td class="text-center fw-bold">{total_trend}</td>
-        </tr>
-    '''
-    
-    html += "</tbody></table>"
-    return html
-
 
 
 if __name__ == "__main__":
