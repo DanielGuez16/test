@@ -7,25 +7,103 @@
  * Gestion des uploads, analyses et affichage des résultats TCD
  */
 
-// Variables globales
-let filesReady = { j: false, j1: false };
+// ================================= VARIABLES GLOBALES  =================================
 
-// Initialisation
+
+let filesReady = { j: false, j1: false };
+let chatMessages = [];
+
+
+// ================================= INITIALISATION  =================================
+
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Interface ALM initialisée');
-    initializeDateSelection(); 
+    console.log('🚀 Interface ALM initialisée');
+    initializeDateSelection();
+    initializeDragAndDrop();
 });
 
-function initializeDragAndDrop() {
-    const uploadAreas = document.querySelectorAll('.upload-area');
+// ================================= UTILITAIRES =================================
+
+
+/**
+ * Formate la taille d'un fichier en unités lisibles
+ * @param {number} bytes - Taille en bytes
+ * @returns {string} Taille formatée
+ */
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
     
-    uploadAreas.forEach(area => {
-        area.addEventListener('dragover', handleDragOver);
-        area.addEventListener('dragenter', handleDragEnter);
-        area.addEventListener('dragleave', handleDragLeave);
-        area.addEventListener('drop', handleDrop);
-    });
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+/**
+ * Retourne l'icône appropriée pour le type de notification
+ * @param {string} type - Type de notification
+ * @returns {string} Nom de l'icône Font Awesome
+ */
+function getNotificationIcon(type) {
+    const icons = {
+        'success': 'check-circle',
+        'error': 'exclamation-triangle',
+        'info': 'info-circle',
+        'warning': 'exclamation-circle'
+    };
+    return icons[type] || 'info-circle';
+}
+
+/**
+ * Affiche une notification toast
+ * @param {string} message - Message à afficher
+ * @param {string} type - Type de notification ('success', 'error', 'info')
+ */
+function showNotification(message, type = 'info') {
+    // Création de l'élément notification
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : type} position-fixed`;
+    notification.style.cssText = `
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+    `;
+    
+    notification.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-${getNotificationIcon(type)} me-2"></i>
+            <span>${message}</span>
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animation d'entrée
+    setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Auto-suppression après 5 secondes
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+}
+
+
+// ================================= DRAG AND DROP HANDLERS =================================
+
 
 function handleDragOver(e) {
     e.preventDefault();
@@ -40,7 +118,7 @@ function handleDragLeave(e) {
     e.currentTarget.classList.remove('drag-over');
 }
 
-function handleDrop(e) {
+function handleFileDrop(e) {
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
     
@@ -52,11 +130,174 @@ function handleDrop(e) {
     }
 }
 
+function handleDocDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        uploadDocument(files[0]);
+    }
+}
+
+
+function initializeDragAndDrop() {
+    const uploadAreas = document.querySelectorAll('.upload-area');
+    
+    uploadAreas.forEach(area => {
+        area.addEventListener('dragover', handleDragOver);
+        area.addEventListener('dragenter', handleDragEnter);
+        area.addEventListener('dragleave', handleDragLeave);
+        area.addEventListener('drop', handleFileDrop);
+    });
+}
+
+function initializeDocumentDragAndDrop() {
+    const docUploadArea = document.getElementById('doc-upload-area');
+    
+    if (docUploadArea) {
+        docUploadArea.addEventListener('dragover', handleDragOver);
+        docUploadArea.addEventListener('dragenter', handleDragEnter);
+        docUploadArea.addEventListener('dragleave', handleDragLeave);
+        docUploadArea.addEventListener('drop', handleDocDrop);
+    }
+}
+
+
+// ================================= GESTION FICHIERS =================================
 
 /**
  * Initialise les listeners pour les uploads de fichiers
  */
-// Remplacer initializeFileUploads() par :
+function initializeFileUploads() {
+    document.getElementById('fileJ').addEventListener('change', function() {
+        if (this.files[0]) {
+            uploadFile(this.files[0], 'j');
+        }
+    });
+    
+    document.getElementById('fileJ1').addEventListener('change', function() {
+        if (this.files[0]) {
+            uploadFile(this.files[0], 'jMinus1');
+        }
+    });
+}
+
+/**
+ * Upload d'un fichier vers l'API
+ * @param {File} file - Fichier à uploader
+ * @param {string} type - Type de fichier ('j' ou 'jMinus1')
+ */
+async function uploadFile(file, type) {
+    const statusDiv = document.getElementById('status' + (type === 'j' ? 'J' : 'J1'));
+    
+    try {
+        console.log(`📤 Upload ${type}:`, file.name);
+
+        // Affichage du statut de progression
+        statusDiv.innerHTML = `
+            <div class="alert alert-info fade-in-up">
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-3"></div>
+                    <div>
+                        <strong>Uploading...</strong><br>
+                        <small>${file.name} (${formatFileSize(file.size)})</small>
+                    </div>
+                </div>
+            </div>
+        `;
+                
+        // Préparation de la requête
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('file_type', type);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            console.log('Upload timeout après 5 minutes');
+            controller.abort();
+        }, 1800000);
+
+        // Envoi à l'API
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ Upload ${type} réussi:`, result);
+            
+            // Mise à jour du statut
+            statusDiv.innerHTML = `
+                <div class="alert alert-success fade-in-up">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <strong>${file.name}</strong>
+                            </div>
+                            <small class="text-muted">
+                                ${result.rows?.toLocaleString()} rows • 
+                                ${result.columns} columns • 
+                                ${formatFileSize(file.size)}
+                            </small>
+                        </div>
+                        <span class="badge bg-success">OK</span>
+                    </div>
+                </div>
+            `;
+            
+            // Marquer le fichier comme prêt
+            filesReady[type === 'j' ? 'j' : 'j1'] = true;
+            
+            // Vérifier si on peut activer l'analyse
+            checkAnalyzeButtonState();
+            
+        } else {
+            const errorData = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
+            throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+        }
+        
+    } catch (error) {
+    clearTimeout(timeoutId);
+    console.error(`❌ Erreur upload ${type}:`, error);
+    
+    // Gestion spécifique pour les timeouts/abort
+    if (error.name === 'AbortError') {
+        statusDiv.innerHTML = `
+            <div class="alert alert-warning fade-in-up">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-clock me-2"></i>
+                    <div>
+                        <strong>Upload timeout</strong><br>
+                        <small>Le fichier est trop volumineux ou la connexion trop lente</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        statusDiv.innerHTML = `
+            <div class="alert alert-danger fade-in-up">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <div>
+                        <strong>Erreur d'upload</strong><br>
+                        <small>${error.message}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    filesReady[type === 'j' ? 'j' : 'j1'] = false;
+    checkAnalyzeButtonState();
+}
+}
+
 function initializeDateSelection() {
     const loadButton = document.getElementById('loadFilesBtn');
     if (loadButton) {
@@ -72,7 +313,6 @@ function initializeDateSelection() {
     }
 }
 
-// Nouvelle fonction pour charger les fichiers par date
 async function loadFilesByDate() {
     const dateInput = document.getElementById('analysisDate');
     const selectedDate = dateInput.value;
@@ -176,141 +416,6 @@ async function loadFilesByDate() {
         showNotification('Error loading files', 'error');
     }
 }
-
-
-async function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        const response = await fetch('/api/logout', { method: 'POST' });
-        const result = await response.json();
-        
-        if (result.success) {
-            window.location.href = result.redirect;
-        }
-    }
-}
-
-/**
- * Initialise le bouton d'analyse
- */
-function initializeAnalyzeButton() {
-    document.getElementById('analyzeBtn').addEventListener('click', analyze);
-}
-
-/**
- * Upload d'un fichier vers l'API
- * @param {File} file - Fichier à uploader
- * @param {string} type - Type de fichier ('j' ou 'jMinus1')
- */
-async function uploadFile(file, type) {
-    const statusDiv = document.getElementById('status' + (type === 'j' ? 'J' : 'J1'));
-    
-    try {
-        console.log(`📤 Upload ${type}:`, file.name);
-
-        // Affichage du statut de progression
-        statusDiv.innerHTML = `
-            <div class="alert alert-info fade-in-up">
-                <div class="d-flex align-items-center">
-                    <div class="spinner-border spinner-border-sm me-3"></div>
-                    <div>
-                        <strong>Uploading...</strong><br>
-                        <small>${file.name} (${formatFileSize(file.size)})</small>
-                    </div>
-                </div>
-            </div>
-        `;
-                
-        // Préparation de la requête
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('file_type', type);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            console.log('Upload timeout après 5 minutes');
-            controller.abort();
-        }, 1800000);
-
-        // Envoi à l'API
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log(`✅ Upload ${type} réussi:`, result);
-            
-            // Mise à jour du statut
-            statusDiv.innerHTML = `
-                <div class="alert alert-success fade-in-up">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="d-flex align-items-center mb-1">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                <strong>${file.name}</strong>
-                            </div>
-                            <small class="text-muted">
-                                ${result.rows?.toLocaleString()} rows • 
-                                ${result.columns} columns • 
-                                ${formatFileSize(file.size)}
-                            </small>
-                        </div>
-                        <span class="badge bg-success">OK</span>
-                    </div>
-                </div>
-            `;
-            
-            // Marquer le fichier comme prêt
-            filesReady[type === 'j' ? 'j' : 'j1'] = true;
-            
-            // Vérifier si on peut activer l'analyse
-            checkAnalyzeButtonState();
-            
-        } else {
-            const errorData = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
-            throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
-        }
-        
-    } catch (error) {
-    clearTimeout(timeoutId); // Ajouter cette ligne
-    console.error(`❌ Erreur upload ${type}:`, error);
-    
-    // Gestion spécifique pour les timeouts/abort
-    if (error.name === 'AbortError') {
-        statusDiv.innerHTML = `
-            <div class="alert alert-warning fade-in-up">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-clock me-2"></i>
-                    <div>
-                        <strong>Upload timeout</strong><br>
-                        <small>Le fichier est trop volumineux ou la connexion trop lente</small>
-                    </div>
-                </div>
-            </div>
-        `;
-    } else {
-        statusDiv.innerHTML = `
-            <div class="alert alert-danger fade-in-up">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <div>
-                        <strong>Erreur d'upload</strong><br>
-                        <small>${error.message}</small>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    filesReady[type === 'j' ? 'j' : 'j1'] = false;
-    checkAnalyzeButtonState();
-}
-}
-
 /**
  * Vérifie l'état du bouton d'analyse
  */
@@ -346,7 +451,6 @@ function checkAnalyzeButtonState() {
     }
 }
 
-// NOUVELLE FONCTION
 async function cleanupMemory() {
     try {
         showNotification('Cleaning memory...', 'info');
@@ -360,6 +464,9 @@ async function cleanupMemory() {
         showNotification('Memory cleanup failed', 'error');
     }
 }
+
+
+// ================================= GESTION ANALYSE =================================
 
 /**
  * Lance l'analyse des fichiers
@@ -509,418 +616,53 @@ function displayCompleteResults(analysisResults) {
         
         let html = '';
         
-        // Section BUFFER
-        if (analysisResults.buffer) {
-            html += generateBufferSection(analysisResults.buffer);
+        // Section Balance Sheet
+        if (analysisResults.balance_sheet) {
+            html += generateBalanceSheetSection(analysisResults.balance_sheet);
         }
         
-        // Section CONSUMPTION FILTERED
-        if (analysisResults.consumption_filtered) {
-            html += generateConsumptionFilteredSection(analysisResults.consumption_filtered);
+        // Section Consumption
+        if (analysisResults.consumption) {
+            html += generateConsumptionSection(analysisResults.consumption);
         }
 
-        html += `
-        <div class="text-center my-4">
-            <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
-                <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
-            </button>
-            <div class="mt-2">
-                <small class="text-muted">
-                    <i class="fas fa-lightbulb me-1"></i>
-                    Report includes analysis results and the latest AI response
-                </small>
-            </div>
+    html += `
+    <div class="text-center my-4">
+        <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
+            <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
+        </button>
+        <div class="mt-2">
+            <small class="text-muted">
+                <i class="fas fa-lightbulb me-1"></i>
+                Report includes analysis results and the latest AI response
+            </small>
         </div>
-        `;
+    </div>
+    `;
         
         document.getElementById('results').innerHTML = html;
         
         // Attendre que le DOM soit mis à jour
         setTimeout(() => {
-            resolve();
+            const firstSection = document.querySelector('.analysis-section');
+            
+            // INITIALISER LES GRAPHIQUES ICI
+            if (window.pendingCharts) {
+                initializeMetierCharts(window.pendingCharts.significantGroups, window.pendingCharts.metierDetails);
+                delete window.pendingCharts;
+            }
+            
+            setTimeout(() => {
+                resolve();
+            }, 1000);
+            
         }, 500);
     });
 }
 
-function generateBufferSection(bufferData) {
-    if (bufferData.error) {
-        return `
-            <div class="analysis-section">
-                <div class="alert alert-danger">
-                    <h5>Erreur BUFFER</h5>
-                    <p>${bufferData.error}</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    return `
-        <div class="analysis-section fade-in-up">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1">${bufferData.title || '1. BUFFER Analysis'}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-container">
-                        ${bufferData.buffer_table_html || '<p class="p-3">Données non disponibles</p>'}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
 
-function generateConsumptionFilteredSection(consumptionData) {
-    if (consumptionData.error) {
-        return `
-            <div class="analysis-section">
-                <div class="alert alert-danger">
-                    <h5>Erreur CONSUMPTION</h5>
-                    <p>${consumptionData.error}</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    return `
-        <div class="analysis-section fade-in-up mt-5">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1">${consumptionData.title || '2. CONSUMPTION Analysis'}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-container">
-                        ${consumptionData.consumption_filtered_table_html || '<p class="p-3">Données non disponibles</p>'}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
+// ================================= GÉNÉRATION CONTENU =================================
 
-
-/**
- * Variables globales pour le chatbot
- */
-let chatMessages = [];
-
-/**
- * Affiche la section chatbot après les analyses
- */
-function showChatbot() {
-    document.getElementById('chatbot-section').style.display = 'block';
-
-    // Initialiser le drag & drop pour les documents
-    initializeDocumentDragAndDrop();
-    
-    // Message initial du bot
-    if (chatMessages.length === 0) {
-        addChatMessage('assistant', 'Hello! I can help you analyze the LCR data that was just processed. You can ask me questions about the Balance Sheet variations, Consumption trends, or upload additional documents for context.');
-    }
-}
-
-/**
- * Toggle l'affichage du chatbot
- */
-function toggleChatbot() {
-    const chatSection = document.getElementById('chatbot-section');
-    chatSection.style.display = chatSection.style.display === 'none' ? 'block' : 'none';
-}
-
-/**
- * Envoie un message au chatbot
- */
-async function sendMessage() {
-    const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    // Ajouter le message utilisateur
-    addChatMessage('user', message);
-    input.value = '';
-    
-    // Afficher l'indicateur de frappe
-    addTypingIndicator();
-    
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ message: message })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            removeTypingIndicator();
-            addChatMessage('assistant', result.response);
-        } else {
-            removeTypingIndicator();
-            addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-        }
-        
-    } catch (error) {
-        console.error('Chat error:', error);
-        removeTypingIndicator();
-        addChatMessage('assistant', 'Connection error. Please check your network.');
-    }
-}
-
-/**
- * Ajoute un message au chat avec rendu Markdown
- */
-function addChatMessage(type, message) {
-    const container = document.getElementById('chat-container');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-message ${type}`;
-    
-    if (type === 'user') {
-        messageDiv.innerHTML = `<strong>You:</strong> ${message}`;
-    } else {
-        // Parser le markdown pour l'IA
-        const formattedMessage = parseMarkdownToHtml(message);
-        messageDiv.innerHTML = `<strong>AI:</strong> <div class="ai-response">${formattedMessage}</div>`;
-    }
-    
-    container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
-    
-    // Sauvegarder en mémoire
-    chatMessages.push({ type, message, timestamp: new Date() });
-}
-
-function initializeDocumentDragAndDrop() {
-    const docUploadArea = document.getElementById('doc-upload-area');
-    
-    if (docUploadArea) {
-        docUploadArea.addEventListener('dragover', handleDocDragOver);
-        docUploadArea.addEventListener('dragenter', handleDocDragEnter);
-        docUploadArea.addEventListener('dragleave', handleDocDragLeave);
-        docUploadArea.addEventListener('drop', handleDocDrop);
-    }
-}
-
-function handleDocDragOver(e) {
-    e.preventDefault();
-    e.currentTarget.classList.add('drag-over');
-}
-
-function handleDocDragEnter(e) {
-    e.preventDefault();
-}
-
-function handleDocDragLeave(e) {
-    e.currentTarget.classList.remove('drag-over');
-}
-
-function handleDocDrop(e) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('drag-over');
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        uploadDocument(files[0]);
-    }
-}
-
-/**
- * Convertit le markdown simple en HTML propre
- */
-function parseMarkdownToHtml(text) {
-    try {
-        // Configuration de Marked pour être plus permissif
-        marked.setOptions({
-            breaks: true,        // Conversion des \n en <br>
-            gfm: true,          // GitHub Flavored Markdown
-            tables: true,       // Support des tableaux
-            sanitize: false,    // On utilisera DOMPurify après
-            smartypants: true,  // Typographie intelligente
-            highlight: function(code, lang) {
-                // Coloration syntaxique basique
-                return `<code class="language-${lang || 'text'}">${code}</code>`;
-            }
-        });
-        
-        // Parser le markdown
-        let html = marked.parse(text);
-        
-        // Nettoyer et sécuriser le HTML avec DOMPurify
-        html = DOMPurify.sanitize(html, {
-            ALLOWED_TAGS: [
-                'p', 'br', 'strong', 'em', 'u', 'del', 's', 'strike',
-                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                'ul', 'ol', 'li', 'dl', 'dt', 'dd',
-                'blockquote', 'pre', 'code',
-                'table', 'thead', 'tbody', 'tr', 'th', 'td',
-                'a', 'img', 'hr', 'div', 'span',
-                'sup', 'sub', 'mark', 'small'
-            ],
-            ALLOWED_ATTR: [
-                'href', 'title', 'alt', 'src', 'class', 'id',
-                'target', 'rel', 'colspan', 'rowspan'
-            ]
-        });
-        
-        // Ajouter les classes Bootstrap/CSS personnalisées
-        html = html
-            .replace(/<h1/g, '<h1 class="mt-4 mb-3 text-primary"')
-            .replace(/<h2/g, '<h2 class="mt-4 mb-3 text-primary"')
-            .replace(/<h3/g, '<h3 class="mt-3 mb-2 text-primary"')
-            .replace(/<h4/g, '<h4 class="mt-3 mb-2 text-secondary"')
-            .replace(/<h5/g, '<h5 class="mt-2 mb-1 text-secondary"')
-            .replace(/<h6/g, '<h6 class="mt-2 mb-1"')
-            .replace(/<table/g, '<table class="table table-bordered table-sm my-3"')
-            .replace(/<blockquote/g, '<blockquote class="border-start border-primary ps-3 ms-3 fst-italic"')
-            .replace(/<pre/g, '<pre class="bg-light p-3 rounded"')
-            .replace(/<code(?![^>]*class)/g, '<code class="bg-light px-1 rounded"')
-            .replace(/<ul/g, '<ul class="mb-2"')
-            .replace(/<ol/g, '<ol class="mb-2"')
-            .replace(/<hr/g, '<hr class="my-3"')
-            .replace(/<img/g, '<img class="img-fluid rounded my-2"')
-            .replace(/<a(?![^>]*target)/g, '<a class="text-primary" target="_blank" rel="noopener noreferrer"');
-        
-        return html;
-        
-    } catch (error) {
-        console.error('Erreur parsing Markdown:', error);
-        // Fallback en cas d'erreur
-        return `<p class="text-danger">Erreur de formatage du message</p><pre>${text}</pre>`;
-    }
-}
-
-/**
- * Gère la touche Entrée dans l'input de chat
- */
-function handleChatKeyPress(event) {
-    if (event.key === 'Enter') {
-        sendMessage();
-    }
-}
-
-/**
- * Affiche l'indicateur de frappe
- */
-function addTypingIndicator() {
-    const container = document.getElementById('chat-container');
-    const typingDiv = document.createElement('div');
-    typingDiv.id = 'typing-indicator';
-    typingDiv.className = 'chat-message assistant';
-    typingDiv.innerHTML = `
-        <div class="d-flex align-items-center">
-            <div class="spinner-border spinner-border-sm me-2" style="width: 1rem; height: 1rem;"></div>
-            <em>AI is thinking...</em>
-        </div>
-    `;
-    
-    container.appendChild(typingDiv);
-    container.scrollTop = container.scrollHeight;
-}
-
-/**
- * Supprime l'indicateur de frappe
- */
-function removeTypingIndicator() {
-    const indicator = document.getElementById('typing-indicator');
-    if (indicator) {
-        indicator.remove();
-    }
-}
-
-/**
- * Upload d'un document pour le contexte
- */
-async function uploadDocument(file) {
-    if (!file) return;
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-        showNotification(`Uploading ${file.name}...`, 'info');
-        
-        const response = await fetch('/api/upload-document', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification(result.message, 'success');
-            updateUploadedDocsList();
-        } else {
-            const error = await response.json();
-            throw new Error(error.detail || 'Upload failed');
-        }
-        
-    } catch (error) {
-        console.error('Document upload error:', error);
-        showNotification(`Error uploading ${file.name}: ${error.message}`, 'error');
-    }
-}
-
-/**
- * Met à jour la liste des documents uploadés
- */
-async function updateUploadedDocsList() {
-    try {
-        const response = await fetch('/api/uploaded-documents');
-        const result = await response.json();
-        
-        const docsContainer = document.getElementById('uploaded-docs');
-        if (result.success && result.count > 0) {
-            let docsHtml = `<h6 class="mb-2">Documents (${result.count})</h6>`;
-            
-            result.documents.forEach(doc => {
-                docsHtml += `
-                    <div class="doc-item">
-                        <i class="fas fa-file-alt me-2"></i>
-                        <strong>${doc.filename}</strong>
-                        <br><small class="text-muted">${formatFileSize(doc.size)} - ${new Date(doc.upload_time).toLocaleTimeString()}</small>
-                    </div>
-                `;
-            });
-            
-            docsContainer.innerHTML = docsHtml;
-        } else {
-            docsContainer.innerHTML = '';
-        }
-        
-    } catch (error) {
-        console.error('Error updating docs list:', error);
-    }
-}
-
-/**
- * Vide l'historique du chat
- */
-async function clearChat() {
-    if (!confirm('Clear all chat history and documents?')) return;
-    
-    try {
-        const response = await fetch('/api/chat-clear', { method: 'DELETE' });
-        
-        if (response.ok) {
-            document.getElementById('chat-container').innerHTML = '';
-            document.getElementById('uploaded-docs').innerHTML = '';
-            chatMessages = [];
-            showNotification('Chat history cleared', 'success');
-        }
-        
-    } catch (error) {
-        console.error('Error clearing chat:', error);
-        showNotification('Error clearing chat', 'error');
-    }
-}
 
 /**
  * Génère la section Balance Sheet
@@ -1233,6 +975,10 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
     return html;
 }
 
+
+// ================================= GRAPHIQUES =================================
+
+
 /**
  * Initialise les graphiques métiers avec Chart.js
  */
@@ -1432,49 +1178,294 @@ function prepareMetierChartData(groupe, metierDetails) {
 }
 
 
+
+// ================================= CHATBOT =================================
+
+
 /**
- * Affiche une notification toast
- * @param {string} message - Message à afficher
- * @param {string} type - Type de notification ('success', 'error', 'info')
+ * Affiche la section chatbot après les analyses
  */
-function showNotification(message, type = 'info') {
-    // Création de l'élément notification
-    const notification = document.createElement('div');
-    notification.className = `alert alert-${type === 'error' ? 'danger' : type} position-fixed`;
-    notification.style.cssText = `
-        top: 20px;
-        right: 20px;
-        z-index: 9999;
-        min-width: 300px;
-        opacity: 0;
-        transform: translateX(100%);
-        transition: all 0.3s ease;
-    `;
+function showChatbot() {
+    document.getElementById('chatbot-section').style.display = 'block';
+
+    // Initialiser le drag & drop pour les documents
+    initializeDocumentDragAndDrop();
     
-    notification.innerHTML = `
+    // Message initial du bot
+    if (chatMessages.length === 0) {
+        addChatMessage('assistant', 'Hello! I can help you analyze the LCR data that was just processed. You can ask me questions about the Balance Sheet variations, Consumption trends, or upload additional documents for context.');
+    }
+}
+
+/**
+ * Envoie un message au chatbot
+ */
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Ajouter le message utilisateur
+    addChatMessage('user', message);
+    input.value = '';
+    
+    // Afficher l'indicateur de frappe
+    addTypingIndicator();
+    
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: message })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            removeTypingIndicator();
+            addChatMessage('assistant', result.response);
+        } else {
+            removeTypingIndicator();
+            addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+        }
+        
+    } catch (error) {
+        console.error('Chat error:', error);
+        removeTypingIndicator();
+        addChatMessage('assistant', 'Connection error. Please check your network.');
+    }
+}
+
+/**
+ * Ajoute un message au chat avec rendu Markdown
+ */
+function addChatMessage(type, message) {
+    const container = document.getElementById('chat-container');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${type}`;
+    
+    if (type === 'user') {
+        messageDiv.innerHTML = `<strong>You:</strong> ${message}`;
+    } else {
+        // Parser le markdown pour l'IA
+        const formattedMessage = parseMarkdownToHtml(message);
+        messageDiv.innerHTML = `<strong>AI:</strong> <div class="ai-response">${formattedMessage}</div>`;
+    }
+    
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    // Sauvegarder en mémoire
+    chatMessages.push({ type, message, timestamp: new Date() });
+}
+
+
+/**
+ * Convertit le markdown simple en HTML propre
+ */
+function parseMarkdownToHtml(text) {
+    try {
+        // Configuration de Marked pour être plus permissif
+        marked.setOptions({
+            breaks: true,        // Conversion des \n en <br>
+            gfm: true,          // GitHub Flavored Markdown
+            tables: true,       // Support des tableaux
+            sanitize: false,    // On utilisera DOMPurify après
+            smartypants: true,  // Typographie intelligente
+            highlight: function(code, lang) {
+                // Coloration syntaxique basique
+                return `<code class="language-${lang || 'text'}">${code}</code>`;
+            }
+        });
+        
+        // Parser le markdown
+        let html = marked.parse(text);
+        
+        // Nettoyer et sécuriser le HTML avec DOMPurify
+        html = DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: [
+                'p', 'br', 'strong', 'em', 'u', 'del', 's', 'strike',
+                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+                'blockquote', 'pre', 'code',
+                'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                'a', 'img', 'hr', 'div', 'span',
+                'sup', 'sub', 'mark', 'small'
+            ],
+            ALLOWED_ATTR: [
+                'href', 'title', 'alt', 'src', 'class', 'id',
+                'target', 'rel', 'colspan', 'rowspan'
+            ]
+        });
+        
+        // Ajouter les classes Bootstrap/CSS personnalisées
+        html = html
+            .replace(/<h1/g, '<h1 class="mt-4 mb-3 text-primary"')
+            .replace(/<h2/g, '<h2 class="mt-4 mb-3 text-primary"')
+            .replace(/<h3/g, '<h3 class="mt-3 mb-2 text-primary"')
+            .replace(/<h4/g, '<h4 class="mt-3 mb-2 text-secondary"')
+            .replace(/<h5/g, '<h5 class="mt-2 mb-1 text-secondary"')
+            .replace(/<h6/g, '<h6 class="mt-2 mb-1"')
+            .replace(/<table/g, '<table class="table table-bordered table-sm my-3"')
+            .replace(/<blockquote/g, '<blockquote class="border-start border-primary ps-3 ms-3 fst-italic"')
+            .replace(/<pre/g, '<pre class="bg-light p-3 rounded"')
+            .replace(/<code(?![^>]*class)/g, '<code class="bg-light px-1 rounded"')
+            .replace(/<ul/g, '<ul class="mb-2"')
+            .replace(/<ol/g, '<ol class="mb-2"')
+            .replace(/<hr/g, '<hr class="my-3"')
+            .replace(/<img/g, '<img class="img-fluid rounded my-2"')
+            .replace(/<a(?![^>]*target)/g, '<a class="text-primary" target="_blank" rel="noopener noreferrer"');
+        
+        return html;
+        
+    } catch (error) {
+        console.error('Erreur parsing Markdown:', error);
+        // Fallback en cas d'erreur
+        return `<p class="text-danger">Erreur de formatage du message</p><pre>${text}</pre>`;
+    }
+}
+
+/**
+ * Gère la touche Entrée dans l'input de chat
+ */
+function handleChatKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+/**
+ * Affiche l'indicateur de frappe
+ */
+function addTypingIndicator() {
+    const container = document.getElementById('chat-container');
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'typing-indicator';
+    typingDiv.className = 'chat-message assistant';
+    typingDiv.innerHTML = `
         <div class="d-flex align-items-center">
-            <i class="fas fa-${getNotificationIcon(type)} me-2"></i>
-            <span>${message}</span>
-            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+            <div class="spinner-border spinner-border-sm me-2" style="width: 1rem; height: 1rem;"></div>
+            <em>AI is thinking...</em>
         </div>
     `;
     
-    document.body.appendChild(notification);
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Supprime l'indicateur de frappe
+ */
+function removeTypingIndicator() {
+    const indicator = document.getElementById('typing-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+/**
+ * Upload d'un document pour le contexte
+ */
+async function uploadDocument(file) {
+    if (!file) return;
     
-    // Animation d'entrée
-    setTimeout(() => {
-        notification.style.opacity = '1';
-        notification.style.transform = 'translateX(0)';
-    }, 100);
+    const formData = new FormData();
+    formData.append('file', file);
     
-    // Auto-suppression après 5 secondes
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateX(100%)';
-            setTimeout(() => notification.remove(), 300);
+    try {
+        showNotification(`Uploading ${file.name}...`, 'info');
+        
+        const response = await fetch('/api/upload-document', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message, 'success');
+            updateUploadedDocsList();
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
         }
-    }, 5000);
+        
+    } catch (error) {
+        console.error('Document upload error:', error);
+        showNotification(`Error uploading ${file.name}: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Met à jour la liste des documents uploadés
+ */
+async function updateUploadedDocsList() {
+    try {
+        const response = await fetch('/api/uploaded-documents');
+        const result = await response.json();
+        
+        const docsContainer = document.getElementById('uploaded-docs');
+        if (result.success && result.count > 0) {
+            let docsHtml = `<h6 class="mb-2">Documents (${result.count})</h6>`;
+            
+            result.documents.forEach(doc => {
+                docsHtml += `
+                    <div class="doc-item">
+                        <i class="fas fa-file-alt me-2"></i>
+                        <strong>${doc.filename}</strong>
+                        <br><small class="text-muted">${formatFileSize(doc.size)} - ${new Date(doc.upload_time).toLocaleTimeString()}</small>
+                    </div>
+                `;
+            });
+            
+            docsContainer.innerHTML = docsHtml;
+        } else {
+            docsContainer.innerHTML = '';
+        }
+        
+    } catch (error) {
+        console.error('Error updating docs list:', error);
+    }
+}
+
+/**
+ * Vide l'historique du chat
+ */
+async function clearChat() {
+    if (!confirm('Clear all chat history and documents?')) return;
+    
+    try {
+        const response = await fetch('/api/chat-clear', { method: 'DELETE' });
+        
+        if (response.ok) {
+            document.getElementById('chat-container').innerHTML = '';
+            document.getElementById('uploaded-docs').innerHTML = '';
+            chatMessages = [];
+            showNotification('Chat history cleared', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Error clearing chat:', error);
+        showNotification('Error clearing chat', 'error');
+    }
+}
+
+
+// ================================= ADMINISTRATION =================================
+
+
+function showAdminPanel() {
+    const modal = new bootstrap.Modal(document.getElementById('admin-panel'));
+    modal.show();
+    
+    // Charger les statistiques et les logs au premier affichage
+    loadLogsStats(); // Cette fonction chargera aussi les logs
+    
+    // Ajouter un listener pour charger les users quand on clique sur l'onglet
+    document.querySelector('a[href="#users-tab"]').addEventListener('click', function() {
+        loadUsers();
+    });
 }
 
 async function loadLogsStats() {
@@ -1530,116 +1521,6 @@ async function loadLogsStats() {
         console.error('Error loading stats:', error);
         document.getElementById('logs-container').innerHTML = '<div class="alert alert-danger">Error loading statistics</div>';
     }
-}
-/**
- * Retourne l'icône appropriée pour le type de notification
- * @param {string} type - Type de notification
- * @returns {string} Nom de l'icône Font Awesome
- */
-function getNotificationIcon(type) {
-    const icons = {
-        'success': 'check-circle',
-        'error': 'exclamation-triangle',
-        'info': 'info-circle',
-        'warning': 'exclamation-circle'
-    };
-    return icons[type] || 'info-circle';
-}
-
-/**
- * Formate la taille d'un fichier en unités lisibles
- * @param {number} bytes - Taille en bytes
- * @returns {string} Taille formatée
- */
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
- * Formate un nombre avec des séparateurs de milliers
- * @param {number} number - Nombre à formater
- * @returns {string} Nombre formaté
- */
-function formatNumber(number) {
-    return new Intl.NumberFormat('fr-FR').format(number);
-}
-
-/**
- * Débuggage - Affiche les informations de débogage dans la console
- */
-function debugInfo() {
-    console.log('🔍 Debug Info:', {
-        filesReady,
-        analyzeButtonState: document.getElementById('analyzeBtn').disabled,
-        timestamp: new Date().toISOString()
-    });
-}
-
-
-// Dans main.js, après l'affichage des résultats
-function addExportButton() {
-    const exportButton = `
-        <div class="text-center my-4">
-            <button class="btn btn-secondary" onclick="exportToPDF()">
-                <i class="fas fa-download me-2"></i>Export to PDF
-            </button>
-        </div>
-    `;
-    document.getElementById('results').insertAdjacentHTML('beforeend', exportButton);
-}
-
-
-async function exportToPDF() {
-    const exportButton = document.querySelector('button[onclick="exportToPDF()"]');
-    const originalContent = exportButton.innerHTML;
-    
-    try {
-        exportButton.disabled = true;
-        exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>GENERATING REPORT...';
-        
-        showNotification('Generating report...', 'info');
-        
-        const response = await fetch('/api/export-pdf', { method: 'POST' });
-        
-        if (response.ok) {
-            const result = await response.json();
-            
-            const link = document.createElement('a');
-            link.href = result.report_url;
-            link.target = '_blank';
-            link.click();
-
-            showNotification('Report opened! Use Ctrl+P to save as PDF', 'success');
-            
-        } else {
-            throw new Error('Export failed');
-        }
-    } catch (error) {
-        console.error('Export error:', error);
-        showNotification('Error generating report', 'error');
-    } finally {
-        exportButton.disabled = false;
-        exportButton.innerHTML = originalContent;
-    }
-}
-
-function showAdminPanel() {
-    const modal = new bootstrap.Modal(document.getElementById('admin-panel'));
-    modal.show();
-    
-    // Charger les statistiques et les logs au premier affichage
-    loadLogsStats(); // Cette fonction chargera aussi les logs
-    
-    // Ajouter un listener pour charger les users quand on clique sur l'onglet
-    document.querySelector('a[href="#users-tab"]').addEventListener('click', function() {
-        loadUsers();
-    });
 }
 
 async function loadActivityLogs() {
@@ -1751,3 +1632,59 @@ function displayUsers(users) {
     html += '</tbody></table></div>';
     container.innerHTML = html;
 }
+
+// ================================= EXPORT =================================
+
+
+async function exportToPDF() {
+    const exportButton = document.querySelector('button[onclick="exportToPDF()"]');
+    const originalContent = exportButton.innerHTML;
+    
+    try {
+        exportButton.disabled = true;
+        exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>GENERATING REPORT...';
+        
+        showNotification('Generating report...', 'info');
+        
+        const response = await fetch('/api/export-pdf', { method: 'POST' });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            const link = document.createElement('a');
+            link.href = result.report_url;
+            link.target = '_blank';
+            link.click();
+
+            showNotification('Report opened! Use Ctrl+P to save as PDF', 'success');
+            
+        } else {
+            throw new Error('Export failed');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Error generating report', 'error');
+    } finally {
+        exportButton.disabled = false;
+        exportButton.innerHTML = originalContent;
+    }
+}
+
+
+// ================================= AUTHENTIFICATION =================================
+
+
+async function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        const response = await fetch('/api/logout', { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            window.location.href = result.redirect;
+        }
+    }
+}
+
+
+
+
