@@ -4,16 +4,19 @@ import hashlib
 import json
 import os
 from pathlib import Path
-
-from sharepoint_connector import SharePointClient
 import pandas as pd
 from io import BytesIO
 
+from sharepoint_connector import SharePointClient
+def get_sharepoint_client():
+    """Initialise le client SharePoint"""
+    return SharePointClient()
+
+# Fichier de logs persistant
+LOGS_FILE = "activity_logs.json"
 
 # Configuration SharePoint pour les logs
 SHAREPOINT_LOGS_PATH = "ALM_Metrics/logs/activity_logs.xlsx"  # Ajustez selon votre structure
-
-
 
 # Base de donnÃ©es utilisateurs simple (en production: vraie BDD)
 USERS_DB = {
@@ -47,8 +50,6 @@ USERS_DB = {
     }
 }
 
-# Fichier de logs persistant
-LOGS_FILE = "activity_logs.json"
 
 def authenticate_user(username: str, password: str) -> Optional[Dict]:
     """Authentifie un utilisateur"""
@@ -59,9 +60,6 @@ def authenticate_user(username: str, password: str) -> Optional[Dict]:
             return user
     return None
 
-def get_sharepoint_client():
-    """Initialise le client SharePoint"""
-    return SharePointClient()
 
 def log_activity(username: str, action: str, details: str = ""):
     """Enregistre une activité utilisateur dans SharePoint Excel"""
@@ -129,6 +127,7 @@ def _log_activity_fallback(username: str, action: str, details: str = ""):
     except Exception as e:
         print(f"ERREUR sauvegarde fallback: {e}")
 
+
 def get_logs(limit: int = 100) -> List[Dict]:
     """Récupère les logs depuis SharePoint"""
     try:
@@ -164,6 +163,7 @@ def _get_logs_fallback(limit: int = 100) -> List[Dict]:
     except Exception as e:
         print(f"ERREUR lecture logs fallback: {e}")
         return []
+
 
 def get_logs_stats() -> Dict:
     """Statistiques sur les logs depuis SharePoint"""

@@ -8,26 +8,21 @@ Application FastAPI utilisant un système de templates Jinja2
 pour séparer la logique métier de la présentation.
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, Cookie
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Cookie
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import pandas as pd
 import uvicorn
-import uuid
 import logging
 from pathlib import Path
 from datetime import datetime
-import math
-import statistics
 import io
 import chardet
-import json
-from typing import Dict, Any, Optional
+from typing import Optional
 import psutil
 import os
-import tempfile
 from user import authenticate_user, log_activity, get_logs, USERS_DB
 import secrets
 
@@ -35,35 +30,37 @@ from llm_connector import LLMConnector
 from report_generator import ReportGenerator
 from sharepoint_connector import SharePointClient
 
+# Initialiser le connecteur LLM
+llm_connector = LLMConnector()
+
+# Formats supportés
+SUPPORTED_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.csv', '.tsv', '.txt']
+
 # Variables globales pour la session chatbot
 chatbot_session = {
     "messages": [],
     "context_data": {},
     "uploaded_documents": []
 }
-
-# Initialiser le connecteur LLM
-llm_connector = LLMConnector()
+# Variables globales pour la session (en production: utiliser une base de données)
+file_session = {"files": {}}
+# Session utilisateur global (en production: vraies sessions SSH si possible)
+active_sessions = {}
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Création des dossiers requis
+required_dirs = ["data", "templates", "static", "static/js", "static/css", "static/images"]
+for directory in required_dirs:
+    Path(directory).mkdir(exist_ok=True)
+
+required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
+                "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
+
 # Création de l'application FastAPI
 app = FastAPI(title="Steering ALM Metrics", version="2.0.0")
-
-
-# Session utilisateur global (en production: vraies sessions)
-active_sessions = {}
-
-def generate_session_token():
-    return secrets.token_urlsafe(32)
-
-def get_current_user_from_session(session_token: Optional[str] = Cookie(None)):
-    """Récupère l'utilisateur depuis le token de session"""
-    if not session_token or session_token not in active_sessions:
-        return None
-    return active_sessions[session_token]
 
 # Configuration CORS
 app.add_middleware(
@@ -74,41 +71,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Création des dossiers requis
-required_dirs = ["data", "templates", "static", "static/js", "static/css", "static/images"]
-for directory in required_dirs:
-    Path(directory).mkdir(exist_ok=True)
-
-# Formats supportés
-SUPPORTED_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.csv', '.tsv', '.txt']
-
 # Configuration des fichiers statiques et templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Variables globales pour la session (en production: utiliser une base de données)
-file_session = {"files": {}}
 
-REQUIRED_COLUMNS = {
-    "balance_sheet": [
-        "Top Conso",
-        "Réaffectation", 
-        "Groupe De Produit",
-        "Nominal Value"
-    ],
-    "consumption": [
-        "Top Conso",
-        "LCR_ECO_GROUPE_METIERS",
-        "LCR_ECO_IMPACT_LCR",
-        "Métier",
-        "Sous-Métier"
-    ]
-}
 
-ALL_REQUIRED_COLUMNS = list(set(
-    REQUIRED_COLUMNS["balance_sheet"] + 
-    REQUIRED_COLUMNS["consumption"]
-))
+# =========================== FONCTIONS UTILITAIRES ===========================
+
+
+def generate_session_token():
+    return secrets.token_urlsafe(32)
+
+def get_current_user_from_session(session_token: Optional[str] = Cookie(None)):
+    """Récupère l'utilisateur depuis le token de session"""
+    if not session_token or session_token not in active_sessions:
+        return None
+    return active_sessions[session_token]
 
 def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     """
@@ -175,11 +154,49 @@ def convert_file_content_to_dataframe(file_content: bytes, filename: str):
     except Exception as e:
         raise ValueError(f"Erreur lecture fichier: {str(e)}")
 
-#######################################################################################################################################
+def cleanup_session_memory():
+    """Nettoie la mémoire des DataFrames de session"""
+    try:
+        if "files" in file_session:
+            for file_type in list(file_session["files"].keys()):
+                if file_type in file_session["files"] and "dataframe" in file_session["files"][file_type]:
+                    del file_session["files"][file_type]["dataframe"]
+                    logger.info(f"DataFrame {file_type} supprimé de la session")
+        
+        # Nettoyage complet
+        file_session["files"].clear()
+        
+        import gc
+        gc.collect()
+        
+        # Vérifier la mémoire après nettoyage
+        process = psutil.Process(os.getpid())
+        memory_after = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire après nettoyage complet: {memory_after:.1f} MB")
+        
+    except Exception as e:
+        logger.warning(f"Erreur nettoyage mémoire: {e}")
 
-#                           API
 
-#######################################################################################################################################
+# ========================== ENDPOINTS EXPORT ===========================  
+
+
+@app.get("/health")
+async def health_check():
+    """Endpoint de vérification de l'état de l'application"""
+    return {
+        "status": "healthy",
+        "service": "steering-alm-metrics",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "active_files": len(file_session.get("files", {})),
+        "templates_available": Path("templates/index.html").exists(),
+        "static_available": Path("static/js/main.js").exists()
+    }
+
+
+# =========================== ENDPOINTS AUTHENTIFICATION ===========================
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -204,19 +221,6 @@ async def root(request: Request):
         "timestamp": datetime.now().isoformat(),
         "user": current_user
     })
-
-@app.get("/health")
-async def health_check():
-    """Endpoint de vérification de l'état de l'application"""
-    return {
-        "status": "healthy",
-        "service": "steering-alm-metrics",
-        "version": "2.0.0",
-        "timestamp": datetime.now().isoformat(),
-        "active_files": len(file_session.get("files", {})),
-        "templates_available": Path("templates/index.html").exists(),
-        "static_available": Path("static/js/main.js").exists()
-    }
 
 @app.post("/api/login")
 async def login(request: Request):
@@ -273,24 +277,113 @@ async def logout(request: Request):
     response.delete_cookie("session_token")
     return response
 
-@app.get("/api/logs-stats")
-async def get_logs_statistics(session_token: Optional[str] = Cookie(None)):
-    """Statistiques sur les logs (admins seulement)"""
+
+# =========================== ENDPOINTS FICHIERS ===========================
+
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...), 
+                     file_type: str = Form(...),
+                     session_token: Optional[str] = Cookie(None)):
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-        
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
     
-    from user import get_logs_stats
-    stats = get_logs_stats()
-    
-    return {
-        "success": True,
-        "stats": stats
-    }
+    log_activity(current_user["username"], "FILE_UPLOAD", f"Uploaded {file.filename} as {file_type}")
+    try:
+        # MONITORING INITIAL
+        process = psutil.Process(os.getpid())
+        memory_start = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire avant upload {file_type}: {memory_start:.1f} MB")
 
+        logger.info(f"Upload reçu: {file.filename}, type: {file_type}")
+        
+        # Validation du fichier
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+        
+        file_extension = Path(file.filename).suffix.lower()
+        
+        if file_extension not in SUPPORTED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Format non supporté: {file_extension}"
+            )
+
+        # Lire le contenu en mémoire
+        contents = await file.read()
+        file_size = len(contents)
+        
+        # TRAITEMENT DIRECT EN MÉMOIRE
+        try:
+            df, file_info = convert_file_content_to_dataframe(contents, file.filename)
+            logger.info(f"Fichier traité en mémoire: {file_info}")
+            
+        except Exception as e:
+            del contents
+            raise HTTPException(status_code=422, detail=f"Erreur lecture: {str(e)}")
+        
+        # Sauvegarder les infos AVANT filtrage
+        original_rows = len(df)
+        original_columns = len(df.columns)
+
+        # Filtrer seulement les lignes nécessaires
+        df_filtered = df[df["Top Conso"] == "O"].copy() if "Top Conso" in df.columns else df.copy()
+
+        # OPTIMISATION MÉMOIRE - Ne garder que les colonnes utiles
+        available_cols = [col for col in required_cols if col in df_filtered.columns]
+        df_minimal = df_filtered[available_cols].copy()
+
+        # Optimiser les types de données
+        for col in df_minimal.select_dtypes(include=['float64']):
+            df_minimal[col] = pd.to_numeric(df_minimal[col], downcast='float')
+
+        # LIBÉRATION MÉMOIRE IMMÉDIATE
+        del df_filtered
+        del df
+        del contents
+        import gc
+        gc.collect()
+
+        # Diagnostic mémoire
+        logger.info(f"DataFrame optimisé: {df_minimal.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
+        logger.info(f"Shape finale: {df_minimal.shape}")
+
+        # Stocker le DataFrame optimisé
+        file_session["files"][file_type] = {
+            "dataframe": df_minimal,  # DataFrame optimisé
+            "original_name": file.filename,
+            "file_format": file_info['format'],
+            "encoding": file_info.get('encoding'),
+            "delimiter": file_info.get('delimiter'),
+            "rows": len(df_minimal),
+            "columns": len(df_minimal.columns),
+            "upload_time": datetime.now().isoformat(),
+        }
+
+        # MONITORING FINAL
+        memory_end = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Mémoire après upload {file_type}: {memory_end:.1f} MB (diff: +{memory_end-memory_start:.1f} MB)")
+        
+        return {
+            "success": True,
+            "message": f"Fichier {file_type} traité en mémoire ({file_info['format']})",
+            "filename": file.filename,
+            "format": file_info['format'],
+            "encoding": file_info.get('encoding'),
+            "delimiter": file_info.get('delimiter'),
+            "rows": original_rows,
+            "columns": original_columns,
+            "file_size": file_size,
+            "processing": "in_memory_optimized"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur upload: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+    
 @app.post("/api/load-files-by-date")
 async def load_files_by_date(request: Request, session_token: Optional[str] = Cookie(None)):
     current_user = get_current_user_from_session(session_token)
@@ -378,7 +471,6 @@ async def load_files_by_date(request: Request, session_token: Optional[str] = Co
                 "rows": len(df_minimal),
                 "columns": len(df_minimal.columns),
                 "upload_time": datetime.now().isoformat(),
-                "missing_columns": [col for col in ALL_REQUIRED_COLUMNS if col not in df.columns]
             }
             
             results[file_type] = {
@@ -402,66 +494,6 @@ async def load_files_by_date(request: Request, session_token: Optional[str] = Co
         logger.error(f"Error loading files by date: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
        
-@app.get("/api/logs")
-async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-        
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    logs = get_logs(limit)
-    return {
-        "success": True,
-        "logs": logs,
-        "total": len(logs)
-    }
-
-@app.get("/api/users")
-async def get_users_list(session_token: Optional[str] = Cookie(None)):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-        
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    users = [
-        {
-            "username": user["username"],
-            "full_name": user["full_name"], 
-            "role": user["role"],
-            "created_at": user["created_at"]
-        }
-        for user in USERS_DB.values()
-    ]
-    
-    return {
-        "success": True,
-        "users": users
-    }
-
-@app.get("/api/uploaded-documents")
-async def get_uploaded_documents():
-    """
-    Récupère la liste détaillée des documents uploadés
-    """
-    documents = []
-    for doc in chatbot_session.get("uploaded_documents", []):
-        documents.append({
-            "filename": doc["filename"],
-            "upload_time": doc["upload_time"],
-            "size": doc["size"]
-        })
-    
-    return {
-        "success": True,
-        "documents": documents,
-        "count": len(documents)
-    }
-
-
 @app.post("/api/cleanup-memory")
 async def cleanup_memory_endpoint(session_token: Optional[str] = Cookie(None)):
     """Endpoint pour nettoyer la mémoire manuellement"""
@@ -488,30 +520,10 @@ async def cleanup_memory_endpoint(session_token: Optional[str] = Cookie(None)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cleanup error: {str(e)}")
-    
-    
-def cleanup_session_memory():
-    """Nettoie la mémoire des DataFrames de session"""
-    try:
-        if "files" in file_session:
-            for file_type in list(file_session["files"].keys()):
-                if file_type in file_session["files"] and "dataframe" in file_session["files"][file_type]:
-                    del file_session["files"][file_type]["dataframe"]
-                    logger.info(f"DataFrame {file_type} supprimé de la session")
-        
-        # Nettoyage complet
-        file_session["files"].clear()
-        
-        import gc
-        gc.collect()
-        
-        # Vérifier la mémoire après nettoyage
-        process = psutil.Process(os.getpid())
-        memory_after = process.memory_info().rss / 1024 / 1024
-        logger.info(f"Mémoire après nettoyage complet: {memory_after:.1f} MB")
-        
-    except Exception as e:
-        logger.warning(f"Erreur nettoyage mémoire: {e}")
+
+
+# ========================== ENDPOINTS ANALYSE ===========================
+
 
 @app.post("/api/analyze")
 async def analyze_files(session_token: Optional[str] = Cookie(None)):
@@ -522,11 +534,10 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     
     # Logger l'activité
     log_activity(current_user["username"], "ANALYSIS", "Started LCR analysis")
-    
     try:
         logger.info("Début de l'analyse depuis DataFrames en mémoire")
-
-                # Vérification de la présence des deux fichiers
+        
+        # Vérification de la présence des deux fichiers
         if len(file_session.get("files", {})) < 2:
             raise HTTPException(status_code=400, detail="Les deux fichiers sont requis")
         
@@ -536,20 +547,20 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
         # Récupérer les DataFrames directement depuis la session
         dataframes = {}
         for file_type, file_info in file_session["files"].items():
-            df = file_info["dataframe"]
+            df = file_info["dataframe"]  # DataFrame déjà en mémoire
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
         
-        # NOUVELLES ANALYSES
-        buffer_results = create_buffer_analysis(dataframes)
-        consumption_filtered_results = create_consumption_filtered_analysis(dataframes)
+        # Analyses
+        balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
+        consumption_results = create_consumption_analysis_grouped_only(dataframes)
         
-        logger.info("Nouvelles analyses terminées (traitement mémoire)")
+        logger.info("Analyses terminées (traitement mémoire)")
 
-        # SAUVEGARDER LE CONTEXTE CHATBOT
+        # SAUVEGARDER LE CONTEXTE CHATBOT AVANT LA RÉPONSE
         chatbot_session["context_data"] = {
-            "buffer": buffer_results,
-            "consumption_filtered": consumption_filtered_results,
+            "balance_sheet": balance_sheet_results,
+            "consumption": consumption_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -571,12 +582,12 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
 
         return {
             "success": True,
-            "message": "Nouvelles analyses terminées avec contexte chatbot prêt",
+            "message": "Analyses terminées avec contexte chatbot prêt",
             "timestamp": datetime.now().isoformat(),
             "context_ready": True,  
             "results": {
-                "buffer": buffer_results,
-                "consumption_filtered": consumption_filtered_results
+                "balance_sheet": balance_sheet_results,
+                "consumption": consumption_results
             }
         }
         
@@ -585,7 +596,23 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
- 
+    
+@app.get("/api/context-status")
+async def get_context_status():
+    """Vérifie si le contexte du chatbot est prêt"""
+    has_context = bool(chatbot_session.get("context_data"))
+    context_keys = list(chatbot_session.get("context_data", {}).keys()) if has_context else []
+    
+    return {
+        "context_ready": has_context,
+        "context_keys": context_keys,
+        "timestamp": datetime.now().isoformat(),
+        "analysis_timestamp": chatbot_session.get("context_data", {}).get("analysis_timestamp")
+    }
+
+
+# ========================== ENDPOINTS CHATBOT ===========================
+
 
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
@@ -641,20 +668,6 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
 
-@app.get("/api/context-status")
-async def get_context_status():
-    """Vérifie si le contexte du chatbot est prêt"""
-    has_context = bool(chatbot_session.get("context_data"))
-    context_keys = list(chatbot_session.get("context_data", {}).keys()) if has_context else []
-    
-    return {
-        "context_ready": has_context,
-        "context_keys": context_keys,
-        "timestamp": datetime.now().isoformat(),
-        "analysis_timestamp": chatbot_session.get("context_data", {}).get("analysis_timestamp")
-    }
-
-
 @app.post("/api/upload-document")
 async def upload_document(file: UploadFile = File(...), session_token: Optional[str] = Cookie(None)):
     """
@@ -708,6 +721,126 @@ async def upload_document(file: UploadFile = File(...), session_token: Optional[
         logger.error(f"Erreur upload document: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
+@app.get("/api/uploaded-documents")
+async def get_uploaded_documents():
+    """
+    Récupère la liste détaillée des documents uploadés
+    """
+    documents = []
+    for doc in chatbot_session.get("uploaded_documents", []):
+        documents.append({
+            "filename": doc["filename"],
+            "upload_time": doc["upload_time"],
+            "size": doc["size"]
+        })
+    
+    return {
+        "success": True,
+        "documents": documents,
+        "count": len(documents)
+    }
+
+@app.get("/api/chat-history")
+async def get_chat_history():
+    """
+    Récupère l'historique des messages du chatbot
+    """
+    return {
+        "success": True,
+        "messages": chatbot_session["messages"],
+        "documents_count": len(chatbot_session["uploaded_documents"])
+    }
+
+@app.delete("/api/chat-clear")
+async def clear_chat():
+    """
+    Vide l'historique du chatbot
+    """
+    chatbot_session["messages"].clear()
+    chatbot_session["uploaded_documents"].clear()
+    return {"success": True, "message": "Historique effacé"}
+
+
+# ========================== ENDPOINTS ADMIN ===========================
+
+
+@app.get("/api/logs")
+async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    logs = get_logs(limit)
+    return {
+        "success": True,
+        "logs": logs,
+        "total": len(logs)
+    }
+
+@app.get("/api/logs-stats")
+async def get_logs_statistics(session_token: Optional[str] = Cookie(None)):
+    """Statistiques sur les logs (admins seulement)"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    from user import get_logs_stats
+    stats = get_logs_stats()
+    
+    return {
+        "success": True,
+        "stats": stats
+    }
+
+@app.get("/api/users")
+async def get_users_list(session_token: Optional[str] = Cookie(None)):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    users = [
+        {
+            "username": user["username"],
+            "full_name": user["full_name"], 
+            "role": user["role"],
+            "created_at": user["created_at"]
+        }
+        for user in USERS_DB.values()
+    ]
+    
+    return {
+        "success": True,
+        "users": users
+    }
+
+
+# ========================== ENDPOINTS EXPORT ===========================  
+
+
+@app.post("/api/export-pdf")
+async def export_pdf(session_token: Optional[str] = Cookie(None)):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Vérifier qu'une analyse existe
+    if not chatbot_session.get("context_data"):
+        raise HTTPException(status_code=400, detail="No analysis available")
+    
+    # Retourner juste l'URL de visualisation
+    return JSONResponse({
+        "success": True,
+        "report_url": "/view-report"
+    })  
 
 @app.get("/view-report")
 async def view_current_report(session_token: Optional[str] = Cookie(None)):
@@ -747,548 +880,8 @@ async def view_current_report(session_token: Optional[str] = Cookie(None)):
         return HTMLResponse(content=f"<h1>Erreur génération rapport</h1><p>{str(e)}</p>")
     
 
-def prepare_analysis_context() -> str:
-    """
-    Prépare le contexte détaillé depuis les données sauvegardées
-    """
-    context_parts = []
-    
-    # Contexte métier de base
-    context_parts.append("CONTEXTE MÉTIER:")
-    context_parts.append("- Application d'analyse LCR (Liquidity Coverage Ratio) pour banque")
-    context_parts.append("- Analyse Balance Sheet (ACTIF/PASSIF) en milliards d'euros")
-    context_parts.append("- Analyse Consumption par groupes métiers en milliards")
-    context_parts.append("- Comparaison J vs J-1 (aujourd'hui vs hier)")
-    
-    # Données d'analyse si disponibles
-    if chatbot_session.get("context_data"):
-        data = chatbot_session["context_data"]
-        
-        context_parts.append(f"\nANALYSE EFFECTUÉE LE : {data.get('analysis_timestamp', 'Inconnue')}")
-        
-        # Balance Sheet
-        if data.get("balance_sheet") and not data["balance_sheet"].get("error"):
-            bs = data["balance_sheet"]
-            context_parts.append("\n=== BALANCE SHEET RESULTS ===")
-            context_parts.append(f"Titre: {bs.get('title', 'Balance Sheet')}")
-            
-            if bs.get("variations"):
-                context_parts.append("Variations détaillées:")
-                for category, var_data in bs["variations"].items():
-                    context_parts.append(f"- {category}: D-1 = {var_data['j_minus_1']} Md€, D = {var_data['j']} Md€")
-                    context_parts.append(f"  → Variation = {var_data['variation']} Md€")
-            
-            if bs.get("summary"):
-                context_parts.append(f"Résumé exécutif: {bs['summary']}")
-        
-        # Consumption
-        if data.get("consumption") and not data["consumption"].get("error"):
-            cons = data["consumption"]
-            context_parts.append("\n=== CONSUMPTION LCR RESULTS ===")
-            context_parts.append(f"Titre: {cons.get('title', 'Consumption Analysis')}")
-            
-            # Variation globale
-            if cons.get("variations", {}).get("global"):
-                global_var = cons["variations"]["global"]
-                context_parts.append(f"Consumption total: D-1 = {global_var['j_minus_1']} Md, D = {global_var['j']} Md")
-                context_parts.append(f"Variation globale = {global_var['variation']} Md")
-            
-            # Variations par groupe métier
-            if cons.get("variations", {}).get("by_groupe_metiers"):
-                context_parts.append("\nVariations par groupe métier:")
-                for groupe, var_data in cons["variations"]["by_groupe_metiers"].items():
-                    if abs(var_data["variation"]) > 0.01:  # Seulement les variations > 10M€
-                        context_parts.append(f"- {groupe}: {var_data['variation']} Md (D-1: {var_data['j_minus_1']}, D: {var_data['j']})")
-            
-            # Analyses textuelles
-            if cons.get("analysis_text"):
-                context_parts.append(f"\nAnalyse principale: {cons['analysis_text']}")
-            
-            if cons.get("metier_detailed_analysis"):
-                context_parts.append(f"Analyse détaillée: {cons['metier_detailed_analysis']}")
-            
-            # Groupes significatifs
-            if cons.get("significant_groups"):
-                context_parts.append(f"Groupes avec variations significatives: {', '.join(cons['significant_groups'])}")
-        
-        # Informations sur les fichiers source
-        if data.get("raw_dataframes_info"):
-            context_parts.append("\n=== FICHIERS SOURCE ===")
-            for file_type, info in data["raw_dataframes_info"].items():
-                context_parts.append(f"Fichier {file_type}: {info['shape'][0]} lignes, {info['shape'][1]} colonnes")
-                context_parts.append(f"Colonnes: {', '.join(info['columns'])}")
-                if info.get("sample_data"):
-                    context_parts.append("Échantillon de données:")
-                    for i, row in enumerate(info["sample_data"][:2]):  # 2 premières lignes
-                        context_parts.append(f"  Ligne {i+1}: {str(row)[:200]}...")
-    
-    else:
-        context_parts.append("\nAucune analyse disponible - les analyses doivent être lancées d'abord.")
-    
-    return "\n".join(context_parts)
+# ========================== FONCTIONS BALANCE SHEET ===========================
 
-def prepare_documents_context() -> str:
-    """
-    Prépare le contexte depuis les documents uploadés
-    """
-    if not chatbot_session["uploaded_documents"]:
-        return ""
-    
-    context_parts = []
-    for doc in chatbot_session["uploaded_documents"]:
-        context_parts.append(f"Document: {doc['filename']}")
-        context_parts.append(f"Contenu: {doc['content'][:2000]}...")  # Limiter à 2000 chars
-        context_parts.append("---")
-    
-    return "\n".join(context_parts)
-
-def prepare_conversation_context() -> str:
-    """
-    Prépare le contexte complet incluant analyses + documents + historique
-    """
-    context_parts = []
-    
-    # Contexte des analyses
-    context_parts.append(prepare_analysis_context())
-    
-    # Documents uploadés
-    docs_context = prepare_documents_context()
-    if docs_context:
-        context_parts.append(f"\n\nContext Documents:\n{docs_context}")
-    
-    # Historique de conversation (derniers 10 messages pour éviter de surcharger)
-    if chatbot_session["messages"]:
-        context_parts.append("\n\nHistory of conversation:")
-        for msg in chatbot_session["messages"][-10:]:
-            role = "Utilisateur" if msg["type"] == "user" else "Assistant"
-            context_parts.append(f"{role}: {msg['message']}")
-        context_parts.append("\n--- End of history of conversation ---")
-    
-    return "\n".join(context_parts)
-
-
-@app.get("/api/chat-history")
-async def get_chat_history():
-    """
-    Récupère l'historique des messages du chatbot
-    """
-    return {
-        "success": True,
-        "messages": chatbot_session["messages"],
-        "documents_count": len(chatbot_session["uploaded_documents"])
-    }
-
-@app.delete("/api/chat-clear")
-async def clear_chat():
-    """
-    Vide l'historique du chatbot
-    """
-    chatbot_session["messages"].clear()
-    chatbot_session["uploaded_documents"].clear()
-    return {"success": True, "message": "Historique effacé"}
-
-@app.get("/api/chatbot-context")
-async def get_chatbot_context():
-    """
-    Endpoint de debug pour voir le contexte du chatbot
-    """
-    return {
-        "success": True,
-        "has_context_data": bool(chatbot_session.get("context_data")),
-        "context_keys": list(chatbot_session.get("context_data", {}).keys()),
-        "messages_count": len(chatbot_session.get("messages", [])),
-        "documents_count": len(chatbot_session.get("uploaded_documents", []))
-    }
-
-#######################################################################################################################################
-
-#                           BALANCE SHEET
-
-#######################################################################################################################################
-
-def create_buffer_analysis(dataframes):
-    """
-    Crée l'analyse BUFFER avec filtres spécifiques
-    """
-    try:
-        logger.info("📊 Création de l'analyse BUFFER")
-        
-        buffer_data = {}
-        
-        for file_type, df in dataframes.items():
-            logger.info(f"📄 Traitement BUFFER pour {file_type}")
-            
-            # Vérification des colonnes requises
-            required_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", "Libellé Client", "LCR_Assiette Pondérée"]
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            
-            if missing_cols:
-                logger.warning(f"⚠️ Colonnes manquantes pour BUFFER {file_type}: {missing_cols}")
-                continue
-            
-            # Filtrage des données
-            df_filtered = df[df["Top Conso"] == "O"].copy()
-            df_filtered = df_filtered[df_filtered["LCR_Catégorie"] == "1- Buffer"].copy()
-            
-            logger.info(f"📋 Après filtrage BUFFER: {len(df_filtered)} lignes")
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"⚠️ Aucune donnée BUFFER pour {file_type}")
-                continue
-            
-            # Préparation des données
-            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
-                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
-            ).fillna(0)
-            
-            # Nettoyage des champs texte
-            df_filtered["LCR_Template Section 1"] = df_filtered["LCR_Template Section 1"].astype(str).str.strip()
-            df_filtered["Libellé Client"] = df_filtered["Libellé Client"].astype(str).str.strip()
-            
-            buffer_data[file_type] = df_filtered
-            
-            logger.info(f"✅ BUFFER {file_type} préparé: {len(df_filtered)} lignes")
-        
-        # Génération du HTML
-        buffer_html = generate_buffer_table_html(buffer_data)
-        
-        return {
-            "title": "BUFFER Analysis",
-            "buffer_table_html": buffer_html,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "lcr_categorie": "1- Buffer"
-                },
-                "files_analyzed": list(buffer_data.keys())
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur création analyse BUFFER: {e}")
-        return {
-            "title": "BUFFER Analysis - Erreur",
-            "error": str(e),
-            "buffer_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse BUFFER</p>"
-        }
-
-def create_consumption_filtered_analysis(dataframes):
-    """
-    Crée l'analyse CONSUMPTION avec filtres spécifiques
-    """
-    try:
-        logger.info("📊 Création de l'analyse CONSUMPTION filtrée")
-        
-        consumption_data = {}
-        
-        for file_type, df in dataframes.items():
-            logger.info(f"📄 Traitement CONSUMPTION filtrée pour {file_type}")
-            
-            # Vérification des colonnes requises
-            required_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "Sous-Métier", "Produit", "LCR_ECO_IMPACT_LCR"]
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            
-            if missing_cols:
-                logger.warning(f"⚠️ Colonnes manquantes pour CONSUMPTION filtrée {file_type}: {missing_cols}")
-                continue
-            
-            # Filtrage des données
-            df_filtered = df[df["Top Conso"] == "O"].copy()
-            
-            # Filtre LCR_ECO_GROUPE_METIERS
-            allowed_groups = ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"]
-            df_filtered = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(allowed_groups)].copy()
-            
-            # Filtre Sous-Métier (exclure certaines valeurs)
-            excluded_sous_metiers = ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"]
-            df_filtered = df_filtered[~df_filtered["Sous-Métier"].isin(excluded_sous_metiers)].copy()
-            
-            # Filtre Produit (exclure certaines valeurs)
-            excluded_produits = ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
-            df_filtered = df_filtered[~df_filtered["Produit"].isin(excluded_produits)].copy()
-            
-            logger.info(f"📋 Après filtrage CONSUMPTION: {len(df_filtered)} lignes")
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"⚠️ Aucune donnée CONSUMPTION filtrée pour {file_type}")
-                continue
-            
-            # Préparation des données
-            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
-                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
-            ).fillna(0)
-            
-            # Nettoyage des champs texte
-            df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
-            
-            # Groupement par LCR_ECO_GROUPE_METIERS
-            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
-            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
-            
-            consumption_data[file_type] = grouped
-            
-            logger.info(f"✅ CONSUMPTION filtrée {file_type}: {len(grouped)} groupes")
-        
-        # Génération du HTML
-        consumption_html = generate_consumption_filtered_table_html(consumption_data)
-        
-        return {
-            "title": "CONSUMPTION Analysis",
-            "consumption_filtered_table_html": consumption_html,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "allowed_groups": ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"],
-                    "excluded_sous_metiers": ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"],
-                    "excluded_produits": ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
-                },
-                "files_analyzed": list(consumption_data.keys())
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur création analyse CONSUMPTION filtrée: {e}")
-        return {
-            "title": "CONSUMPTION Analysis - Erreur",
-            "error": str(e),
-            "consumption_filtered_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse CONSUMPTION filtrée</p>"
-        }
-
-def generate_buffer_table_html(buffer_data):
-    """
-    Génère le HTML du tableau BUFFER
-    """
-    if len(buffer_data) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse BUFFER</div>"
-    
-    data_j = buffer_data.get("j")
-    data_j1 = buffer_data.get("jMinus1")
-    
-    if data_j is None or data_j1 is None:
-        return "<div class='alert alert-danger'>Erreur: données BUFFER manquantes</div>"
-    
-    # Créer les structures de données avec détail pour "1.1- Cash"
-    def prepare_buffer_structure(df):
-        result = {}
-        
-        for _, row in df.iterrows():
-            section = row["LCR_Template Section 1"]
-            client = row["Libellé Client"]
-            value = row["LCR_Assiette Pondérée"] / 1_000_000_000  # Conversion en milliards
-            
-            if section == "1.1- Cash":
-                # Détail pour 1.1- Cash
-                if section not in result:
-                    result[section] = {"total": 0, "details": {}}
-                result[section]["details"][client] = value
-                result[section]["total"] += value
-            else:
-                # Total seulement pour les autres sections
-                if section not in result:
-                    result[section] = {"total": 0, "details": None}
-                result[section]["total"] += value
-        
-        return result
-    
-    structure_j = prepare_buffer_structure(data_j)
-    structure_j1 = prepare_buffer_structure(data_j1)
-    
-    # Récupérer toutes les sections et clients
-    all_sections = set(structure_j.keys()) | set(structure_j1.keys())
-    
-    html = """
-    <table class="table table-bordered buffer-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">LCR Template Section</th>
-                <th rowspan="2" class="align-middle">Libellé Client</th>
-                <th class="text-center header-current">Current (Bn €)</th>
-                <th class="text-center header-variation">Variation (Bn €)</th>
-            </tr>
-            <tr>
-                <th class="text-center header-current">Amount</th>
-                <th class="text-center header-variation">Change</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Générer les lignes
-    for section in sorted(all_sections):
-        section_j = structure_j.get(section, {"total": 0, "details": None})
-        section_j1 = structure_j1.get(section, {"total": 0, "details": None})
-        
-        if section == "1.1- Cash" and section_j.get("details"):
-            # Détail pour 1.1- Cash
-            all_clients = set()
-            if section_j.get("details"):
-                all_clients.update(section_j["details"].keys())
-            if section_j1.get("details"):
-                all_clients.update(section_j1["details"].keys())
-            
-            first_client = True
-            for client in sorted(all_clients):
-                value_j = section_j["details"].get(client, 0) if section_j.get("details") else 0
-                value_j1 = section_j1["details"].get(client, 0) if section_j1.get("details") else 0
-                variation = abs(value_j - value_j1)
-                is_positive = value_j >= value_j1
-                
-                html += '<tr>'
-                if first_client:
-                    html += f'<td rowspan="{len(all_clients)+1}" class="section-cell">{section}</td>'
-                    first_client = False
-                else:
-                    # Pas de cellule section pour les lignes suivantes
-                    pass
-                
-                html += f'<td class="client-cell">{client}</td>'
-                html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
-                
-                # Colonne variation avec indicateur coloré
-                if variation > 0.001:  # Seuil de 1M€
-                    icon = "▲" if is_positive else "▼"
-                    color_class = "text-success" if is_positive else "text-danger"
-                    html += f'<td class="text-end numeric-value {color_class}">{variation:.3f} {icon}</td>'
-                else:
-                    html += f'<td class="text-end numeric-value text-muted">0.000 —</td>'
-                
-                html += '</tr>'
-            
-            # Ligne de total pour 1.1- Cash
-            total_j = section_j["total"]
-            total_j1 = section_j1["total"]
-            total_variation = abs(total_j - total_j1)
-            total_is_positive = total_j >= total_j1
-            
-            html += '<tr class="subtotal-row">'
-            html += f'<td class="fw-bold text-end">Total {section}:</td>'
-            html += f'<td class="text-end fw-bold">{total_j:.3f}</td>'
-            
-            if total_variation > 0.001:
-                icon = "▲" if total_is_positive else "▼"
-                color_class = "text-success" if total_is_positive else "text-danger"
-                html += f'<td class="text-end fw-bold {color_class}">{total_variation:.3f} {icon}</td>'
-            else:
-                html += f'<td class="text-end fw-bold text-muted">0.000 —</td>'
-            
-            html += '</tr>'
-        
-        else:
-            # Total seulement pour les autres sections
-            total_j = section_j["total"]
-            total_j1 = section_j1["total"]
-            variation = abs(total_j - total_j1)
-            is_positive = total_j >= total_j1
-            
-            html += '<tr>'
-            html += f'<td class="section-cell">{section}</td>'
-            html += f'<td class="fw-bold">TOTAL</td>'
-            html += f'<td class="text-end numeric-value">{total_j:.3f}</td>'
-            
-            if variation > 0.001:
-                icon = "▲" if is_positive else "▼"
-                color_class = "text-success" if is_positive else "text-danger"
-                html += f'<td class="text-end numeric-value {color_class}">{variation:.3f} {icon}</td>'
-            else:
-                html += f'<td class="text-end numeric-value text-muted">0.000 —</td>'
-            
-            html += '</tr>'
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
-
-def generate_consumption_filtered_table_html(consumption_data):
-    """
-    Génère le HTML du tableau CONSUMPTION filtré
-    """
-    if len(consumption_data) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse CONSUMPTION</div>"
-    
-    data_j = consumption_data.get("j")
-    data_j1 = consumption_data.get("jMinus1")
-    
-    if data_j is None or data_j1 is None:
-        return "<div class='alert alert-danger'>Erreur: données CONSUMPTION manquantes</div>"
-    
-    # Créer les dictionnaires de lookup
-    lookup_j = data_j.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
-    lookup_j1 = data_j1.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
-    
-    # Récupérer tous les groupes
-    all_groups = set(lookup_j.keys()) | set(lookup_j1.keys())
-    
-    html = """
-    <table class="table table-bordered consumption-filtered-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">LCR Groupe Métiers</th>
-                <th class="text-center header-current">Current (Bn €)</th>
-                <th class="text-center header-variation">Variation (Bn €)</th>
-            </tr>
-            <tr>
-                <th class="text-center header-current">Amount</th>
-                <th class="text-center header-variation">Change</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Générer les lignes
-    total_j = 0
-    total_j1 = 0
-    
-    for group in sorted(all_groups):
-        value_j = lookup_j.get(group, 0)
-        value_j1 = lookup_j1.get(group, 0)
-        variation = abs(value_j - value_j1)
-        is_positive = value_j >= value_j1
-        
-        total_j += value_j
-        total_j1 += value_j1
-        
-        html += '<tr>'
-        html += f'<td class="group-cell">{group}</td>'
-        html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
-        
-        # Colonne variation avec indicateur coloré
-        if variation > 0.001:  # Seuil de 1M€
-            icon = "▲" if is_positive else "▼"
-            color_class = "text-success" if is_positive else "text-danger"
-            html += f'<td class="text-end numeric-value {color_class}">{variation:.3f} {icon}</td>'
-        else:
-            html += f'<td class="text-end numeric-value text-muted">0.000 —</td>'
-        
-        html += '</tr>'
-    
-    # Ligne de total
-    total_variation = abs(total_j - total_j1)
-    total_is_positive = total_j >= total_j1
-    
-    html += '<tr class="total-row">'
-    html += f'<td class="fw-bold">TOTAL GÉNÉRAL:</td>'
-    html += f'<td class="text-end fw-bold">{total_j:.3f}</td>'
-    
-    if total_variation > 0.001:
-        icon = "▲" if total_is_positive else "▼"
-        color_class = "text-success" if total_is_positive else "text-danger"
-        html += f'<td class="text-end fw-bold {color_class}">{total_variation:.3f} {icon}</td>'
-    else:
-        html += f'<td class="text-end fw-bold text-muted">0.000 —</td>'
-    
-    html += '</tr>'
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
 
 def create_balance_sheet_pivot_table(dataframes):
     """
@@ -1543,26 +1136,8 @@ def generate_executive_summary(variations):
         return f"Balance Sheet on {date_str} - Small variations observed (< 100M€)."
 
 
-@app.post("/api/export-pdf")
-async def export_pdf(session_token: Optional[str] = Cookie(None)):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    # Vérifier qu'une analyse existe
-    if not chatbot_session.get("context_data"):
-        raise HTTPException(status_code=400, detail="No analysis available")
-    
-    # Retourner juste l'URL de visualisation
-    return JSONResponse({
-        "success": True,
-        "report_url": "/view-report"
-    })  
-#######################################################################################################################################
+# ========================== FONCTIONS CONSUMPTION ===========================
 
-#                           CONSUMPTION
-
-#######################################################################################################################################
 
 def create_consumption_analysis_grouped_only(dataframes):
     """
@@ -1579,7 +1154,6 @@ def create_consumption_analysis_grouped_only(dataframes):
             logger.info(f"🔄 Traitement Consumption groupé pour {file_type}")
             
             # Vérification des colonnes requises
-            required_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR"]
             missing_cols = [col for col in required_cols if col not in df.columns]
             
             if missing_cols:
@@ -2111,6 +1685,130 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
         return f"At the detailed level: {full_text}."
     
     return ""
+
+
+
+# ========================== FONCTIONS CONTEXTE CHATBOT ===========================
+
+
+def prepare_analysis_context() -> str:
+    """
+    Prépare le contexte détaillé depuis les données sauvegardées
+    """
+    context_parts = []
+    
+    # Contexte métier de base
+    context_parts.append("CONTEXTE MÉTIER:")
+    context_parts.append("- Application d'analyse LCR (Liquidity Coverage Ratio) pour banque")
+    context_parts.append("- Analyse Balance Sheet (ACTIF/PASSIF) en milliards d'euros")
+    context_parts.append("- Analyse Consumption par groupes métiers en milliards")
+    context_parts.append("- Comparaison J vs J-1 (aujourd'hui vs hier)")
+    
+    # Données d'analyse si disponibles
+    if chatbot_session.get("context_data"):
+        data = chatbot_session["context_data"]
+        
+        context_parts.append(f"\nANALYSE EFFECTUÉE LE : {data.get('analysis_timestamp', 'Inconnue')}")
+        
+        # Balance Sheet
+        if data.get("balance_sheet") and not data["balance_sheet"].get("error"):
+            bs = data["balance_sheet"]
+            context_parts.append("\n=== BALANCE SHEET RESULTS ===")
+            context_parts.append(f"Titre: {bs.get('title', 'Balance Sheet')}")
+            
+            if bs.get("variations"):
+                context_parts.append("Variations détaillées:")
+                for category, var_data in bs["variations"].items():
+                    context_parts.append(f"- {category}: D-1 = {var_data['j_minus_1']} Md€, D = {var_data['j']} Md€")
+                    context_parts.append(f"  → Variation = {var_data['variation']} Md€")
+            
+            if bs.get("summary"):
+                context_parts.append(f"Résumé exécutif: {bs['summary']}")
+        
+        # Consumption
+        if data.get("consumption") and not data["consumption"].get("error"):
+            cons = data["consumption"]
+            context_parts.append("\n=== CONSUMPTION LCR RESULTS ===")
+            context_parts.append(f"Titre: {cons.get('title', 'Consumption Analysis')}")
+            
+            # Variation globale
+            if cons.get("variations", {}).get("global"):
+                global_var = cons["variations"]["global"]
+                context_parts.append(f"Consumption total: D-1 = {global_var['j_minus_1']} Md, D = {global_var['j']} Md")
+                context_parts.append(f"Variation globale = {global_var['variation']} Md")
+            
+            # Variations par groupe métier
+            if cons.get("variations", {}).get("by_groupe_metiers"):
+                context_parts.append("\nVariations par groupe métier:")
+                for groupe, var_data in cons["variations"]["by_groupe_metiers"].items():
+                    if abs(var_data["variation"]) > 0.01:  # Seulement les variations > 10M€
+                        context_parts.append(f"- {groupe}: {var_data['variation']} Md (D-1: {var_data['j_minus_1']}, D: {var_data['j']})")
+            
+            # Analyses textuelles
+            if cons.get("analysis_text"):
+                context_parts.append(f"\nAnalyse principale: {cons['analysis_text']}")
+            
+            if cons.get("metier_detailed_analysis"):
+                context_parts.append(f"Analyse détaillée: {cons['metier_detailed_analysis']}")
+            
+            # Groupes significatifs
+            if cons.get("significant_groups"):
+                context_parts.append(f"Groupes avec variations significatives: {', '.join(cons['significant_groups'])}")
+        
+        # Informations sur les fichiers source
+        if data.get("raw_dataframes_info"):
+            context_parts.append("\n=== FICHIERS SOURCE ===")
+            for file_type, info in data["raw_dataframes_info"].items():
+                context_parts.append(f"Fichier {file_type}: {info['shape'][0]} lignes, {info['shape'][1]} colonnes")
+                context_parts.append(f"Colonnes: {', '.join(info['columns'])}")
+                if info.get("sample_data"):
+                    context_parts.append("Échantillon de données:")
+                    for i, row in enumerate(info["sample_data"][:2]):  # 2 premières lignes
+                        context_parts.append(f"  Ligne {i+1}: {str(row)[:200]}...")
+    
+    else:
+        context_parts.append("\nAucune analyse disponible - les analyses doivent être lancées d'abord.")
+    
+    return "\n".join(context_parts)
+
+def prepare_documents_context() -> str:
+    """
+    Prépare le contexte depuis les documents uploadés
+    """
+    if not chatbot_session["uploaded_documents"]:
+        return ""
+    
+    context_parts = []
+    for doc in chatbot_session["uploaded_documents"]:
+        context_parts.append(f"Document: {doc['filename']}")
+        context_parts.append(f"Contenu: {doc['content'][:2000]}...")  # Limiter à 2000 chars
+        context_parts.append("---")
+    
+    return "\n".join(context_parts)
+
+def prepare_conversation_context() -> str:
+    """
+    Prépare le contexte complet incluant analyses + documents + historique
+    """
+    context_parts = []
+    
+    # Contexte des analyses
+    context_parts.append(prepare_analysis_context())
+    
+    # Documents uploadés
+    docs_context = prepare_documents_context()
+    if docs_context:
+        context_parts.append(f"\n\nContext Documents:\n{docs_context}")
+    
+    # Historique de conversation (derniers 10 messages pour éviter de surcharger)
+    if chatbot_session["messages"]:
+        context_parts.append("\n\nHistory of conversation:")
+        for msg in chatbot_session["messages"][-10:]:
+            role = "Utilisateur" if msg["type"] == "user" else "Assistant"
+            context_parts.append(f"{role}: {msg['message']}")
+        context_parts.append("\n--- End of history of conversation ---")
+    
+    return "\n".join(context_parts)
 
 
 if __name__ == "__main__":

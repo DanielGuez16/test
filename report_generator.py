@@ -1,8 +1,6 @@
 # report_generator.py
-import asyncio
 from pathlib import Path
 from datetime import datetime
-import tempfile
 import os
 import json
 import base64
@@ -13,10 +11,13 @@ class ReportGenerator:
         self.last_ai_response = last_ai_response
         self.timestamp = datetime.now()
         self.chart_images = {}  # Stockage des images de graphiques
-    
-    def generate_export_html(self):
-        """Génère le HTML pour export avec CSS inline"""
-        css = self._get_inline_css()
+
+    # ========================== FONCTIONS PRINCIPALES ===========================
+
+
+    def generate_print_html(self):
+        """HTML avec CSS optimisé pour impression navigateur"""
+        print_css = self._get_print_css()
         
         html = f"""
         <!DOCTYPE html>
@@ -24,9 +25,18 @@ class ReportGenerator:
         <head>
             <meta charset="UTF-8">
             <title>LCR Analysis Report - {self.timestamp.strftime('%Y-%m-%d')}</title>
-            <style>{css}</style>
+            <style>{print_css}</style>
         </head>
         <body>
+            <!-- WARNING EN HAUT DE PAGE -->
+            <div class="print-warning no-print">
+                <div class="warning-content">
+                    <h3>⚠️ IMPORTANT - To export to PDF</h3>
+                    <p><strong>Press Ctrl+P then check "Background Graphics"</strong><br>
+                    Otherwise, tables and graphs will not have the right visual in the PDF.</p>
+                </div>
+            </div>
+            
             <div class="report-container">
                 {self._generate_header()}
                 {self._generate_balance_sheet_section()}
@@ -34,11 +44,86 @@ class ReportGenerator:
                 {self._generate_ai_analysis_section()}
                 {self._generate_footer()}
             </div>
+            
+            <!-- Bouton d'impression -->
+            <div class="no-print print-controls">
+                <button onclick="window.print()" class="print-btn">
+                    📄 Export to PDF
+                </button>
+            </div>
         </body>
         </html>
         """
         return html
+
+    def capture_charts_with_html2image(self):
+        """Version synchrone de la capture des graphiques"""
+        cons = self.analysis_results.get("consumption", {})
+        significant_groups = cons.get("significant_groups", [])
+        metier_details = cons.get("metier_details", {})
+        
+        if not significant_groups or not metier_details:
+            print("Pas de groupes significatifs ou données métier")
+            return {}
+        
+        print(f"Capture de {len(significant_groups)} graphiques: {significant_groups}")
+        
+        try:
+            from html2image import Html2Image
+            
+            # Initialiser Html2Image
+            hti = Html2Image()
+            hti.size = (1000, 500)
+            
+            chart_images = {}
+            
+            # Capturer chaque graphique
+            for i, groupe in enumerate(significant_groups):
+                try:
+                    # HTML spécifique pour ce graphique
+                    single_chart_html = self._generate_single_chart_html(groupe, metier_details, i)
+                    
+                    # Fichier temporaire
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                        temp_file.write(single_chart_html)
+                        temp_file_path = temp_file.name
+                    
+                    # Capturer
+                    screenshot_files = hti.screenshot(
+                        html_file=temp_file_path,
+                        save_as=f'chart_{i}_{groupe.replace(" ", "_")}.png',
+                        size=(1000, 500)
+                    )
+                    
+                    # Encoder en base64
+                    if screenshot_files:
+                        chart_path = os.path.join(hti.output_path, screenshot_files[0])
+                        if os.path.exists(chart_path):
+                            with open(chart_path, 'rb') as img_file:
+                                chart_images[groupe] = base64.b64encode(img_file.read()).decode()
+                                print(f"Graphique capturé: {groupe}")
+                    
+                    # Nettoyer
+                    os.unlink(temp_file_path)
+                    
+                except Exception as e:
+                    print(f"Erreur capture graphique {groupe}: {e}")
+            
+            print(f"Capture terminée: {len(chart_images)} graphiques")
+            return chart_images
+            
+        except ImportError:
+            print("Html2Image non installé: pip install html2image")
+            return {}
+        except Exception as e:
+            print(f"Erreur Html2Image: {e}")
+            return {}
     
+
+    # ========================== FONCTIONS GÉNÉRATIONS HTML ===========================
+
+
     def _generate_header(self):
         return f"""
         <div class="report-header">
@@ -178,6 +263,18 @@ class ReportGenerator:
         </div>
         """
     
+    def _generate_footer(self):
+        return f"""
+        <div class="report-footer">
+            <p>Generated by Steering ALM Metrics Tool</p>
+            <p>Report ID: {self.timestamp.strftime('%Y%m%d_%H%M%S')}</p>
+        </div>
+        """
+    
+    
+    # ========================== FONCTIONS SPÉCIALISÉES ===========================
+
+
     def _generate_variations_cards(self, variations):
         """Génère les cartes de variations Balance Sheet comme dans l'interface"""
         html = '<div class="balance-variations-container">'
@@ -224,6 +321,195 @@ class ReportGenerator:
         html += '</div>'
         return html
 
+    def _generate_single_chart_html(self, groupe, metier_details, index):
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+            <style>
+                body {{ margin: 0; padding: 20px; background: white; }}
+                .chart-container {{ 
+                    width: 960px;
+                    height: 460px;
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 20px;
+                }}
+                h3 {{ 
+                    color: #76279b; 
+                    text-align: center; 
+                    margin-bottom: 20px; 
+                    font-size: 18px;
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="chart-container">
+                <h3>{groupe}</h3>
+                <canvas id="chart_{index}" width="920" height="420"></canvas>
+            </div>
+            
+            <script>
+                const metierDetails = {json.dumps(metier_details)};
+                
+                function prepareMetierChartData(groupe, metierDetails) {{
+                    try {{
+                        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+                        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
+                        
+                        if (dataJ.length === 0 && dataJ1.length === 0) {{
+                            return null;
+                        }}
+                        
+                        const metiersMap = new Map();
+                        
+                        dataJ1.forEach(item => {{
+                            metiersMap.set(item.Métier, {{
+                                metier: item.Métier,
+                                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
+                                j: 0
+                            }});
+                        }});
+                        
+                        dataJ.forEach(item => {{
+                            if (metiersMap.has(item.Métier)) {{
+                                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
+                            }} else {{
+                                metiersMap.set(item.Métier, {{
+                                    metier: item.Métier,
+                                    j_minus_1: 0,
+                                    j: item.LCR_ECO_IMPACT_LCR_Bn
+                                }});
+                            }}
+                        }});
+                        
+                        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({{
+                            metier: metier,
+                            variation: data.j - data.j_minus_1,
+                            j: data.j,
+                            j_minus_1: data.j_minus_1
+                        }}));
+                        
+                        metierVariations.sort((a, b) => b.variation - a.variation);
+                        
+                        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
+                        
+                        let labels = [];
+                        let variations = [];
+                        
+                        if (totalVariation >= 0) {{
+                            labels.push('TOTAL GROUP');
+                            variations.push(totalVariation);
+                            
+                            metierVariations.forEach(item => {{
+                                labels.push(item.metier);
+                                variations.push(item.variation);
+                            }});
+                        }} else {{
+                            metierVariations.forEach(item => {{
+                                labels.push(item.metier);
+                                variations.push(item.variation);
+                            }});
+                            
+                            labels.push('TOTAL GROUP');
+                            variations.push(totalVariation);
+                        }}
+                        
+                        return {{
+                            labels: labels,
+                            datasets: [{{
+                                label: 'Variation (D - D-1)',
+                                data: variations,
+                                backgroundColor: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    if (isTotalBar) {{
+                                        return '#6B218D';
+                                    }}
+                                    return v >= 0 ? '#51A0A2' : '#805bed';
+                                }}),
+                                borderColor: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    if (isTotalBar) {{
+                                        return '#6B218D';
+                                    }}
+                                    return v >= 0 ? '#51A0A2' : '#805bed';
+                                }}),
+                                borderWidth: variations.map((v, index) => {{
+                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
+                                    return isTotalBar ? 3 : 2;
+                                }})
+                            }}]
+                        }};
+                        
+                    }} catch (error) {{
+                        console.error('Erreur préparation données pour', groupe, ':', error);
+                        return null;
+                    }}
+                }}
+                
+                const chartData = prepareMetierChartData('{groupe}', metierDetails);
+                
+                if (chartData) {{
+                    new Chart(document.getElementById('chart_{index}'), {{
+                        type: 'bar',
+                        data: chartData,
+                        options: {{
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            plugins: {{
+                                title: {{
+                                    display: true,
+                                    text: 'LCR variations detailed for - {groupe}',
+                                    font: {{ size: 16, weight: 'bold' }}
+                                }},
+                                legend: {{
+                                    display: true,
+                                    position: 'top',
+                                    labels: {{ font: {{ size: 12 }} }}
+                                }}
+                            }},
+                            scales: {{
+                                y: {{
+                                    beginAtZero: false,
+                                    title: {{
+                                        display: true,
+                                        text: 'LCR Impact (Bn €)',
+                                        font: {{ size: 14 }}
+                                    }},
+                                    ticks: {{ font: {{ size: 12 }} }},
+                                    grid: {{ color: 'rgba(0,0,0,0.1)' }}
+                                }},
+                                x: {{
+                                    ticks: {{ 
+                                        font: {{ size: 11 }},
+                                        maxRotation: 45,
+                                        minRotation: 0
+                                    }}
+                                }}
+                            }},
+                            elements: {{
+                                bar: {{ borderWidth: 2 }}
+                            }}
+                        }}
+                    }});
+                }}
+                
+                setTimeout(() => {{
+                    document.body.classList.add('chart-ready');
+                }}, 2000);
+            </script>
+        </body>
+        </html>
+        """
+
+
+    # ========================== FONCTIONS UTILITAIRES ===========================
+
+
     def _markdown_to_simple_html(self, text):
         """Conversion markdown simple vers HTML pour PDF"""
         import re
@@ -235,14 +521,6 @@ class ReportGenerator:
         text = f'<p>{text}</p>'
         
         return text
-    
-    def _generate_footer(self):
-        return f"""
-        <div class="report-footer">
-            <p>Generated by Steering ALM Metrics Tool</p>
-            <p>Report ID: {self.timestamp.strftime('%Y%m%d_%H%M%S')}</p>
-        </div>
-        """
     
     def _get_inline_css(self):
         """CSS optimisé pour l'impression PDF avec support des graphiques"""
@@ -572,136 +850,6 @@ class ReportGenerator:
 
         """
 
-    def export_to_html_for_print(self, output_path):
-        """Génère HTML avec graphiques capturés pour impression"""
-        try:
-            print("Début génération HTML avec capture graphiques")
-            
-            # ÉTAPE 1: Capturer les graphiques d'abord
-            self.chart_images = self.capture_charts_with_html2image()
-            print(f"Graphiques capturés: {len(self.chart_images)}")
-            
-            # ÉTAPE 2: Générer HTML avec graphiques inclus
-            html_content = self.generate_print_html()
-            
-            # Sauvegarder en .html
-            html_path = output_path.replace('.pdf', '.html')
-            with open(html_path, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            print(f"HTML généré avec graphiques: {html_path}")
-            return html_path
-            
-        except Exception as e:
-            print(f"Erreur génération HTML: {e}")
-            raise
-
-    def capture_charts_with_html2image(self):
-        """Version synchrone de la capture des graphiques"""
-        cons = self.analysis_results.get("consumption", {})
-        significant_groups = cons.get("significant_groups", [])
-        metier_details = cons.get("metier_details", {})
-        
-        if not significant_groups or not metier_details:
-            print("Pas de groupes significatifs ou données métier")
-            return {}
-        
-        print(f"Capture de {len(significant_groups)} graphiques: {significant_groups}")
-        
-        try:
-            from html2image import Html2Image
-            
-            # Initialiser Html2Image
-            hti = Html2Image()
-            hti.size = (1000, 500)
-            
-            chart_images = {}
-            
-            # Capturer chaque graphique
-            for i, groupe in enumerate(significant_groups):
-                try:
-                    # HTML spécifique pour ce graphique
-                    single_chart_html = self._generate_single_chart_html(groupe, metier_details, i)
-                    
-                    # Fichier temporaire
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
-                        temp_file.write(single_chart_html)
-                        temp_file_path = temp_file.name
-                    
-                    # Capturer
-                    screenshot_files = hti.screenshot(
-                        html_file=temp_file_path,
-                        save_as=f'chart_{i}_{groupe.replace(" ", "_")}.png',
-                        size=(1000, 500)
-                    )
-                    
-                    # Encoder en base64
-                    if screenshot_files:
-                        chart_path = os.path.join(hti.output_path, screenshot_files[0])
-                        if os.path.exists(chart_path):
-                            with open(chart_path, 'rb') as img_file:
-                                chart_images[groupe] = base64.b64encode(img_file.read()).decode()
-                                print(f"Graphique capturé: {groupe}")
-                    
-                    # Nettoyer
-                    os.unlink(temp_file_path)
-                    
-                except Exception as e:
-                    print(f"Erreur capture graphique {groupe}: {e}")
-            
-            print(f"Capture terminée: {len(chart_images)} graphiques")
-            return chart_images
-            
-        except ImportError:
-            print("Html2Image non installé: pip install html2image")
-            return {}
-        except Exception as e:
-            print(f"Erreur Html2Image: {e}")
-            return {}
-    
-    def generate_print_html(self):
-        """HTML avec CSS optimisé pour impression navigateur"""
-        print_css = self._get_print_css()
-        
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>LCR Analysis Report - {self.timestamp.strftime('%Y-%m-%d')}</title>
-            <style>{print_css}</style>
-        </head>
-        <body>
-            <!-- WARNING EN HAUT DE PAGE -->
-            <div class="print-warning no-print">
-                <div class="warning-content">
-                    <h3>⚠️ IMPORTANT - To export to PDF</h3>
-                    <p><strong>Press Ctrl+P then check "Background Graphics"</strong><br>
-                    Otherwise, tables and graphs will not have the right visual in the PDF.</p>
-                </div>
-            </div>
-            
-            <div class="report-container">
-                {self._generate_header()}
-                {self._generate_balance_sheet_section()}
-                {self._generate_consumption_section()}
-                {self._generate_ai_analysis_section()}
-                {self._generate_footer()}
-            </div>
-            
-            <!-- Bouton d'impression -->
-            <div class="no-print print-controls">
-                <button onclick="window.print()" class="print-btn">
-                    📄 Export to PDF
-                </button>
-            </div>
-        </body>
-        </html>
-        """
-        return html
-
-
     def _get_print_css(self):
         """CSS optimisé pour impression PDF navigateur"""
         return """
@@ -833,188 +981,3 @@ class ReportGenerator:
         
         """ + self._get_inline_css()
 
-
-    def _generate_single_chart_html(self, groupe, metier_details, index):
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-            <style>
-                body {{ margin: 0; padding: 20px; background: white; }}
-                .chart-container {{ 
-                    width: 960px;
-                    height: 460px;
-                    margin: 0 auto; 
-                    background: white; 
-                    padding: 20px;
-                }}
-                h3 {{ 
-                    color: #76279b; 
-                    text-align: center; 
-                    margin-bottom: 20px; 
-                    font-size: 18px;
-                    font-weight: bold;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="chart-container">
-                <h3>{groupe}</h3>
-                <canvas id="chart_{index}" width="920" height="420"></canvas>
-            </div>
-            
-            <script>
-                const metierDetails = {json.dumps(metier_details)};
-                
-                function prepareMetierChartData(groupe, metierDetails) {{
-                    try {{
-                        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
-                        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
-                        
-                        if (dataJ.length === 0 && dataJ1.length === 0) {{
-                            return null;
-                        }}
-                        
-                        const metiersMap = new Map();
-                        
-                        dataJ1.forEach(item => {{
-                            metiersMap.set(item.Métier, {{
-                                metier: item.Métier,
-                                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
-                                j: 0
-                            }});
-                        }});
-                        
-                        dataJ.forEach(item => {{
-                            if (metiersMap.has(item.Métier)) {{
-                                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
-                            }} else {{
-                                metiersMap.set(item.Métier, {{
-                                    metier: item.Métier,
-                                    j_minus_1: 0,
-                                    j: item.LCR_ECO_IMPACT_LCR_Bn
-                                }});
-                            }}
-                        }});
-                        
-                        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({{
-                            metier: metier,
-                            variation: data.j - data.j_minus_1,
-                            j: data.j,
-                            j_minus_1: data.j_minus_1
-                        }}));
-                        
-                        metierVariations.sort((a, b) => b.variation - a.variation);
-                        
-                        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
-                        
-                        let labels = [];
-                        let variations = [];
-                        
-                        if (totalVariation >= 0) {{
-                            labels.push('TOTAL GROUP');
-                            variations.push(totalVariation);
-                            
-                            metierVariations.forEach(item => {{
-                                labels.push(item.metier);
-                                variations.push(item.variation);
-                            }});
-                        }} else {{
-                            metierVariations.forEach(item => {{
-                                labels.push(item.metier);
-                                variations.push(item.variation);
-                            }});
-                            
-                            labels.push('TOTAL GROUP');
-                            variations.push(totalVariation);
-                        }}
-                        
-                        return {{
-                            labels: labels,
-                            datasets: [{{
-                                label: 'Variation (D - D-1)',
-                                data: variations,
-                                backgroundColor: variations.map((v, index) => {{
-                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
-                                    if (isTotalBar) {{
-                                        return '#6B218D';
-                                    }}
-                                    return v >= 0 ? '#51A0A2' : '#805bed';
-                                }}),
-                                borderColor: variations.map((v, index) => {{
-                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
-                                    if (isTotalBar) {{
-                                        return '#6B218D';
-                                    }}
-                                    return v >= 0 ? '#51A0A2' : '#805bed';
-                                }}),
-                                borderWidth: variations.map((v, index) => {{
-                                    const isTotalBar = labels[index] === 'TOTAL GROUP';
-                                    return isTotalBar ? 3 : 2;
-                                }})
-                            }}]
-                        }};
-                        
-                    }} catch (error) {{
-                        console.error('Erreur préparation données pour', groupe, ':', error);
-                        return null;
-                    }}
-                }}
-                
-                const chartData = prepareMetierChartData('{groupe}', metierDetails);
-                
-                if (chartData) {{
-                    new Chart(document.getElementById('chart_{index}'), {{
-                        type: 'bar',
-                        data: chartData,
-                        options: {{
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            animation: false,
-                            plugins: {{
-                                title: {{
-                                    display: true,
-                                    text: 'LCR variations detailed for - {groupe}',
-                                    font: {{ size: 16, weight: 'bold' }}
-                                }},
-                                legend: {{
-                                    display: true,
-                                    position: 'top',
-                                    labels: {{ font: {{ size: 12 }} }}
-                                }}
-                            }},
-                            scales: {{
-                                y: {{
-                                    beginAtZero: false,
-                                    title: {{
-                                        display: true,
-                                        text: 'LCR Impact (Bn €)',
-                                        font: {{ size: 14 }}
-                                    }},
-                                    ticks: {{ font: {{ size: 12 }} }},
-                                    grid: {{ color: 'rgba(0,0,0,0.1)' }}
-                                }},
-                                x: {{
-                                    ticks: {{ 
-                                        font: {{ size: 11 }},
-                                        maxRotation: 45,
-                                        minRotation: 0
-                                    }}
-                                }}
-                            }},
-                            elements: {{
-                                bar: {{ borderWidth: 2 }}
-                            }}
-                        }}
-                    }});
-                }}
-                
-                setTimeout(() => {{
-                    document.body.classList.add('chart-ready');
-                }}, 2000);
-            </script>
-        </body>
-        </html>
-        """
