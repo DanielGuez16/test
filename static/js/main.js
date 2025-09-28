@@ -499,15 +499,27 @@ function displayCompleteResults(analysisResults) {
         
         let html = '';
         
-        // Section Balance Sheet
-        if (analysisResults.balance_sheet) {
-            html += generateBalanceSheetSection(analysisResults.balance_sheet);
-        }
+        // // Section Balance Sheet
+        // if (analysisResults.balance_sheet) {
+        //     html += generateBalanceSheetSection(analysisResults.balance_sheet);
+        // }
         
-        // Section Consumption
-        if (analysisResults.consumption) {
-            html += generateConsumptionSection(analysisResults.consumption);
+        // // Section Consumption
+        // if (analysisResults.consumption) {
+        //     html += generateConsumptionSection(analysisResults.consumption);
+        // }
+
+
+        // Section Buffer
+        if (analysisResults.buffer) {
+            html += generateBufferSection(analysisResults.buffer);
         }
+
+        // Section Consumption v2
+        if (analysisResults.consumption_v2) {
+            html += generateConsumptionV2Section(analysisResults.consumption_v2);
+        }
+
 
     html += `
     <div class="text-center my-4">
@@ -858,6 +870,120 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
     return html;
 }
 
+/**
+ * Génère la section BUFFER
+ */
+function generateBufferSection(bufferData) {
+    if (bufferData.error) {
+        return `
+            <div class="analysis-section">
+                <div class="alert alert-danger">
+                    <h5>Erreur BUFFER</h5>
+                    <p>${bufferData.error}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="analysis-section fade-in-up">
+            <div class="card border-0">
+                <div class="card-header no-background">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 style="color: #76279b;" class="mb-1">${bufferData.title || '1. BUFFER Analysis'}</h2>
+                            <small class="text-muted">LCR_Catégorie: 1- Buffer | Top Conso = O</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-container">
+                        ${bufferData.table_html || '<p class="p-3">Données non disponibles</p>'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Trait de séparation à la fin 
+    html += `
+        <div class="analysis-section">
+            <hr class="balance-sheet-separator">
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
+ * Génère la section CONSUMPTION v2
+ */
+function generateConsumptionV2Section(consumptionData) {
+    if (consumptionData.error) {
+        return `
+            <div class="analysis-section">
+                <div class="alert alert-danger">
+                    <h5>Erreur CONSUMPTION</h5>
+                    <p>${consumptionData.error}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="analysis-section fade-in-up">
+            <div class="card border-0">
+                <div class="card-header no-background">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 style="color: #76279b;" class="mb-1">${consumptionData.title || '2. CONSUMPTION Analysis'}</h2>
+                            <small class="text-muted">
+                                Groupes: A&WM & Insurance, CIB Financing, CIB Markets, GLOBAL TRADE, Other Consumption | 
+                                Exclusions: GT TREASURY/GROUP SERVICES, SIGHT DEPOSIT/FINANCING MIRROR
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-container">
+                        ${consumptionData.table_html || '<p class="p-3">Données non disponibles</p>'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Légende pour les indicateurs visuels
+    html += `
+        <div class="analysis-section fade-in-up">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-center align-items-center">
+                            <small class="me-4">
+                                <i class="fas fa-arrow-up text-success me-1"></i>
+                                <strong class="text-success">Augmentation</strong>
+                            </small>
+                            <small>
+                                <i class="fas fa-arrow-down text-danger me-1"></i>
+                                <strong class="text-danger">Diminution</strong>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Trait de séparation à la fin 
+    html += `
+        <div class="analysis-section">
+            <hr class="balance-sheet-separator">
+        </div>
+    `;
+    
+    return html;
+}
 
 // ================================= GRAPHIQUES =================================
 

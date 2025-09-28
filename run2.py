@@ -551,16 +551,20 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
         
-        # Analyses
-        balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
-        consumption_results = create_consumption_analysis_grouped_only(dataframes)
-        
+        # # Analyses (ANCIEN VISUEL)
+        # balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
+        # consumption_results = create_consumption_analysis_grouped_only(dataframes)
+
+        # Nouvelles analyses
+        buffer_results = create_buffer_analysis(dataframes)
+        consumption_v2_results = create_consumption_v2_analysis(dataframes)
+
         logger.info("Analyses terminées (traitement mémoire)")
 
         # SAUVEGARDER LE CONTEXTE CHATBOT AVANT LA RÉPONSE
         chatbot_session["context_data"] = {
-            "balance_sheet": balance_sheet_results,
-            "consumption": consumption_results,
+            "buffer": buffer_results,
+            "consumption": consumption_v2_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -586,8 +590,8 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             "timestamp": datetime.now().isoformat(),
             "context_ready": True,  
             "results": {
-                "balance_sheet": balance_sheet_results,
-                "consumption": consumption_results
+                "buffer": buffer_results,
+                "consumption": consumption_v2_results
             }
         }
         
@@ -1686,6 +1690,301 @@ def generate_metier_detailed_analysis(significant_groups, dataframes=None):
     
     return ""
 
+
+# ========================== FONCTIONS BUFFER + CONSUMPTION ===========================
+
+
+def create_buffer_analysis(dataframes):
+    """Créé l'analyse BUFFER avec filtres spécifiques"""
+    try:
+        logger.info("💼 Création de l'analyse BUFFER")
+        
+        buffer_data = {}
+        
+        for file_type, df in dataframes.items():
+            # Filtres : Top Conso = "O" ET LCR_Catégorie = "1- Buffer"
+            df_filtered = df[
+                (df["Top Conso"] == "O") & 
+                (df["LCR_Catégorie"] == "1- Buffer")
+            ].copy()
+            
+            if len(df_filtered) == 0:
+                continue
+                
+            # Préparation des données numériques
+            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            # Groupement par LCR_Template Section 1 et Libellé Client
+            grouped = df_filtered.groupby(["LCR_Template Section 1", "Libellé Client"])["LCR_Assiette Pondérée"].sum().reset_index()
+            
+            buffer_data[file_type] = grouped
+            
+        # Générer le HTML
+        buffer_html = generate_buffer_table_html(buffer_data)
+        
+        return {
+            "title": "1. BUFFER Analysis",
+            "table_html": buffer_html,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "lcr_categorie": "1- Buffer"
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"⌀ Erreur création analyse BUFFER: {e}")
+        return {"title": "BUFFER - Erreur", "error": str(e)}
+
+def create_consumption_v2_analysis(dataframes):
+    """Créé l'analyse CONSUMPTION v2 avec filtres spécifiques"""
+    try:
+        logger.info("💼 Création de l'analyse CONSUMPTION v2")
+        
+        consumption_data = {}
+        
+        for file_type, df in dataframes.items():
+            # Filtres multiples
+            df_filtered = df[
+                (df["Top Conso"] == "O") & 
+                (df["LCR_ECO_GROUPE_METIERS"].isin([
+                    "A&WM & Insurance", "CIB Financing", "CIB Markets", 
+                    "GLOBAL TRADE", "Other Consumption"
+                ])) &
+                (~df["Sous-Métier"].isin(["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"])) &
+                (~df["Produit"].isin(["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]))
+            ].copy()
+            
+            if len(df_filtered) == 0:
+                continue
+                
+            # Préparation des données numériques
+            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
+                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
+            ).fillna(0)
+            
+            # Groupement par LCR_ECO_GROUPE_METIERS
+            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+            
+            consumption_data[file_type] = grouped
+            
+        # Générer le HTML
+        consumption_html = generate_consumption_v2_table_html(consumption_data)
+        
+        return {
+            "title": "2. CONSUMPTION Analysis",
+            "table_html": consumption_html,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "groupe_metiers": ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"],
+                    "excluded_sous_metier": ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"],
+                    "excluded_produit": ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"⌀ Erreur création analyse CONSUMPTION v2: {e}")
+        return {"title": "CONSUMPTION v2 - Erreur", "error": str(e)}
+
+def generate_buffer_table_html(buffer_data):
+    """Génère le HTML pour le tableau BUFFER"""
+    if len(buffer_data) < 2:
+        return "<div class='alert alert-warning'>Données insuffisantes pour BUFFER</div>"
+    
+    data_j = buffer_data.get("j")
+    data_j1 = buffer_data.get("jMinus1")
+    
+    if data_j is None or data_j1 is None:
+        return "<div class='alert alert-danger'>Données BUFFER manquantes</div>"
+    
+    # Créer des dictionnaires de lookup par (Section, Libellé)
+    lookup_j = {}
+    lookup_j1 = {}
+    
+    for _, row in data_j.iterrows():
+        key = (row["LCR_Template Section 1"], row["Libellé Client"])
+        lookup_j[key] = row["LCR_Assiette Pondérée"]
+    
+    for _, row in data_j1.iterrows():
+        key = (row["LCR_Template Section 1"], row["Libellé Client"])
+        lookup_j1[key] = row["LCR_Assiette Pondérée"]
+    
+    # Fusionner toutes les clés uniques
+    all_keys = set(lookup_j.keys()) | set(lookup_j1.keys())
+    
+    html = """
+    <table class="table table-bordered buffer-table">
+        <thead>
+            <tr>
+                <th>LCR Template Section 1</th>
+                <th>Libellé Client</th>
+                <th class="text-center">LCR Assiette Pondérée (Bn €)</th>
+                <th class="text-center">Variation (Bn €)</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    # Grouper par Section pour gérer l'affichage détaillé/résumé
+    sections_data = {}
+    for (section, libelle) in all_keys:
+        if section not in sections_data:
+            sections_data[section] = []
+        
+        value_j = lookup_j.get((section, libelle), 0) / 1_000_000_000  # Conversion en milliards
+        value_j1 = lookup_j1.get((section, libelle), 0) / 1_000_000_000
+        variation = value_j - value_j1
+        
+        sections_data[section].append({
+            'libelle': libelle,
+            'value_j': value_j,
+            'value_j1': value_j1,
+            'variation': variation
+        })
+    
+    # Générer les lignes
+    for section, items in sorted(sections_data.items()):
+        if section == "1.1- Cash":
+            # Affichage détaillé pour 1.1- Cash
+            for item in sorted(items, key=lambda x: x['libelle']):
+                css_class = "variation-positive" if item['variation'] > 0 else "variation-negative" if item['variation'] < 0 else ""
+                sign = "+" if item['variation'] > 0 else ""
+                
+                html += f"""
+                <tr>
+                    <td>{section}</td>
+                    <td>{item['libelle']}</td>
+                    <td class="text-end numeric-value">{item['value_j']:.3f}</td>
+                    <td class="text-end numeric-value {css_class}">{sign}{item['variation']:.3f}</td>
+                </tr>
+                """
+        else:
+            # Affichage des totaux seulement pour les autres sections
+            total_j = sum(item['value_j'] for item in items)
+            total_variation = sum(item['variation'] for item in items)
+            
+            css_class = "variation-positive" if total_variation > 0 else "variation-negative" if total_variation < 0 else ""
+            sign = "+" if total_variation > 0 else ""
+            
+            html += f"""
+            <tr>
+                <td><strong>{section}</strong></td>
+                <td><em>Total</em></td>
+                <td class="text-end numeric-value"><strong>{total_j:.3f}</strong></td>
+                <td class="text-end numeric-value {css_class}"><strong>{sign}{total_variation:.3f}</strong></td>
+            </tr>
+            """
+    
+    html += """
+        </tbody>
+    </table>
+    """
+    
+    return html
+
+def generate_consumption_v2_table_html(consumption_data):
+    """Génère le HTML pour le tableau CONSUMPTION v2"""
+    if len(consumption_data) < 2:
+        return "<div class='alert alert-warning'>Données insuffisantes pour CONSUMPTION v2</div>"
+    
+    data_j = consumption_data.get("j")
+    data_j1 = consumption_data.get("jMinus1")
+    
+    if data_j is None or data_j1 is None:
+        return "<div class='alert alert-danger'>Données CONSUMPTION v2 manquantes</div>"
+    
+    # Créer des dictionnaires de lookup par groupe métier
+    lookup_j = data_j.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].to_dict()
+    lookup_j1 = data_j1.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].to_dict()
+    
+    # Fusionner tous les groupes
+    all_groups = set(lookup_j.keys()) | set(lookup_j1.keys())
+    
+    html = """
+    <table class="table table-bordered consumption-v2-table">
+        <thead>
+            <tr>
+                <th>Groupe Métiers</th>
+                <th class="text-center">LCR Impact (Bn €)</th>
+                <th class="text-center">Variation</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    total_j = 0
+    total_j1 = 0
+    
+    # Générer les lignes pour chaque groupe
+    for groupe in sorted(all_groups):
+        value_j = lookup_j.get(groupe, 0) / 1_000_000_000  # Conversion en milliards
+        value_j1 = lookup_j1.get(groupe, 0) / 1_000_000_000
+        variation = value_j - value_j1
+        
+        total_j += value_j
+        total_j1 += value_j1
+        
+        # Valeur absolue et indicateur visuel
+        abs_variation = abs(variation)
+        if variation > 0:
+            indicator = '<i class="fas fa-arrow-up text-success me-1"></i>'
+            variation_class = 'text-success'
+        elif variation < 0:
+            indicator = '<i class="fas fa-arrow-down text-danger me-1"></i>'
+            variation_class = 'text-danger'
+        else:
+            indicator = '<i class="fas fa-minus text-muted me-1"></i>'
+            variation_class = 'text-muted'
+        
+        html += f"""
+        <tr>
+            <td><strong>{groupe}</strong></td>
+            <td class="text-end numeric-value">{value_j:.3f}</td>
+            <td class="text-center {variation_class}">
+                {indicator}
+                <strong>{abs_variation:.3f} Bn</strong>
+            </td>
+        </tr>
+        """
+    
+    # Ligne de total
+    total_variation = total_j - total_j1
+    abs_total_variation = abs(total_variation)
+    
+    if total_variation > 0:
+        total_indicator = '<i class="fas fa-arrow-up text-success me-1"></i>'
+        total_class = 'text-success'
+    elif total_variation < 0:
+        total_indicator = '<i class="fas fa-arrow-down text-danger me-1"></i>'
+        total_class = 'text-danger'
+    else:
+        total_indicator = '<i class="fas fa-minus text-muted me-1"></i>'
+        total_class = 'text-muted'
+    
+    html += f"""
+        <tr class="total-row">
+            <td class="text-end"><strong>TOTAL:</strong></td>
+            <td class="text-end"><strong>{total_j:.3f}</strong></td>
+            <td class="text-center {total_class}">
+                {total_indicator}
+                <strong>{abs_total_variation:.3f} Bn</strong>
+            </td>
+        </tr>
+    """
+    
+    html += """
+        </tbody>
+    </table>
+    """
+    
+    return html
 
 
 # ========================== FONCTIONS CONTEXTE CHATBOT ===========================
