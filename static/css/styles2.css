@@ -745,3 +745,74 @@ body {
     font-family: 'Courier New', monospace;
     text-align: right;
 }
+
+/* Styles pour les nouveaux tableaux */
+.new-table { 
+    font-size: 13px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.new-table th { 
+    background: #bf7cde;
+    color: white; 
+    font-weight: 600; 
+    text-align: center; 
+    padding: 12px 8px; 
+    border: none;
+}
+
+.new-table td { 
+    padding: 8px; 
+    border: 1px solid #e0e6ed; 
+    vertical-align: middle;
+}
+
+.variation-indicator {
+    margin-left: 5px;
+    font-size: 12px;
+}
+
+.variation-indicator.positive {
+    color: #28a745;
+}
+
+.variation-indicator.negative {
+    color: #dc3545;
+}
+
+.new-table tbody tr:hover {
+    background-color: rgba(0, 102, 204, 0.05);
+    transition: background-color 0.2s ease;
+}
+
+/* Styles pour la hiérarchie dans les tableaux */
+.section-header {
+    background: rgba(118, 39, 155, 0.1) !important;
+    border-left: 4px solid var(--natixis-blue) !important;
+}
+
+.section-header td {
+    font-weight: 600 !important;
+    color: var(--natixis-blue) !important;
+}
+
+.detail-row {
+    background: rgba(248, 249, 250, 0.5);
+}
+
+.detail-row td:first-child {
+    font-size: 0.9em;
+    color: #6c757d;
+    border-left: 2px solid var(--natixis-light-blue);
+}
+
+.detail-row:hover {
+    background: rgba(171, 84, 212, 0.05) !important;
+}
+
+/* Amélioration du padding pour l'indentation */
+.ps-4 {
+    padding-left: 2rem !important;
+}

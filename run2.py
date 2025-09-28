@@ -56,8 +56,9 @@ required_dirs = ["data", "templates", "static", "static/js", "static/css", "stat
 for directory in required_dirs:
     Path(directory).mkdir(exist_ok=True)
 
-required_cols = ["Top Conso", "Réaffectation", "Groupe De Produit", "Nominal Value", 
-                "LCR_ECO_GROUPE_METIERS", "LCR_ECO_IMPACT_LCR", "Métier", "Sous-Métier"]
+required_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", "Libellé Client", 
+                "LCR_Assiette Pondérée", "LCR_ECO_GROUPE_METIERS", "Sous-Métier", "Produit", 
+                "LCR_ECO_IMPACT_LCR", "SI Remettant", "Commentaire", "Date d'arrêté"]
 
 # Création de l'application FastAPI
 app = FastAPI(title="Steering ALM Metrics", version="2.0.0")
@@ -550,21 +551,23 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             df = file_info["dataframe"]  # DataFrame déjà en mémoire
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
-        
-        # # Analyses (ANCIEN VISUEL)
-        # balance_sheet_results = create_balance_sheet_pivot_table(dataframes)
-        # consumption_results = create_consumption_analysis_grouped_only(dataframes)
 
         # Nouvelles analyses
-        buffer_results = create_buffer_analysis(dataframes)
-        consumption_v2_results = create_consumption_v2_analysis(dataframes)
+        buffer_results = create_buffer_table(dataframes)
+        consumption_results = create_consumption_table(dataframes)
+        resources_results = create_resources_table(dataframes)
+        cappage_results = create_cappage_table(dataframes)
+        buffer_nco_results = create_buffer_nco_table(dataframes)
+        
+        logger.info("Analyses terminées (nouveaux tableaux)")
 
-        logger.info("Analyses terminées (traitement mémoire)")
-
-        # SAUVEGARDER LE CONTEXTE CHATBOT AVANT LA RÉPONSE
+        # SAUVEGARDER LE CONTEXTE CHATBOT
         chatbot_session["context_data"] = {
             "buffer": buffer_results,
-            "consumption": consumption_v2_results,
+            "consumption": consumption_results,
+            "resources": resources_results,
+            "cappage": cappage_results,
+            "buffer_nco": buffer_nco_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -577,21 +580,17 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             }
         }
 
-        logger.info("Analyses ET contexte chatbot terminés - tout est prêt")
-
-        # MONITORING MÉMOIRE
-        process = psutil.Process(os.getpid())
-        memory_analysis = process.memory_info().rss / 1024 / 1024
-        logger.info(f"Mémoire après analyse complète: {memory_analysis:.1f} MB")
-
         return {
             "success": True,
-            "message": "Analyses terminées avec contexte chatbot prêt",
+            "message": "Analyses terminées avec nouveaux tableaux",
             "timestamp": datetime.now().isoformat(),
             "context_ready": True,  
             "results": {
                 "buffer": buffer_results,
-                "consumption": consumption_v2_results
+                "consumption": consumption_results,
+                "resources": resources_results,
+                "cappage": cappage_results,
+                "buffer_nco": buffer_nco_results
             }
         }
         
@@ -600,7 +599,7 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
-    
+   
 @app.get("/api/context-status")
 async def get_context_status():
     """Vérifie si le contexte du chatbot est prêt"""
@@ -830,22 +829,74 @@ async def get_users_list(session_token: Optional[str] = Cookie(None)):
 # ========================== ENDPOINTS EXPORT ===========================  
 
 
-@app.post("/api/export-pdf")
-async def export_pdf(session_token: Optional[str] = Cookie(None)):
+@app.post("/api/analyze")
+async def analyze_files(session_token: Optional[str] = Cookie(None)):
+    # Vérifier l'authentification
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # Vérifier qu'une analyse existe
-    if not chatbot_session.get("context_data"):
-        raise HTTPException(status_code=400, detail="No analysis available")
-    
-    # Retourner juste l'URL de visualisation
-    return JSONResponse({
-        "success": True,
-        "report_url": "/view-report"
-    })  
+    # Logger l'activité
+    log_activity(current_user["username"], "ANALYSIS", "Started LCR analysis")
+    try:
+        logger.info("Début de l'analyse depuis DataFrames en mémoire")
+        
+        # Vérification de la présence des deux fichiers
+        if len(file_session.get("files", {})) < 2:
+            raise HTTPException(status_code=400, detail="Les deux fichiers sont requis")
+        
+        if "j" not in file_session["files"] or "jMinus1" not in file_session["files"]:
+            raise HTTPException(status_code=400, detail="Fichiers manquants")
+        
+        # Récupérer les DataFrames directement depuis la session
+        dataframes = {}
+        for file_type, file_info in file_session["files"].items():
+            df = file_info["dataframe"]  # DataFrame déjà en mémoire
+            dataframes[file_type] = df
+            logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
 
+        # Nouvelles analyses
+        buffer_results = create_buffer_table(dataframes)
+        consumption_results = create_consumption_table(dataframes)
+        resources_results = create_resources_table(dataframes)
+        
+        logger.info("Analyses terminées (nouveaux tableaux)")
+
+        # SAUVEGARDER LE CONTEXTE CHATBOT
+        chatbot_session["context_data"] = {
+            "buffer": buffer_results,
+            "consumption": consumption_results,
+            "resources": resources_results,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "raw_dataframes_info": {
+                file_type: {
+                    "shape": [len(df), len(df.columns)],
+                    "columns": df.columns.tolist(),
+                    "sample_data": df.head(3).to_dict('records') if len(df) > 0 else [],
+                    "file_info": file_session["files"][file_type]
+                }
+                for file_type, df in dataframes.items()
+            }
+        }
+
+        return {
+            "success": True,
+            "message": "Analyses terminées avec nouveaux tableaux",
+            "timestamp": datetime.now().isoformat(),
+            "context_ready": True,  
+            "results": {
+                "buffer": buffer_results,
+                "consumption": consumption_results,
+                "resources": resources_results
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur analyse: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
+   
 @app.get("/view-report")
 async def view_current_report(session_token: Optional[str] = Cookie(None)):
     """Affiche le dernier rapport généré"""
@@ -884,849 +935,83 @@ async def view_current_report(session_token: Optional[str] = Cookie(None)):
         return HTMLResponse(content=f"<h1>Erreur génération rapport</h1><p>{str(e)}</p>")
     
 
-# ========================== FONCTIONS BALANCE SHEET ===========================
+# ========================== FONCTIONS BUFFER TABLE ===========================
 
 
-def create_balance_sheet_pivot_table(dataframes):
+def create_buffer_table(dataframes):
     """
-    Crée le tableau croisé dynamique Balance Sheet
-    
-    Args:
-        dataframes: Dict contenant les DataFrames 'j' et 'jMinus1'
-    
-    Returns:
-        Dict contenant les résultats de l'analyse
+    Crée le tableau BUFFER avec filtres spécifiques
     """
     try:
-        logger.info("💼 Création du TCD Balance Sheet")
+        logger.info("📊 Création du tableau BUFFER")
         
-        pivot_tables = {}
-        totals_summary = {}
+        buffer_results = {}
         
-        # Traitement de chaque fichier
         for file_type, df in dataframes.items():
-            logger.info(f"🔄 Traitement du fichier {file_type}")
+            logger.info(f"📄 Traitement BUFFER pour {file_type}")
+            
+            # Vérification des colonnes requises
+            buffer_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", 
+                          "Libellé Client", "LCR_Assiette Pondérée"]
+            missing_cols = [col for col in buffer_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour BUFFER {file_type}: {missing_cols}")
+                continue
             
             # Filtrage des données
             df_filtered = df[df["Top Conso"] == "O"].copy()
-            logger.info(f"📋 Après filtrage Top Conso='O': {len(df_filtered)} lignes")
+            df_filtered = df_filtered[df_filtered["LCR_Catégorie"] == "1- Buffer"].copy()
+            
+            logger.info(f"📋 Après filtrage BUFFER: {len(df_filtered)} lignes")
             
             if len(df_filtered) == 0:
-                logger.warning(f"⚠️ Aucune donnée avec Top Conso='O' pour {file_type}")
-                continue
-            
-            # Préparation des colonnes
-            df_filtered["Nominal Value"] = pd.to_numeric(
-                df_filtered["Nominal Value"], errors='coerce'
-            ).fillna(0)
-            
-            df_filtered["Réaffectation"] = df_filtered["Réaffectation"].astype(str).str.upper().str.strip()
-            
-            # Filtrage ACTIF/PASSIF uniquement
-            df_filtered = df_filtered[
-                df_filtered["Réaffectation"].isin(["ACTIF", "PASSIF"])
-            ].copy()
-            
-            logger.info(f"📊 Après filtrage ACTIF/PASSIF: {len(df_filtered)} lignes")
-            logger.info(f"🏷️ Réaffectations trouvées: {sorted(df_filtered['Réaffectation'].unique())}")
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"⚠️ Aucune donnée ACTIF/PASSIF pour {file_type}")
-                continue
-            
-            # Création du tableau croisé dynamique
-            pivot_table = pd.pivot_table(
-                df_filtered,
-                index="Groupe De Produit",
-                columns="Réaffectation",
-                values="Nominal Value",
-                aggfunc="sum",
-                fill_value=0,
-                margins=True,
-                margins_name="TOTAL"
-            )
-            
-            # Conversion en milliards d'euros
-            pivot_table = (pivot_table / 1_000_000_000).round(2)
-            
-            # Assurer la présence des colonnes ACTIF et PASSIF
-            for col in ["ACTIF", "PASSIF"]:
-                if col not in pivot_table.columns:
-                    pivot_table[col] = 0.0
-            
-            # Réorganisation des colonnes
-            pivot_table = pivot_table[["ACTIF", "PASSIF"]]
-            
-            pivot_tables[file_type] = pivot_table
-            
-            # Calcul des totaux
-            if "TOTAL" in pivot_table.index:
-                totals_summary[file_type] = {
-                    "ACTIF": float(pivot_table.loc["TOTAL", "ACTIF"]),
-                    "PASSIF": float(pivot_table.loc["TOTAL", "PASSIF"])
-                }
-            
-            logger.info(f"✅ TCD {file_type} créé: {pivot_table.shape[0]} lignes x {pivot_table.shape[1]} colonnes")
-        
-        # Génération du HTML du tableau combiné
-        pivot_html = generate_pivot_table_html(pivot_tables)
-        
-        # Calcul des variations
-        variations = calculate_variations(totals_summary)
-        
-        # Génération du résumé exécutif
-        summary = generate_executive_summary(variations)
-        
-        return {
-            "title": "1. Balance Sheet",
-            "pivot_table_html": pivot_html,
-            "variations": variations,
-            "summary": summary,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "reaffectation": ["ACTIF", "PASSIF"]
-                },
-                "files_analyzed": list(pivot_tables.keys())
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur création TCD: {e}")
-        return {
-            "title": "Balance Sheet - Erreur",
-            "error": str(e),
-            "pivot_table_html": "<p class='text-danger'>Erreur lors de la génération du tableau</p>"
-        }
-
-def generate_pivot_table_html(pivot_tables):
-    """
-    Génère le HTML du tableau croisé dynamique combiné
-    
-    Args:
-        pivot_tables: Dict des tables pivot par type de fichier
-    
-    Returns:
-        String HTML du tableau formaté
-    """
-    if len(pivot_tables) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour générer le TCD complet</div>"
-    
-    pivot_j = pivot_tables.get("j")
-    pivot_j1 = pivot_tables.get("jMinus1")
-    
-    if pivot_j is None or pivot_j1 is None:
-        return "<div class='alert alert-danger'>Erreur: données manquantes pour la comparaison</div>"
-    
-    # Liste des groupes de produits (sans TOTAL pour l'instant)
-    all_products = sorted([p for p in set(pivot_j.index) | set(pivot_j1.index) if p != "TOTAL"])
-    all_products.append("TOTAL")  # Ajouter TOTAL à la fin
-    
-    html = """
-    <table class="table table-bordered pivot-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">Groupe De Produit</th>
-                <th colspan="2" class="text-center header-j-minus-1">D-1 (Yesterday)</th>
-                <th colspan="2" class="text-center header-j">D (Today)</th>
-                <th colspan="2" class="text-center header-variation">Variation (D - D-1)</th>
-            </tr>
-            <tr>
-                <th class="text-center header-j-minus-1">ACTIF</th>
-                <th class="text-center header-j-minus-1">PASSIF</th>
-                <th class="text-center header-j">ACTIF</th>
-                <th class="text-center header-j">PASSIF</th>
-                <th class="text-center header-variation">ACTIF</th>
-                <th class="text-center header-variation">PASSIF</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Génération des lignes
-    for product in all_products:
-        css_class = "total-row" if product == "TOTAL" else ""
-        html += f'<tr class="{css_class}">'
-        html += f'<td class="fw-bold">{product}</td>'
-        
-        # Valeurs J-1
-        for category in ["ACTIF", "PASSIF"]:
-            value_j1 = pivot_j1.loc[product, category] if product in pivot_j1.index else 0.0
-            html += f'<td class="text-end numeric-value">{value_j1:.2f}</td>'
-        
-        # Valeurs J
-        for category in ["ACTIF", "PASSIF"]:
-            value_j = pivot_j.loc[product, category] if product in pivot_j.index else 0.0
-            html += f'<td class="text-end numeric-value">{value_j:.2f}</td>'
-        
-        # Variations
-        for category in ["ACTIF", "PASSIF"]:
-            value_j1 = pivot_j1.loc[product, category] if product in pivot_j1.index else 0.0
-            value_j = pivot_j.loc[product, category] if product in pivot_j.index else 0.0
-            variation = value_j - value_j1
-            
-            css_class = "variation-positive" if variation > 0 else "variation-negative" if variation < 0 else ""
-            sign = "+" if variation > 0 else ""
-            html += f'<td class="text-end numeric-value {css_class}">{sign}{variation:.2f}</td>'
-        
-        html += '</tr>'
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
-
-def calculate_variations(totals_summary):
-    """
-    Calcule les variations entre J et J-1
-    
-    Args:
-        totals_summary: Dict des totaux par fichier
-    
-    Returns:
-        Dict des variations calculées
-    """
-    if "j" not in totals_summary or "jMinus1" not in totals_summary:
-        return {}
-    
-    variations = {}
-    for category in ["ACTIF", "PASSIF"]:
-        
-        j_value = totals_summary["j"].get(category, 0)
-        j1_value = totals_summary["jMinus1"].get(category, 0)
-        
-        variations[category] = {
-            "j_minus_1": round(j1_value, 2),
-            "j": round(j_value, 2),
-            "variation": round(j_value - j1_value, 2)
-        }
-    
-    return variations
-
-def generate_executive_summary(variations):
-    """
-    Génère un résumé exécutif de l'analyse
-    
-    Args:
-        variations: Dict des variations calculées
-    
-    Returns:
-        String du résumé exécutif
-    """
-    if not variations:
-        return "Analyse incomplète - données insuffisantes pour générer un résumé."
-    
-    date_str = datetime.now().strftime("%d/%m/%Y")
-    summary_parts = []
-    
-    for category, data in variations.items():
-        if category == "ACTIF":
-            category_name = "ASSET"
-        elif category == "PASSIF": 
-            category_name = "LIABILITY"
-        else:
-            category_name = category  # fallback
-        variation = data["variation"]
-        if abs(variation) >= 0.1:  # Variations significatives >= 100M€
-            direction = "increase" if variation > 0 else "decrease"
-            summary_parts.append(f"{category_name}: {direction} of {abs(variation):.2f} Md€")
-    
-    if summary_parts:
-        return f"On {date_str} Natixis' balance sheet presents some variations: {', '.join(summary_parts)}."
-    else:
-        return f"Balance Sheet on {date_str} - Small variations observed (< 100M€)."
-
-
-# ========================== FONCTIONS CONSUMPTION ===========================
-
-
-def create_consumption_analysis_grouped_only(dataframes):
-    """
-    Crée l'analyse Consumption UNIQUEMENT par Groupe Métiers (sans détail des métiers)
-    """
-    try:
-        logger.info("💼 Création de l'analyse Consumption - Groupes Métiers uniquement")
-        
-        consumption_grouped = {}
-        totals_by_group = {}
-        
-        # Traitement de chaque fichier
-        for file_type, df in dataframes.items():
-            logger.info(f"🔄 Traitement Consumption groupé pour {file_type}")
-            
-            # Vérification des colonnes requises
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            
-            if missing_cols:
-                logger.warning(f"⚠️ Colonnes manquantes pour Consumption {file_type}: {missing_cols}")
-                continue
-            
-            # Filtrage des données (Top Conso = "O")
-            df_filtered = df[df["Top Conso"] == "O"].copy()
-            logger.info(f"📋 Après filtrage Top Conso='O': {len(df_filtered)} lignes")
-            
-            if len(df_filtered) == 0:
-                logger.warning(f"⚠️ Aucune donnée avec Top Conso='O' pour Consumption {file_type}")
+                logger.warning(f"⚠️ Aucune donnée BUFFER pour {file_type}")
                 continue
             
             # Préparation des données
-            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
-                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
-            ).fillna(0)
-            
-            # Nettoyage des champs texte
-            df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
-            
-            # Groupement UNIQUEMENT par LCR_ECO_GROUPE_METIERS
-            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
-            
-            # Conversion en milliards
-            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
-            
-            consumption_grouped[file_type] = grouped
-            
-            # Calcul des totaux
-            total_global = (df_filtered["LCR_ECO_IMPACT_LCR"].sum() / 1_000_000_000).round(3)
-            
-            totals_by_group[file_type] = {
-                "total_global": total_global,
-                "by_groupe_metiers": grouped.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict(),
-                "grouped_data": grouped
-            }
-            
-            logger.info(f"✅ Consumption groupé {file_type}: {len(grouped)} groupes, Total global = {total_global:.3f} Bn")
-        
-        # Génération du HTML du tableau groupé
-        consumption_html = generate_consumption_grouped_table_html(consumption_grouped)
-        
-        # Calcul des variations
-        variations = calculate_consumption_grouped_variations(totals_by_group)
-
-        # Génération de l'analyse textuelle
-        analysis_text, significant_groups = generate_consumption_grouped_analysis_text(variations, totals_by_group, dataframes)
-
-        # Génération de l'analyse détaillée par métier (NOUVELLE VERSION)
-        metier_detailed_analysis = generate_metier_detailed_analysis(significant_groups, dataframes)
-
-        # Préparer les données détaillées par métier pour les groupes significatifs
-        metier_details = {}
-        for file_type, df in dataframes.items():
-            df_filtered = df[df["Top Conso"] == "O"].copy()
-            if "Métier" in df_filtered.columns:
-                print(significant_groups)
-                if len(significant_groups) != 0:
-                    # Filtrer pour les groupes significatifs seulement
-                    df_significant = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(significant_groups)]
-                    
-                    # Grouper par groupe métier et métier
-                    grouped = df_significant.groupby(["LCR_ECO_GROUPE_METIERS", "Métier"])["LCR_ECO_IMPACT_LCR"].sum().reset_index()
-                    grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
-                    
-                    # CONVERTIR EN DICTIONNAIRE SÉRIALISABLE
-                    metier_details[file_type] = grouped.to_dict(orient='records')
-    
-        return {
-            "title": "2. LCR Consumption",
-            "consumption_table_html": consumption_html,
-            "variations": variations,
-            "analysis_text": analysis_text,
-            "metier_detailed_analysis": metier_detailed_analysis, 
-            "significant_groups": significant_groups,
-            "metier_details": metier_details,
-            "metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "filter_applied": "Top Conso = 'O'",
-                "grouping": ["LCR_ECO_GROUPE_METIERS"],  # Seulement groupe, pas métier
-                "measure": "LCR_ECO_IMPACT_LCR (Bn €)",
-                "view_type": "grouped_summary"
-            }
-        }
-    
-    except Exception as e:
-        logger.error(f"❌ Erreur création analyse Consumption groupée: {e}")
-        return {
-            "title": "Consumption Analysis Grouped - Erreur",
-            "error": str(e),
-            "consumption_table_html": "<p class='text-danger'>Erreur lors de la génération de l'analyse Consumption groupée</p>"
-        }
-    
-def generate_consumption_grouped_table_html(consumption_grouped):
-    """
-    Génère le HTML du tableau Consumption GROUPÉ (sans détail métiers)
-    """
-    if len(consumption_grouped) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour l'analyse Consumption groupée</div>"
-    
-    grouped_j = consumption_grouped.get("j")
-    grouped_j1 = consumption_grouped.get("jMinus1")
-    
-    if grouped_j is None or grouped_j1 is None:
-        return "<div class='alert alert-danger'>Erreur: données Consumption groupées manquantes</div>"
-    
-    # Fusion de tous les groupes métiers
-    all_groups = set()
-    all_groups.update(grouped_j["LCR_ECO_GROUPE_METIERS"].tolist())
-    all_groups.update(grouped_j1["LCR_ECO_GROUPE_METIERS"].tolist())
-    
-    # Création des dictionnaires de lookup
-    lookup_j = grouped_j.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
-    lookup_j1 = grouped_j1.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR_Bn"].to_dict()
-    
-    html = """
-    <table class="table table-bordered consumption-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="align-middle">LCR Groupe Métiers</th>
-                <th colspan="2" class="text-center header-j-minus-1">D-1 (Yesterday)</th>
-                <th colspan="2" class="text-center header-j">D (Today)</th>
-                <th rowspan="2" class="text-center header-variation align-middle">Variation<br>(Bn €)</th>
-            </tr>
-            <tr>
-                <th class="text-center header-j-minus-1">Consumption (Bn €)</th>
-                <th class="text-center header-j-minus-1">Part (%)</th>
-                <th class="text-center header-j">Consumption (Bn €)</th>
-                <th class="text-center header-j">Part (%)</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Calcul des totaux globaux pour les pourcentages
-    total_j1 = sum(lookup_j1.values())
-    total_j = sum(lookup_j.values())
-    
-    # Génération des lignes - UNE LIGNE PAR GROUPE MÉTIER
-    for groupe_metiers in sorted(all_groups):
-        value_j1 = lookup_j1.get(groupe_metiers, 0)
-        value_j = lookup_j.get(groupe_metiers, 0)
-        variation = value_j - value_j1
-        
-        # Calcul des pourcentages
-        pct_j1 = (value_j1 / total_j1 * 100) if total_j1 != 0 else 0
-        pct_j = (value_j / total_j * 100) if total_j != 0 else 0
-        
-        html += '<tr>'
-        html += f'<td class="fw-bold">{groupe_metiers}</td>'
-        
-        # Valeurs J-1
-        html += f'<td class="text-end numeric-value">{value_j1:.3f}</td>'
-        html += f'<td class="text-end numeric-value">{pct_j1:.1f}%</td>'
-        
-        # Valeurs J
-        html += f'<td class="text-end numeric-value">{value_j:.3f}</td>'
-        html += f'<td class="text-end numeric-value">{pct_j:.1f}%</td>'
-        
-        # Variation
-        css_class = "variation-positive" if variation > 0 else "variation-negative" if variation < 0 else ""
-        sign = "+" if variation > 0 else ""
-        html += f'<td class="text-end numeric-value {css_class}">{sign}{variation:.3f}</td>'
-        
-        html += '</tr>'
-    
-    # Ligne de total général
-    total_variation = total_j - total_j1
-    css_class = "variation-positive" if total_variation > 0 else "variation-negative" if total_variation < 0 else ""
-    sign = "+" if total_variation > 0 else ""
-    
-    html += f'''
-        <tr class="total-row">
-            <td class="text-end fw-bold">TOTAL GÉNÉRAL:</td>
-            <td class="text-end fw-bold">{total_j1:.3f}</td>
-            <td class="text-end fw-bold">100.0%</td>
-            <td class="text-end fw-bold">{total_j:.3f}</td>
-            <td class="text-end fw-bold">100.0%</td>
-            <td class="text-end fw-bold {css_class}">{sign}{total_variation:.3f}</td>
-        </tr>
-    '''
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
-
-def calculate_consumption_grouped_variations(totals_by_group):
-    """Calcule les variations de consumption groupée entre J et J-1"""
-    if "j" not in totals_by_group or "jMinus1" not in totals_by_group:
-        return {}
-    
-    j_data = totals_by_group["j"]
-    j1_data = totals_by_group["jMinus1"]
-    
-    # Variation globale
-    global_variation = j_data["total_global"] - j1_data["total_global"]
-    
-    # Variations par groupe métiers
-    group_variations = {}
-    all_groups = set(j_data["by_groupe_metiers"].keys()) | set(j1_data["by_groupe_metiers"].keys())
-    
-    for group in all_groups:
-        j_value = j_data["by_groupe_metiers"].get(group, 0)
-        j1_value = j1_data["by_groupe_metiers"].get(group, 0)
-        group_variations[group] = {
-            "j_minus_1": j1_value,
-            "j": j_value,
-            "variation": round(j_value - j1_value, 3)
-        }
-    
-    return {
-        "global": {
-            "j_minus_1": j1_data["total_global"],
-            "j": j_data["total_global"],
-            "variation": round(global_variation, 3)
-        },
-        "by_groupe_metiers": group_variations
-    }
-
-def generate_consumption_grouped_analysis_text(variations, totals_by_group, dataframes=None):
-    """Génère le texte d'analyse de la consumption groupée avec mapping Métier -> Sous-Métier"""
-    if not variations or "global" not in variations:
-        return "Analyse Consumption groupée non disponible - données insuffisantes.", []
-    
-    # Créer le mapping Métier -> Sous-Métier depuis les données Excel IL SERT À RIEN ICI ON UTILISE PAS MÉTIER MAIS À RÉUTILISER POUR LES MÉTIER AU NIVEAU DE GRANULARITÉ SUIVANT.
-    metier_to_sous_metier = {}
-    if dataframes is not None and isinstance(dataframes, dict): #ATTENTION NE PAS METTRE if dataframes.
-        # Utiliser le fichier J pour créer le mapping (ou J-1 si J n'existe pas)
-        df_for_mapping = dataframes.get("j")
-        if df_for_mapping is None:
-            df_for_mapping = dataframes.get("jMinus1")
-        
-        if df_for_mapping is not None:
-            # Vérifier que les colonnes existent
-            if "Métier" in df_for_mapping.columns and "Sous-Métier" in df_for_mapping.columns:
-                try:
-                    # Créer le mapping en supprimant les doublons
-                    mapping_df = df_for_mapping[["Métier", "Sous-Métier"]].dropna().drop_duplicates()
-                    metier_to_sous_metier = mapping_df.set_index("Métier")["Sous-Métier"].to_dict()
-                    logger.info(f"Mapping Métier -> Sous-Métier créé: {len(metier_to_sous_metier)} entrées")
-                except Exception as e:
-                    logger.warning(f"Erreur création mapping Métier->Sous-Métier: {e}")
-            else:
-                logger.warning("Colonnes 'Métier' ou 'Sous-Métier' non trouvées dans les données")
-    
-    global_data = variations["global"]
-    date_str = datetime.now().strftime("March %d")
-    
-    # Analyse globale
-    total_j = global_data["j"]
-    variation = global_data["variation"]
-    direction = "decrease" if variation < 0 else "increase"
-    
-    analysis = f"Summary view: on {date_str}, business groups have total consumption of {total_j:.2f} Bn, representing a {direction} of {abs(variation):.2f} Bn compared to yesterday."
-    
-    # Identification des principales variations par groupe (auto, sans paramètre)
-    significant_groups = []
-    if "by_groupe_metiers" in variations and variations["by_groupe_metiers"]:
-        def _tukey_upper_threshold(values):
-            import statistics
-            if len(values) < 4:
-                return max(values) if values else 0.0
-            q1 = statistics.quantiles(values, n=4)[0]
-            q3 = statistics.quantiles(values, n=4)[2]
-            iqr = q3 - q1
-            return q3 + 1.5 * iqr
-
-        def _knee_index(cum_shares):
-            n = len(cum_shares)
-            if n == 0:
-                return None
-            diffs = []
-            for i, cs in enumerate(cum_shares, start=1):
-                baseline = i / n
-                diffs.append(cs - baseline)
-            k = max(range(n), key=lambda i: diffs[i])
-            return k if diffs[k] > 1e-9 else None
-
-        by_grp = variations["by_groupe_metiers"]
-        items = []
-        for group, data in by_grp.items():
-            gv = float(data.get("variation", 0.0))
-            items.append((group, gv, abs(gv)))
-
-        net_var = float(global_data.get("variation", 0.0))
-        net_mag = abs(net_var)
-
-        selected = []
-        # CAS 1 : mouvement net significatif -> sélection des "drivers" alignés (knee + outliers IQR)
-        if net_mag >= 1e-9:
-            sign = 1 if net_var >= 0 else -1
-            aligned = [(g, v, av) for (g, v, av) in items if (v > 0 and sign > 0) or (v < 0 and sign < 0)]
-            aligned.sort(key=lambda x: x[2], reverse=True)
-
-            cum = 0.0
-            cum_shares = []
-            for _, _, av in aligned:
-                cum += av
-                cum_shares.append(min(cum / net_mag, 1.0))
-
-            knee = _knee_index(cum_shares)
-            if knee is not None:
-                selected = aligned[:knee+1]
-
-            aligned_abs = [av for (_, _, av) in aligned]
-            upper = _tukey_upper_threshold(aligned_abs)
-            for tup in aligned:
-                if tup not in selected and tup[2] >= upper:
-                    selected.append(tup)
-
-            # GARANTIR AU MOINS 2 DRIVERS pour CAS 1
-            if len(selected) < 2 and len(aligned) >= 2:
-                # Prendre les 2 plus gros drivers alignés
-                selected = aligned[:2]
-            elif len(selected) < 1 and len(aligned) >= 1:
-                # Fallback : au moins 1 driver si disponible
-                selected = [aligned[0]]
-
-        # CAS 2 : net ~ 0 -> sortir les vrais movers (IQR) des deux côtés
-        else:
-            abs_vars = [av for (_, _, av) in items]
-            upper = _tukey_upper_threshold(abs_vars)
-            movers = [(g, v, av) for (g, v, av) in items if av >= upper]
-            movers.sort(key=lambda x: x[2], reverse=True)
-            
-            # GARANTIR AU MOINS 2 MOVERS pour CAS 2
-            if len(movers) < 2 and len(items) >= 2:
-                # Prendre les 2 plus grosses variations absolues
-                items_sorted = sorted(items, key=lambda x: x[2], reverse=True)
-                selected = items_sorted[:2]
-            elif len(movers) >= 2:
-                selected = movers
-            elif len(movers) == 1:
-                # 1 mover détecté, ajouter le suivant par taille
-                items_sorted = sorted(items, key=lambda x: x[2], reverse=True)
-                selected = movers + [item for item in items_sorted if item not in movers][:1]
-            else:
-                # Aucun mover détecté, prendre les 2 plus gros
-                if len(items) >= 2:
-                    items_sorted = sorted(items, key=lambda x: x[2], reverse=True)
-                    selected = items_sorted[:2]
-                elif len(items) == 1:
-                    selected = items
-
-        # Mise en forme avec mapping Métier -> Sous-Métier
-        significant_variations = []
-        for g, v, av in selected:
-            sign_sym = "-" if v < 0 else "+"
-            
-            # Utiliser le mapping pour obtenir le nom complet
-            display_name = metier_to_sous_metier.get(g, g)
-            
-            significant_variations.append(f"{display_name} ({sign_sym}{abs(v):.2f} Bn)")
-            significant_groups.append(g)  # Garder l'abréviation pour les traitements ultérieurs
-
-        if significant_variations:
-            if variation < 0:
-                analysis += f" Main contributors to this decrease: {', '.join(significant_variations)}."
-            else:
-                analysis += f" Main drivers of this increase: {', '.join(significant_variations)}."
-    
-    return analysis, significant_groups
-
-def generate_metier_detailed_analysis(significant_groups, dataframes=None):
-    """
-    Génère une analyse textuelle détaillée des métiers avec les plus grosses variations
-    en recréant les données métier depuis les DataFrames
-    """
-    if not significant_groups or not dataframes:
-        return ""
-    
-    logger.info(f"Génération analyse détaillée pour groupes: {significant_groups}")
-    
-    # Créer le mapping Métier -> Sous-Métier
-    metier_to_sous_metier = {}
-    if dataframes is not None and isinstance(dataframes, dict):
-        df_for_mapping = dataframes.get("j")
-        if df_for_mapping is None:
-            df_for_mapping = dataframes.get("jMinus1")
-        
-        if df_for_mapping is not None:
-            has_metier = "Métier" in df_for_mapping.columns
-            has_sous_metier = "Sous-Métier" in df_for_mapping.columns
-            
-            if has_metier and has_sous_metier:
-                try:
-                    mapping_df = df_for_mapping[["Métier", "Sous-Métier"]].dropna().drop_duplicates()
-                    metier_to_sous_metier = mapping_df.set_index("Métier")["Sous-Métier"].to_dict()
-                    logger.info(f"Mapping Métier -> Sous-Métier créé pour analyse détaillée: {len(metier_to_sous_metier)} entrées")
-                except Exception as e:
-                    logger.warning(f"Erreur création mapping pour analyse détaillée: {e}")
-    
-    # Recréer les données métier depuis les DataFrames
-    metier_data = {}
-    
-    try:
-        for file_type, df in dataframes.items():
-            df_filtered = df[df["Top Conso"] == "O"].copy()
-            
-            # Vérifier si la colonne Métier existe
-            if "Métier" not in df_filtered.columns:
-                logger.warning(f"Colonne 'Métier' non trouvée dans {file_type}, analyse détaillée impossible")
-                continue
-            
-            if len(significant_groups) > 0:
-                # Filtrer pour les groupes significatifs seulement
-                df_significant = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(significant_groups)]
-                
-                if df_significant.empty:  # Utiliser .empty au lieu de len() == 0
-                    logger.warning(f"Aucune donnée pour les groupes significatifs dans {file_type}")
-                    continue
-                
-                # Grouper par groupe métier et métier
-                grouped = df_significant.groupby(["LCR_ECO_GROUPE_METIERS", "Métier"])["LCR_ECO_IMPACT_LCR"].sum().reset_index()
-                grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
-                
-                metier_data[file_type] = grouped
-                logger.info(f"Données métier créées pour {file_type}: {len(grouped)} lignes")
-    
-    except Exception as e:
-        logger.error(f"Erreur lors de la création des données métier: {e}")
-        return ""
-
-    # Vérifier que nous avons les données J et J-1
-    if "j" not in metier_data or "jMinus1" not in metier_data:
-        logger.warning("Données J ou J-1 manquantes pour l'analyse détaillée")
-        return ""
-    
-    data_j = metier_data["j"]
-    data_j1 = metier_data["jMinus1"]
-    
-    # Vérifier que les DataFrames ne sont pas vides
-    if data_j.empty or data_j1.empty:
-        logger.warning("DataFrames J ou J-1 vides pour l'analyse détaillée")
-        return ""
-    
-    # Créer des dictionnaires de lookup par (groupe, métier)
-    lookup_j = {}
-    lookup_j1 = {}
-    
-    try:
-        for _, row in data_j.iterrows():
-            key = (row["LCR_ECO_GROUPE_METIERS"], row["Métier"])
-            lookup_j[key] = row["LCR_ECO_IMPACT_LCR_Bn"]
-        
-        for _, row in data_j1.iterrows():
-            key = (row["LCR_ECO_GROUPE_METIERS"], row["Métier"])
-            lookup_j1[key] = row["LCR_ECO_IMPACT_LCR_Bn"]
-    
-    except Exception as e:
-        logger.error(f"Erreur lors de la création des dictionnaires lookup: {e}")
-        return ""
-    
-    # Calculer les variations par métier
-    all_keys = set(lookup_j.keys()) | set(lookup_j1.keys())
-    metier_variations = []
-    
-    for key in all_keys:
-        groupe, metier = key
-        if groupe in significant_groups:  # Seulement les groupes significatifs
-            value_j = lookup_j.get(key, 0)
-            value_j1 = lookup_j1.get(key, 0)
-            variation = value_j - value_j1
-            
-            # Utiliser le mapping pour obtenir le nom complet
-            display_name = metier_to_sous_metier.get(metier, metier)
-            
-            metier_variations.append({
-                "groupe": groupe,
-                "metier": metier,
-                "display_name": display_name,
-                "variation": variation,
-                "abs_variation": abs(variation),
-                "value_j": value_j,
-                "value_j1": value_j1
-            })
-    
-    # NOUVEAU: Grouper par groupe métier et prendre le top 3 de chaque groupe
-    variations_by_group = {}
-    for variation in metier_variations:
-        groupe = variation["groupe"]
-        if groupe not in variations_by_group:
-            variations_by_group[groupe] = []
-        variations_by_group[groupe].append(variation)
-    
-    # Trier chaque groupe par variation absolue décroissante et prendre le top 3
-    top_variations_by_group = {}
-    for groupe, variations in variations_by_group.items():
-        # Trier par variation absolue décroissante
-        sorted_variations = sorted(variations, key=lambda x: x["abs_variation"], reverse=True)
-        # Prendre les 3 premières (ou moins si moins de 3 métiers)
-        top_variations_by_group[groupe] = sorted_variations[:3]
-    
-    # Générer le texte d'analyse
-    date_str = datetime.now().strftime("March %d")
-    group_sentences = []
-    
-    # Traiter chaque groupe séparément pour créer des phrases distinctes
-    for groupe in significant_groups:
-        if groupe in top_variations_by_group:
-            group_variations = top_variations_by_group[groupe]
-            group_parts = []
-            
-            for item in group_variations:
-                variation = item["variation"]
-                abs_variation = item["abs_variation"]
-                display_name = item["display_name"]
-                
-                # Ignorer les variations très faibles
-                if abs_variation < 0.01:  # Moins de 10M€
-                    continue
-                
-                direction = "increased" if variation > 0 else "decreased"
-                group_parts.append(f"{display_name} {direction} by {abs_variation:.2f} Bn")
-            
-            # Créer une phrase complète pour ce groupe avec le nom du groupe en gras
-            if group_parts:
-                group_sentence = f"In <strong>{groupe}</strong>, {', '.join(group_parts)}"
-                group_sentences.append(group_sentence)
-    
-    if group_sentences:
-        # Joindre les phrases avec ". " pour séparer chaque groupe
-        full_text = ". ".join(group_sentences)
-        return f"At the detailed level: {full_text}."
-    
-    return ""
-
-
-# ========================== FONCTIONS BUFFER + CONSUMPTION ===========================
-
-
-def create_buffer_analysis(dataframes):
-    """Créé l'analyse BUFFER avec filtres spécifiques"""
-    try:
-        logger.info("💼 Création de l'analyse BUFFER")
-        
-        buffer_data = {}
-        
-        for file_type, df in dataframes.items():
-            # Filtres : Top Conso = "O" ET LCR_Catégorie = "1- Buffer"
-            df_filtered = df[
-                (df["Top Conso"] == "O") & 
-                (df["LCR_Catégorie"] == "1- Buffer")
-            ].copy()
-            
-            if len(df_filtered) == 0:
-                continue
-                
-            # Préparation des données numériques
             df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
                 df_filtered["LCR_Assiette Pondérée"], errors='coerce'
             ).fillna(0)
             
-            # Groupement par LCR_Template Section 1 et Libellé Client
-            grouped = df_filtered.groupby(["LCR_Template Section 1", "Libellé Client"])["LCR_Assiette Pondérée"].sum().reset_index()
+            # Nettoyage des champs texte
+            df_filtered["LCR_Template Section 1"] = df_filtered["LCR_Template Section 1"].astype(str).str.strip()
+            df_filtered["Libellé Client"] = df_filtered["Libellé Client"].astype(str).str.strip()
             
-            buffer_data[file_type] = grouped
+            # Groupement
+            grouped_data = []
             
-        # Générer le HTML
-        buffer_html = generate_buffer_table_html(buffer_data)
+            # Grouper par LCR_Template Section 1
+            for section in df_filtered["LCR_Template Section 1"].unique():
+                section_data = df_filtered[df_filtered["LCR_Template Section 1"] == section]
+                
+                if section == "1.1- Cash":
+                    # Pour 1.1- Cash, montrer le détail par Libellé Client
+                    for client in section_data["Libellé Client"].unique():
+                        client_data = section_data[section_data["Libellé Client"] == client]
+                        total = float(client_data["LCR_Assiette Pondérée"].sum())
+                        grouped_data.append({
+                            "section": section,
+                            "client": client,
+                            "total": total / 1_000_000_000,  # Conversion en milliards
+                            "is_detail": True
+                        })
+                else:
+                    # Pour les autres sections, montrer seulement le total
+                    total = float(section_data["LCR_Assiette Pondérée"].sum())
+                    grouped_data.append({
+                        "section": section,
+                        "client": "TOTAL",
+                        "total": total / 1_000_000_000,  # Conversion en milliards
+                        "is_detail": False
+                    })
+            
+            buffer_results[file_type] = grouped_data
+            logger.info(f"✅ BUFFER {file_type}: {len(grouped_data)} entrées")
         
         return {
-            "title": "1. BUFFER Analysis",
-            "table_html": buffer_html,
+            "title": "BUFFER",
+            "data": buffer_results,
             "metadata": {
                 "analysis_date": datetime.now().isoformat(),
                 "filters_applied": {
@@ -1737,255 +1022,421 @@ def create_buffer_analysis(dataframes):
         }
         
     except Exception as e:
-        logger.error(f"⌀ Erreur création analyse BUFFER: {e}")
-        return {"title": "BUFFER - Erreur", "error": str(e)}
+        logger.error(f"❌ Erreur création tableau BUFFER: {e}")
+        return {
+            "title": "BUFFER - Erreur",
+            "error": str(e)
+        }
 
-def create_consumption_v2_analysis(dataframes):
-    """Créé l'analyse CONSUMPTION v2 avec filtres spécifiques"""
+
+# ========================== FONCTIONS CONSUMPTION TABLE ===========================
+
+
+def create_consumption_table(dataframes):
+    """
+    Crée le tableau CONSUMPTION avec filtres spécifiques
+    """
     try:
-        logger.info("💼 Création de l'analyse CONSUMPTION v2")
+        logger.info("📊 Création du tableau CONSUMPTION")
         
-        consumption_data = {}
+        consumption_results = {}
         
         for file_type, df in dataframes.items():
-            # Filtres multiples
-            df_filtered = df[
-                (df["Top Conso"] == "O") & 
-                (df["LCR_ECO_GROUPE_METIERS"].isin([
-                    "A&WM & Insurance", "CIB Financing", "CIB Markets", 
-                    "GLOBAL TRADE", "Other Consumption"
-                ])) &
-                (~df["Sous-Métier"].isin(["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"])) &
-                (~df["Produit"].isin(["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]))
-            ].copy()
+            logger.info(f"📄 Traitement CONSUMPTION pour {file_type}")
+            
+            # Vérification des colonnes requises
+            consumption_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "Sous-Métier", 
+                              "Produit", "LCR_ECO_IMPACT_LCR"]
+            missing_cols = [col for col in consumption_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour CONSUMPTION {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage des données
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            # Filtres spécifiques CONSUMPTION
+            allowed_groupes = ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"]
+            df_filtered = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(allowed_groupes)].copy()
+            
+            excluded_sous_metier = ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"]
+            df_filtered = df_filtered[~df_filtered["Sous-Métier"].isin(excluded_sous_metier)].copy()
+            
+            excluded_produit = ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
+            df_filtered = df_filtered[~df_filtered["Produit"].isin(excluded_produit)].copy()
+            
+            logger.info(f"📋 Après filtrage CONSUMPTION: {len(df_filtered)} lignes")
             
             if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée CONSUMPTION pour {file_type}")
                 continue
-                
-            # Préparation des données numériques
+            
+            # Préparation des données
+            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
+                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
+            ).fillna(0)
+
+            # Groupement par LCR_ECO_GROUPE_METIERS
+            grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
+
+            # Convertir en dictionnaire avec types Python natifs
+            consumption_results[file_type] = [
+                {
+                    "LCR_ECO_GROUPE_METIERS": str(row["LCR_ECO_GROUPE_METIERS"]),
+                    "LCR_ECO_IMPACT_LCR": float(row["LCR_ECO_IMPACT_LCR"]),
+                    "LCR_ECO_IMPACT_LCR_Bn": float(row["LCR_ECO_IMPACT_LCR_Bn"])
+                }
+                for _, row in grouped.iterrows()
+            ]
+            logger.info(f"✅ CONSUMPTION {file_type}: {len(grouped)} groupes")
+        
+        return {
+            "title": "CONSUMPTION",
+            "data": consumption_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "groupe_metiers": allowed_groupes,
+                    "excluded_sous_metier": excluded_sous_metier,
+                    "excluded_produit": excluded_produit
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création tableau CONSUMPTION: {e}")
+        return {
+            "title": "CONSUMPTION - Erreur",
+            "error": str(e)
+        }
+
+
+# ========================== FONCTIONS RESOURCES TABLE ===========================
+
+
+def create_resources_table(dataframes):
+    """
+    Crée le tableau RESOURCES avec filtres spécifiques
+    """
+    try:
+        logger.info("📊 Création du tableau RESOURCES")
+        
+        resources_results = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement RESOURCES pour {file_type}")
+            
+            # Vérification des colonnes requises
+            resources_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "Sous-Métier", 
+                            "Produit", "LCR_ECO_IMPACT_LCR"]
+            missing_cols = [col for col in resources_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour RESOURCES {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage des données
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            # Filtres spécifiques RESOURCES
+            allowed_groupes = ["GLOBAL TRADE", "Other Contribution", "Treasury"]
+            df_filtered = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(allowed_groupes)].copy()
+            
+            excluded_sous_metier = ["GT GROUP SERVICES", "GT COMMODITY", "GT TRADE FINANCE", "SYN GLOBAL TRADE"]
+            df_filtered = df_filtered[~df_filtered["Sous-Métier"].isin(excluded_sous_metier)].copy()
+            
+            excluded_produit = ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
+            df_filtered = df_filtered[~df_filtered["Produit"].isin(excluded_produit)].copy()
+            
+            logger.info(f"📋 Après filtrage RESOURCES: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée RESOURCES pour {file_type}")
+                continue
+            
+            # Préparation des données
             df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
                 df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
             ).fillna(0)
             
             # Groupement par LCR_ECO_GROUPE_METIERS
             grouped = df_filtered.groupby("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].sum().reset_index()
+            grouped["LCR_ECO_IMPACT_LCR_Bn"] = (grouped["LCR_ECO_IMPACT_LCR"] / 1_000_000_000).round(3)
             
-            consumption_data[file_type] = grouped
+            # Convertir en dictionnaire avec types Python natifs
+            resources_results[file_type] = [
+                {
+                    "LCR_ECO_GROUPE_METIERS": str(row["LCR_ECO_GROUPE_METIERS"]),
+                    "LCR_ECO_IMPACT_LCR": float(row["LCR_ECO_IMPACT_LCR"]),
+                    "LCR_ECO_IMPACT_LCR_Bn": float(row["LCR_ECO_IMPACT_LCR_Bn"])
+                }
+                for _, row in grouped.iterrows()
+            ]
             
-        # Générer le HTML
-        consumption_html = generate_consumption_v2_table_html(consumption_data)
+            logger.info(f"✅ RESOURCES {file_type}: {len(grouped)} groupes")
         
         return {
-            "title": "2. CONSUMPTION Analysis",
-            "table_html": consumption_html,
+            "title": "RESOURCES",
+            "data": resources_results,
             "metadata": {
                 "analysis_date": datetime.now().isoformat(),
                 "filters_applied": {
                     "top_conso": "O",
-                    "groupe_metiers": ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"],
-                    "excluded_sous_metier": ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"],
-                    "excluded_produit": ["SIGHT DEPOSIT MIRROR", "SIGHT FINANCING MIRROR"]
+                    "groupe_metiers": allowed_groupes,
+                    "excluded_sous_metier": excluded_sous_metier,
+                    "excluded_produit": excluded_produit
                 }
             }
         }
         
     except Exception as e:
-        logger.error(f"⌀ Erreur création analyse CONSUMPTION v2: {e}")
-        return {"title": "CONSUMPTION v2 - Erreur", "error": str(e)}
+        logger.error(f"❌ Erreur création tableau RESOURCES: {e}")
+        return {
+            "title": "RESOURCES - Erreur",
+            "error": str(e)
+        }
+    
 
-def generate_buffer_table_html(buffer_data):
-    """Génère le HTML pour le tableau BUFFER"""
-    if len(buffer_data) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour BUFFER</div>"
-    
-    data_j = buffer_data.get("j")
-    data_j1 = buffer_data.get("jMinus1")
-    
-    if data_j is None or data_j1 is None:
-        return "<div class='alert alert-danger'>Données BUFFER manquantes</div>"
-    
-    # Créer des dictionnaires de lookup par (Section, Libellé)
-    lookup_j = {}
-    lookup_j1 = {}
-    
-    for _, row in data_j.iterrows():
-        key = (row["LCR_Template Section 1"], row["Libellé Client"])
-        lookup_j[key] = row["LCR_Assiette Pondérée"]
-    
-    for _, row in data_j1.iterrows():
-        key = (row["LCR_Template Section 1"], row["Libellé Client"])
-        lookup_j1[key] = row["LCR_Assiette Pondérée"]
-    
-    # Fusionner toutes les clés uniques
-    all_keys = set(lookup_j.keys()) | set(lookup_j1.keys())
-    
-    html = """
-    <table class="table table-bordered buffer-table">
-        <thead>
-            <tr>
-                <th>LCR Template Section 1</th>
-                <th>Libellé Client</th>
-                <th class="text-center">LCR Assiette Pondérée (Bn €)</th>
-                <th class="text-center">Variation (Bn €)</th>
-            </tr>
-        </thead>
-        <tbody>
+# ========================== FONCTIONS CAPPAGE TABLE ===========================
+
+
+def create_cappage_table(dataframes):
     """
-    
-    # Grouper par Section pour gérer l'affichage détaillé/résumé
-    sections_data = {}
-    for (section, libelle) in all_keys:
-        if section not in sections_data:
-            sections_data[section] = []
+    Crée le tableau CAPPAGE & Short_LCR avec structure pivot par date
+    """
+    try:
+        logger.info("📊 Création du tableau CAPPAGE & Short_LCR")
         
-        value_j = lookup_j.get((section, libelle), 0) / 1_000_000_000  # Conversion en milliards
-        value_j1 = lookup_j1.get((section, libelle), 0) / 1_000_000_000
-        variation = value_j - value_j1
+        cappage_results = {}
         
-        sections_data[section].append({
-            'libelle': libelle,
-            'value_j': value_j,
-            'value_j1': value_j1,
-            'variation': variation
-        })
-    
-    # Générer les lignes
-    for section, items in sorted(sections_data.items()):
-        if section == "1.1- Cash":
-            # Affichage détaillé pour 1.1- Cash
-            for item in sorted(items, key=lambda x: x['libelle']):
-                css_class = "variation-positive" if item['variation'] > 0 else "variation-negative" if item['variation'] < 0 else ""
-                sign = "+" if item['variation'] > 0 else ""
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement CAPPAGE pour {file_type}")
+            
+            # Vérification des colonnes requises
+            cappage_cols = ["Top Conso", "SI Remettant", "Commentaire", 
+                           "Date d'arrêté", "LCR_Assiette Pondérée"]
+            missing_cols = [col for col in cappage_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour CAPPAGE {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage des données
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            # Filtres spécifiques CAPPAGE
+            allowed_si_remettant = ["SHORT_LCR", "CAPREOS"]
+            df_filtered = df_filtered[df_filtered["SI Remettant"].isin(allowed_si_remettant)].copy()
+            
+            logger.info(f"📋 Après filtrage CAPPAGE: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée CAPPAGE pour {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage des champs texte
+            df_filtered["SI Remettant"] = df_filtered["SI Remettant"].astype(str).str.strip()
+            df_filtered["Commentaire"] = df_filtered["Commentaire"].astype(str).str.strip()
+            df_filtered["Date d'arrêté"] = df_filtered["Date d'arrêté"].astype(str).str.strip()
+            
+            # Structure de données pour le tableau croisé
+            cappage_data = []
+            
+            # Obtenir toutes les dates uniques
+            dates = sorted(df_filtered["Date d'arrêté"].unique())
+            
+            # Traitement par SI Remettant
+            for si_remettant in allowed_si_remettant:
+                si_data = df_filtered[df_filtered["SI Remettant"] == si_remettant]
                 
-                html += f"""
-                <tr>
-                    <td>{section}</td>
-                    <td>{item['libelle']}</td>
-                    <td class="text-end numeric-value">{item['value_j']:.3f}</td>
-                    <td class="text-end numeric-value {css_class}">{sign}{item['variation']:.3f}</td>
-                </tr>
-                """
-        else:
-            # Affichage des totaux seulement pour les autres sections
-            total_j = sum(item['value_j'] for item in items)
-            total_variation = sum(item['variation'] for item in items)
+                if si_remettant == "CAPREOS":
+                    # Pour CAPREOS, montrer le détail par Commentaire
+                    for commentaire in si_data["Commentaire"].unique():
+                        commentaire_data = si_data[si_data["Commentaire"] == commentaire]
+                        
+                        # Créer une ligne pour chaque commentaire avec toutes les dates
+                        row_data = {
+                            "si_remettant": si_remettant,
+                            "commentaire": commentaire,
+                            "is_detail": True,
+                            "dates": {}
+                        }
+                        
+                        for date in dates:
+                            date_data = commentaire_data[commentaire_data["Date d'arrêté"] == date]
+                            total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
+                            row_data["dates"][date] = total
+                        
+                        cappage_data.append(row_data)
+                else:
+                    # Pour SHORT_LCR, montrer seulement le total
+                    row_data = {
+                        "si_remettant": si_remettant,
+                        "commentaire": "TOTAL",
+                        "is_detail": False,
+                        "dates": {}
+                    }
+                    
+                    for date in dates:
+                        date_data = si_data[si_data["Date d'arrêté"] == date]
+                        total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
+                        row_data["dates"][date] = total
+                    
+                    cappage_data.append(row_data)
             
-            css_class = "variation-positive" if total_variation > 0 else "variation-negative" if total_variation < 0 else ""
-            sign = "+" if total_variation > 0 else ""
+            cappage_results[file_type] = {
+                "data": cappage_data,
+                "dates": dates
+            }
             
-            html += f"""
-            <tr>
-                <td><strong>{section}</strong></td>
-                <td><em>Total</em></td>
-                <td class="text-end numeric-value"><strong>{total_j:.3f}</strong></td>
-                <td class="text-end numeric-value {css_class}"><strong>{sign}{total_variation:.3f}</strong></td>
-            </tr>
-            """
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
+            logger.info(f"✅ CAPPAGE {file_type}: {len(cappage_data)} lignes, {len(dates)} dates")
+        
+        return {
+            "title": "CAPPAGE & Short_LCR",
+            "data": cappage_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "si_remettant": allowed_si_remettant
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création tableau CAPPAGE: {e}")
+        return {
+            "title": "CAPPAGE & Short_LCR - Erreur",
+            "error": str(e)
+        }
 
-def generate_consumption_v2_table_html(consumption_data):
-    """Génère le HTML pour le tableau CONSUMPTION v2"""
-    if len(consumption_data) < 2:
-        return "<div class='alert alert-warning'>Données insuffisantes pour CONSUMPTION v2</div>"
-    
-    data_j = consumption_data.get("j")
-    data_j1 = consumption_data.get("jMinus1")
-    
-    if data_j is None or data_j1 is None:
-        return "<div class='alert alert-danger'>Données CONSUMPTION v2 manquantes</div>"
-    
-    # Créer des dictionnaires de lookup par groupe métier
-    lookup_j = data_j.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].to_dict()
-    lookup_j1 = data_j1.set_index("LCR_ECO_GROUPE_METIERS")["LCR_ECO_IMPACT_LCR"].to_dict()
-    
-    # Fusionner tous les groupes
-    all_groups = set(lookup_j.keys()) | set(lookup_j1.keys())
-    
-    html = """
-    <table class="table table-bordered consumption-v2-table">
-        <thead>
-            <tr>
-                <th>Groupe Métiers</th>
-                <th class="text-center">LCR Impact (Bn €)</th>
-                <th class="text-center">Variation</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    total_j = 0
-    total_j1 = 0
-    
-    # Générer les lignes pour chaque groupe
-    for groupe in sorted(all_groups):
-        value_j = lookup_j.get(groupe, 0) / 1_000_000_000  # Conversion en milliards
-        value_j1 = lookup_j1.get(groupe, 0) / 1_000_000_000
-        variation = value_j - value_j1
-        
-        total_j += value_j
-        total_j1 += value_j1
-        
-        # Valeur absolue et indicateur visuel
-        abs_variation = abs(variation)
-        if variation > 0:
-            indicator = '<i class="fas fa-arrow-up text-success me-1"></i>'
-            variation_class = 'text-success'
-        elif variation < 0:
-            indicator = '<i class="fas fa-arrow-down text-danger me-1"></i>'
-            variation_class = 'text-danger'
-        else:
-            indicator = '<i class="fas fa-minus text-muted me-1"></i>'
-            variation_class = 'text-muted'
-        
-        html += f"""
-        <tr>
-            <td><strong>{groupe}</strong></td>
-            <td class="text-end numeric-value">{value_j:.3f}</td>
-            <td class="text-center {variation_class}">
-                {indicator}
-                <strong>{abs_variation:.3f} Bn</strong>
-            </td>
-        </tr>
-        """
-    
-    # Ligne de total
-    total_variation = total_j - total_j1
-    abs_total_variation = abs(total_variation)
-    
-    if total_variation > 0:
-        total_indicator = '<i class="fas fa-arrow-up text-success me-1"></i>'
-        total_class = 'text-success'
-    elif total_variation < 0:
-        total_indicator = '<i class="fas fa-arrow-down text-danger me-1"></i>'
-        total_class = 'text-danger'
-    else:
-        total_indicator = '<i class="fas fa-minus text-muted me-1"></i>'
-        total_class = 'text-muted'
-    
-    html += f"""
-        <tr class="total-row">
-            <td class="text-end"><strong>TOTAL:</strong></td>
-            <td class="text-end"><strong>{total_j:.3f}</strong></td>
-            <td class="text-center {total_class}">
-                {total_indicator}
-                <strong>{abs_total_variation:.3f} Bn</strong>
-            </td>
-        </tr>
-    """
-    
-    html += """
-        </tbody>
-    </table>
-    """
-    
-    return html
 
+# ========================== FONCTIONS BUFFER & NCO TABLE ===========================
+
+
+def create_buffer_nco_table(dataframes):
+    """
+    Crée les tableaux BUFFER & NCO avec structure pivot par date
+    """
+    try:
+        logger.info("📊 Création des tableaux BUFFER & NCO")
+        
+        buffer_nco_results = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement BUFFER & NCO pour {file_type}")
+            
+            # Vérification des colonnes requises
+            buffer_nco_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", 
+                              "Libellé Client", "Date d'arrêté", "LCR_Assiette Pondérée"]
+            missing_cols = [col for col in buffer_nco_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour BUFFER & NCO {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage Top Conso pour les deux tableaux
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            logger.info(f"📋 Après filtrage Top Conso: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée BUFFER & NCO pour {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage des champs texte
+            df_filtered["LCR_Catégorie"] = df_filtered["LCR_Catégorie"].astype(str).str.strip()
+            df_filtered["LCR_Template Section 1"] = df_filtered["LCR_Template Section 1"].astype(str).str.strip()
+            df_filtered["Libellé Client"] = df_filtered["Libellé Client"].astype(str).str.strip()
+            df_filtered["Date d'arrêté"] = df_filtered["Date d'arrêté"].astype(str).str.strip()
+            
+            # Obtenir toutes les dates uniques
+            dates = sorted(df_filtered["Date d'arrêté"].unique())
+            
+            # TABLEAU 1: BUFFER (avec filtre LCR_Catégorie = "1- Buffer")
+            buffer_data = []
+            df_buffer = df_filtered[df_filtered["LCR_Catégorie"] == "1- Buffer"].copy()
+            
+            if len(df_buffer) > 0:
+                # Grouper par LCR_Template Section 1 et Libellé Client
+                for section in df_buffer["LCR_Template Section 1"].unique():
+                    section_data = df_buffer[df_buffer["LCR_Template Section 1"] == section]
+                    
+                    for client in section_data["Libellé Client"].unique():
+                        client_data = section_data[section_data["Libellé Client"] == client]
+                        
+                        row_data = {
+                            "lcr_template_section": section,
+                            "libelle_client": client,
+                            "dates": {}
+                        }
+                        
+                        for date in dates:
+                            date_data = client_data[client_data["Date d'arrêté"] == date]
+                            total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
+                            row_data["dates"][date] = total
+                        
+                        buffer_data.append(row_data)
+            
+            # TABLEAU 2: NCO (sans filtre, groupé par LCR_Catégorie)
+            nco_data = []
+            
+            for categorie in df_filtered["LCR_Catégorie"].unique():
+                categorie_data = df_filtered[df_filtered["LCR_Catégorie"] == categorie]
+                
+                row_data = {
+                    "lcr_categorie": categorie,
+                    "dates": {}
+                }
+                
+                for date in dates:
+                    date_data = categorie_data[categorie_data["Date d'arrêté"] == date]
+                    total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
+                    row_data["dates"][date] = total
+                
+                nco_data.append(row_data)
+            
+            buffer_nco_results[file_type] = {
+                "buffer_data": buffer_data,
+                "nco_data": nco_data,
+                "dates": dates
+            }
+            
+            logger.info(f"✅ BUFFER & NCO {file_type}: Buffer={len(buffer_data)} lignes, NCO={len(nco_data)} lignes, {len(dates)} dates")
+        
+        return {
+            "title": "BUFFER & NCO",
+            "data": buffer_nco_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "buffer_filter": "LCR_Catégorie = '1- Buffer'",
+                    "nco_filter": "Aucun filtre supplémentaire"
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création tableaux BUFFER & NCO: {e}")
+        return {
+            "title": "BUFFER & NCO - Erreur",
+            "error": str(e)
+        }
+    
 
 # ========================== FONCTIONS CONTEXTE CHATBOT ===========================
 

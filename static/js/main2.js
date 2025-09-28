@@ -616,377 +616,85 @@ function displayCompleteResults(analysisResults) {
         
         let html = '';
         
-        // // Section Balance Sheet
-        // if (analysisResults.balance_sheet) {
-        //     html += generateBalanceSheetSection(analysisResults.balance_sheet);
-        // }
+        // Section avec les deux tableaux côte à côte (BUFFER et CONSUMPTION)
+        html += '<div class="analysis-section fade-in-up">';
+        html += '<div class="row">';
         
-        // // Section Consumption
-        // if (analysisResults.consumption) {
-        //     html += generateConsumptionSection(analysisResults.consumption);
-        // }
-
-
-        // Section Buffer
+        // Tableau BUFFER (côté gauche)
         if (analysisResults.buffer) {
+            html += '<div class="col-lg-6">';
             html += generateBufferSection(analysisResults.buffer);
+            html += '</div>';
+        }
+        
+        // Tableau CONSUMPTION (côté droit)
+        if (analysisResults.consumption) {
+            html += '<div class="col-lg-6">';
+            html += generateConsumptionSection(analysisResults.consumption);
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        html += '</div>';
+        
+        // Tableau RESOURCES en pleine largeur
+        if (analysisResults.resources) {
+            html += '<div class="analysis-section fade-in-up">';
+            html += '<div class="row">';
+            html += '<div class="col-12">';
+            html += generateResourcesSection(analysisResults.resources);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
         }
 
-        // Section Consumption v2
-        if (analysisResults.consumption_v2) {
-            html += generateConsumptionV2Section(analysisResults.consumption_v2);
+        // Tableau CAPPAGE en pleine largeur
+        if (analysisResults.cappage) {
+            html += '<div class="analysis-section fade-in-up">';
+            html += '<div class="row">';
+            html += '<div class="col-12">';
+            html += generateCappageSection(analysisResults.cappage);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
         }
 
+        // Tableaux BUFFER & NCO empilés
+        if (analysisResults.buffer_nco) {
+            html += '<div class="analysis-section fade-in-up">';
+            html += '<div class="row">';
+            html += '<div class="col-12">';
+            html += generateBufferNcoSection(analysisResults.buffer_nco);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        }
 
-    html += `
-    <div class="text-center my-4">
-        <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
-            <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
-        </button>
-        <div class="mt-2">
-            <small class="text-muted">
-                <i class="fas fa-lightbulb me-1"></i>
-                Report includes analysis results and the latest AI response
-            </small>
+        // Bouton export PDF
+        html += `
+        <div class="text-center my-4">
+            <button class="btn btn-analyze btn-lg" onclick="exportToPDF()">
+                <i class="fas fa-file-pdf me-2"></i>DOWNLOAD PDF REPORT
+            </button>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    Report includes analysis results and the latest AI response
+                </small>
+            </div>
         </div>
-    </div>
-    `;
+        `;
         
         document.getElementById('results').innerHTML = html;
         
-        // Attendre que le DOM soit mis à jour
         setTimeout(() => {
-            const firstSection = document.querySelector('.analysis-section');
-            
-            // INITIALISER LES GRAPHIQUES ICI
-            if (window.pendingCharts) {
-                initializeMetierCharts(window.pendingCharts.significantGroups, window.pendingCharts.metierDetails);
-                delete window.pendingCharts;
-            }
-            
-            setTimeout(() => {
-                resolve();
-            }, 1000);
-            
+            resolve();
         }, 500);
     });
 }
 
+// ================================= GÉNÉRATION BUFFER & CONSUMPTION & RESOURCES & CAPPAGE SECTION & BUFFER&NCO =================================
 
-
-// ================================= GÉNÉRATION CONTENU =================================
-
-
-/**
- * Génère la section Balance Sheet
- */
-function generateBalanceSheetSection(balanceSheetData) {
-    if (balanceSheetData.error) {
-        return `
-            <div class="analysis-section">
-                <div class="alert alert-danger">
-                    <h5>Erreur Balance Sheet</h5>
-                    <p>${balanceSheetData.error}</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    let html = `
-        <div class="analysis-section fade-in-up">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1"> ${balanceSheetData.title || '1. Balance Sheet'}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-container">
-                        ${balanceSheetData.pivot_table_html || '<p class="p-3">Données non disponibles</p>'}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-        
-    // Résumé Balance Sheet
-    if (balanceSheetData.summary) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="summary-box">
-                    <div class="d-flex align-items-start">
-                        <div>
-                            <p class="mb-0">${balanceSheetData.summary}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    
-    // Variations Balance Sheet
-    if (balanceSheetData.variations) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="row justify-content-center">
-        `;
-
-        const variations = balanceSheetData.variations;
-
-        // Carte ACTIF
-        if (variations.ACTIF) {
-            const actif = variations.ACTIF;
-            const isPositive = actif.variation >= 0;
-            
-            html += `
-                <div class="col-md-5 mb-3">
-                    <div class="metric-card p-3">
-                        <div class="text-center">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">ASSET</h6>
-                                <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                    ${isPositive ? '📈 Increase' : '📉 Decrease'}
-                                </span>
-                            </div>
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <small class="opacity-75">D-1</small>
-                                    <h4>${actif.j_minus_1} Bn €</h4>
-                                </div>
-                                <div class="col-6">
-                                    <small class="opacity-75">D</small>
-                                    <h4>${actif.j} Bn €</h4>
-                                </div>
-                            </div>
-                            <hr class="my-3 opacity-50">
-                            <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
-                                ${isPositive ? '+' : ''}${actif.variation} Bn €
-                            </h3>
-                            <small class="opacity-75">Variation</small>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Carte PASSIF
-        if (variations.PASSIF) {
-            const passif = variations.PASSIF;
-            const isPositive = passif.variation >= 0;
-            
-            html += `
-                <div class="col-md-5 mb-3">
-                    <div class="metric-card p-3">
-                        <div class="text-center">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">LIABILITY</h6>
-                                <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                    ${isPositive ? '📈 Increase' : '📉 Decrease'}
-                                </span>
-                            </div>
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <small class="opacity-75">D-1</small>
-                                    <h4>${passif.j_minus_1} Bn €</h4>
-                                </div>
-                                <div class="col-6">
-                                    <small class="opacity-75">D</small>
-                                    <h4>${passif.j} Bn €</h4>
-                                </div>
-                            </div>
-                            <hr class="my-3 opacity-50">
-                            <h3 class="${isPositive ? 'text-success' : 'text-danger'}">
-                                ${isPositive ? '+' : ''}${passif.variation} Bn €
-                            </h3>
-                            <small class="opacity-75">Variation</small>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        html += `
-                </div>
-            </div>
-        `;
-
-        // Trait de séparation à la fin 
-        html += `
-            <div class="analysis-section">
-                <hr class="balance-sheet-separator">
-            </div>
-        `;
-    }
-    
-    return html;
-}
-
-/**
- * Génère la section Consumption avec graphiques par métier
- */
-function generateConsumptionSection(consumptionData) {
-    if (consumptionData.error) {
-        return `
-            <div class="analysis-section">
-                <div class="alert alert-danger">
-                    <h5>Erreur Consumption</h5>
-                    <p>${consumptionData.error}</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    let html = `
-        <div class="analysis-section fade-in-up mt-5">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1"> ${consumptionData.title || '2. LCR Consumption'}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-container">
-                        ${consumptionData.consumption_table_html || '<p class="p-3">Données non disponibles</p>'}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Analyse textuelle Consumption
-    if (consumptionData.analysis_text) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="summary-box">
-                    <div class="d-flex align-items-start">
-                        <div>
-                            <p class="mb-0">${consumptionData.analysis_text}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Métriques Consumption globales
-    if (consumptionData.variations && consumptionData.variations.global) {
-        const globalVar = consumptionData.variations.global;
-        const isPositive = globalVar.variation >= 0;
-        
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="row justify-content-center">
-                    <div class="col-md-8">
-                        <div class="metric-card p-2">
-                            <div class="text-center">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">CONSUMPTION</h6>
-                                    <span class="badge ${isPositive ? 'bg-success' : 'bg-danger'}">
-                                        ${isPositive ? '📈 Increase' : '📉 Decrease'}
-                                    </span>
-                                </div>
-                                <div class="row text-center">
-                                    <div class="col-4">
-                                        <small class="opacity-75">D-1</small>
-                                        <h4>${globalVar.j_minus_1} Bn</h4>
-                                    </div>
-                                    <div class="col-4">
-                                        <small class="opacity-75">D</small>
-                                        <h4>${globalVar.j} Bn</h4>
-                                    </div>
-                                    <div class="col-4">
-                                        <small class="opacity-75">Variation</small>
-                                        <h4 class="${isPositive ? 'text-success' : 'text-danger'}">
-                                            ${isPositive ? '+' : ''}${globalVar.variation} Bn
-                                        </h4>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    // Graphiques par métier pour les groupes significatifs
-    if (consumptionData.significant_groups && consumptionData.significant_groups.length > 0 && consumptionData.metier_details) {
-        html += generateMetierChartsSection(consumptionData.significant_groups, consumptionData.metier_details);
-    }
-    
-    // Analyse textuelle par métier
-    if (consumptionData.metier_detailed_analysis) {
-        html += `
-            <div class="analysis-section fade-in-up">
-                <div class="summary-box">
-                    <div class="d-flex align-items-start">
-                        <div>
-                            <p class="mb-0">${consumptionData.metier_detailed_analysis}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    ;
-
-    // Trait de séparation à la fin 
-    html += `
-        <div class="analysis-section">
-            <hr class="balance-sheet-separator">
-        </div>
-    `;
-    
-    return html;
-}
-
-/**
- * Génère la section des graphiques par métier
- */
-function generateMetierChartsSection(significantGroups, metierDetails) {
-    console.log('📊 Génération des graphiques métiers pour:', significantGroups);
-    console.log('📊 Données métiers:', metierDetails);
-    
-    let html = `
-        <div class="analysis-section fade-in-up">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <h4 class="mb-0">Details by group (LCR Consumption)</h4>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-    `;
-    
-    // Générer un graphique pour chaque groupe significatif
-    significantGroups.forEach((groupe, index) => {
-        const chartId = `metierChart_${index}`;
-        html += `
-            <div class="col-lg-6 mb-4">
-                <div class="chart-container">
-                    <h5 class="text-center mb-3">${groupe}</h5>
-                    <canvas id="${chartId}" width="400" height="300"></canvas>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += `
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    window.pendingCharts = { significantGroups, metierDetails };
-
-    return html;
-}
 
 /**
  * Génère la section BUFFER
@@ -994,39 +702,23 @@ function generateMetierChartsSection(significantGroups, metierDetails) {
 function generateBufferSection(bufferData) {
     if (bufferData.error) {
         return `
-            <div class="analysis-section">
-                <div class="alert alert-danger">
-                    <h5>Erreur BUFFER</h5>
-                    <p>${bufferData.error}</p>
-                </div>
+            <div class="alert alert-danger">
+                <h5>Erreur BUFFER</h5>
+                <p>${bufferData.error}</p>
             </div>
         `;
     }
     
     let html = `
-        <div class="analysis-section fade-in-up">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1">${bufferData.title || '1. BUFFER Analysis'}</h2>
-                            <small class="text-muted">LCR_Catégorie: 1- Buffer | Top Conso = O</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-container">
-                        ${bufferData.table_html || '<p class="p-3">Données non disponibles</p>'}
-                    </div>
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">${bufferData.title}</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    ${generateBufferTableHTML(bufferData.data)}
                 </div>
             </div>
-        </div>
-    `;
-
-    // Trait de séparation à la fin 
-    html += `
-        <div class="analysis-section">
-            <hr class="balance-sheet-separator">
         </div>
     `;
     
@@ -1034,276 +726,566 @@ function generateBufferSection(bufferData) {
 }
 
 /**
- * Génère la section CONSUMPTION v2
+ * Génère la section CONSUMPTION
  */
-function generateConsumptionV2Section(consumptionData) {
+function generateConsumptionSection(consumptionData) {
     if (consumptionData.error) {
         return `
-            <div class="analysis-section">
-                <div class="alert alert-danger">
-                    <h5>Erreur CONSUMPTION</h5>
-                    <p>${consumptionData.error}</p>
-                </div>
+            <div class="alert alert-danger">
+                <h5>Erreur CONSUMPTION</h5>
+                <p>${consumptionData.error}</p>
             </div>
         `;
     }
     
     let html = `
-        <div class="analysis-section fade-in-up">
-            <div class="card border-0">
-                <div class="card-header no-background">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 style="color: #76279b;" class="mb-1">${consumptionData.title || '2. CONSUMPTION Analysis'}</h2>
-                            <small class="text-muted">
-                                Groupes: A&WM & Insurance, CIB Financing, CIB Markets, GLOBAL TRADE, Other Consumption | 
-                                Exclusions: GT TREASURY/GROUP SERVICES, SIGHT DEPOSIT/FINANCING MIRROR
-                            </small>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-container">
-                        ${consumptionData.table_html || '<p class="p-3">Données non disponibles</p>'}
-                    </div>
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">${consumptionData.title}</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    ${generateConsumptionTableHTML(consumptionData.data)}
                 </div>
             </div>
-        </div>
-    `;
-
-    // Légende pour les indicateurs visuels
-    html += `
-        <div class="analysis-section fade-in-up">
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-center align-items-center">
-                            <small class="me-4">
-                                <i class="fas fa-arrow-up text-success me-1"></i>
-                                <strong class="text-success">Augmentation</strong>
-                            </small>
-                            <small>
-                                <i class="fas fa-arrow-down text-danger me-1"></i>
-                                <strong class="text-danger">Diminution</strong>
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Trait de séparation à la fin 
-    html += `
-        <div class="analysis-section">
-            <hr class="balance-sheet-separator">
         </div>
     `;
     
     return html;
 }
 
-// ================================= GRAPHIQUES =================================
-
-
 /**
- * Initialise les graphiques métiers avec Chart.js
+ * Génère le HTML du tableau BUFFER 
  */
-function initializeMetierCharts(significantGroups, metierDetails) {
-    console.log('🎨 Initialisation des graphiques métiers');
-    
-    // Vérifier que Chart.js est disponible
-    if (typeof Chart === 'undefined') {
-        console.error('❌ Chart.js non disponible');
-        return;
+function generateBufferTableHTML(bufferData) {
+    if (!bufferData.j || !bufferData.jMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau BUFFER</div>';
     }
     
-    significantGroups.forEach((groupe, index) => {
-        const chartId = `metierChart_${index}`;
-        const canvas = document.getElementById(chartId);
+    const dataJ = bufferData.j;
+    const dataJ1 = bufferData.jMinus1;
+    
+    // Créer un mapping pour les variations
+    const variationsMap = new Map();
+    
+    // Calculer les variations
+    dataJ.forEach(itemJ => {
+        const key = `${itemJ.section}_${itemJ.client}`;
+        const itemJ1 = dataJ1.find(item => item.section === itemJ.section && item.client === itemJ.client);
+        const valueJ1 = itemJ1 ? itemJ1.total : 0;
+        const variation = itemJ.total - valueJ1;
         
-        if (!canvas) {
-            console.error(`❌ Canvas ${chartId} non trouvé`);
-            return;
-        }
-        
-        // Préparer les données pour ce groupe
-        const chartData = prepareMetierChartData(groupe, metierDetails);
-        
-        if (!chartData) {
-            console.error(`❌ Pas de données pour ${groupe}`);
-            return;
-        }
-        
-        // Créer le graphique
-        new Chart(canvas.getContext('2d'), {
-            type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: `LCR variations detailed for - ${groupe}`,
-                        font: { size: 14, weight: 'bold' }
-                    },
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        title: {
-                            display: true,
-                            text: 'LCR Impact (Bn €)'
-                        },
-                        grid: {
-                            color: 'rgba(0,0,0,0.1)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: ''
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 0
-                        }
-                    }
-                },
-                elements: {
-                    bar: {
-                        borderWidth: 1
-                    }
-                }
-            }
+        variationsMap.set(key, {
+            j: itemJ.total,
+            j1: valueJ1,
+            variation: variation
         });
-        
-        console.log(`✅ Graphique créé pour ${groupe}`);
     });
-}
-
-/**
- * Prépare les données pour un graphique métier
- */
-function prepareMetierChartData(groupe, metierDetails) {
-    try {
-        // Récupérer les données J et J-1 pour ce groupe
-        const dataJ = metierDetails.j ? metierDetails.j.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
-        const dataJ1 = metierDetails.jMinus1 ? metierDetails.jMinus1.filter(item => item.LCR_ECO_GROUPE_METIERS === groupe) : [];
-        
-        if (dataJ.length === 0 && dataJ1.length === 0) {
-            return null;
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th class="align-middle">Hierarchy</th>
+                    <th class="text-center header-j">D (Today)<br><small>LCR Assiette Pondérée (Bn €)</small></th>
+                    <th class="text-center header-variation">Variation<br><small>Abs. Value</small></th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Organiser les données par section
+    const sectionGroups = {};
+    dataJ.forEach(item => {
+        if (!sectionGroups[item.section]) {
+            sectionGroups[item.section] = [];
         }
+        sectionGroups[item.section].push(item);
+    });
+    
+    // Générer les lignes avec hiérarchie
+    Object.keys(sectionGroups).forEach(section => {
+        const items = sectionGroups[section];
         
-        // Créer un mapping par métier
-        const metiersMap = new Map();
-        
-        // Ajouter les données J-1
-        dataJ1.forEach(item => {
-            metiersMap.set(item.Métier, {
-                metier: item.Métier,
-                j_minus_1: item.LCR_ECO_IMPACT_LCR_Bn,
-                j: 0
-            });
-        });
-        
-        // Ajouter/mettre à jour avec les données J
-        dataJ.forEach(item => {
-            if (metiersMap.has(item.Métier)) {
-                metiersMap.get(item.Métier).j = item.LCR_ECO_IMPACT_LCR_Bn;
-            } else {
-                metiersMap.set(item.Métier, {
-                    metier: item.Métier,
-                    j_minus_1: 0,
-                    j: item.LCR_ECO_IMPACT_LCR_Bn
-                });
-            }
-        });
-        
-        // Calculer les variations et trier par ordre décroissant
-        const metierVariations = Array.from(metiersMap.entries()).map(([metier, data]) => ({
-            metier: metier,
-            variation: data.j - data.j_minus_1,
-            j: data.j,
-            j_minus_1: data.j_minus_1
-        }));
-        
-        // TRIER PAR VARIATION DÉCROISSANTE (positives d'abord, puis négatives)
-        metierVariations.sort((a, b) => b.variation - a.variation);
-        
-        // Calculer la variation totale du groupe
-        const totalVariation = metierVariations.reduce((sum, item) => sum + item.variation, 0);
-        
-        // NOUVEAU: Positionner intelligemment la barre TOTAL
-        let labels = [];
-        let variations = [];
-        
-        if (totalVariation >= 0) {
-            // Si le total est positif, le mettre tout à gauche
-            labels.push('TOTAL GROUP');
-            variations.push(totalVariation);
+        if (section === "1.1- Cash") {
+            // Pour 1.1- Cash, d'abord la ligne de section
+            html += `<tr class="section-header">`;
+            html += `<td class="fw-bold text-primary">${section}</td>`;
+            html += `<td colspan="2" class="text-muted text-center"><em>Détail ci-dessous</em></td>`;
+            html += '</tr>';
             
-            // Ajouter les métiers ensuite
-            metierVariations.forEach(item => {
-                labels.push(item.metier);
-                variations.push(item.variation);
+            // Puis les détails avec indentation
+            items.forEach(item => {
+                const key = `${item.section}_${item.client}`;
+                const varData = variationsMap.get(key);
+                const absVariation = Math.abs(varData.variation);
+                const isPositive = varData.variation >= 0;
+                
+                html += `<tr class="detail-row">`;
+                html += `<td class="ps-4">├─ ${item.client}</td>`;
+                html += `<td class="text-end numeric-value">${item.total.toFixed(3)}</td>`;
+                html += `<td class="text-end numeric-value">
+                            ${absVariation.toFixed(3)}
+                            <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
+                                ${isPositive ? '▲' : '▼'}
+                            </span>
+                         </td>`;
+                html += '</tr>';
             });
         } else {
-            // Si le total est négatif, mettre d'abord les métiers
-            metierVariations.forEach(item => {
-                labels.push(item.metier);
-                variations.push(item.variation);
-            });
+            // Pour les autres sections, juste la ligne totale
+            const item = items[0]; // Il n'y a qu'un élément "TOTAL" pour ces sections
+            const key = `${item.section}_${item.client}`;
+            const varData = variationsMap.get(key);
+            const absVariation = Math.abs(varData.variation);
+            const isPositive = varData.variation >= 0;
             
-            // Puis mettre le total à droite
-            labels.push('TOTAL GROUP');
-            variations.push(totalVariation);
+            html += `<tr class="total-row">`;
+            html += `<td class="fw-bold">${section}</td>`;
+            html += `<td class="text-end numeric-value">${item.total.toFixed(3)}</td>`;
+            html += `<td class="text-end numeric-value">
+                        ${absVariation.toFixed(3)}
+                        <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
+                            ${isPositive ? '▲' : '▼'}
+                        </span>
+                     </td>`;
+            html += '</tr>';
         }
-        
-        return {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Variation (D - D-1)',
-                    data: variations,
-                    backgroundColor: variations.map((v, index) => {
-                        // Identifier si c'est la barre TOTAL
-                        const isTotalBar = labels[index] === 'TOTAL GROUP';
-                        
-                        if (isTotalBar) {
-                            return v >= 0 ? '#6B218D' : '#6B218D'; // Couleur spéciale pour le total
-                        }
-                        // Couleurs normales pour les métiers
-                        return v >= 0 ? '#51A0A2' : '#805bed';
-                    }),
-                    borderColor: variations.map((v, index) => {
-                        const isTotalBar = labels[index] === 'TOTAL GROUP';
-                        
-                        if (isTotalBar) {
-                            return v >= 0 ? '#6B218D' : '#6B218D';
-                        }
-                        return v >= 0 ? '#51A0A2' : '#805bed';
-                    }),
-                    borderWidth: variations.map((v, index) => {
-                        const isTotalBar = labels[index] === 'TOTAL GROUP';
-                        // Bordure plus épaisse pour le total
-                        return isTotalBar ? 3 : 2;
-                    })
-                }
-            ]
-        };
-        
-    } catch (error) {
-        console.error(`⚠ Erreur préparation données pour ${groupe}:`, error);
-        return null;
-    }
+    });
+    
+    html += '</tbody></table>';
+    return html;
 }
 
+/**
+ * Génère le HTML du tableau CONSUMPTION
+ */
+function generateConsumptionTableHTML(consumptionData) {
+    if (!consumptionData.j || !consumptionData.jMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CONSUMPTION</div>';
+    }
+    
+    const dataJ = consumptionData.j;
+    const dataJ1 = consumptionData.jMinus1;
+    
+    // Créer un mapping pour les variations
+    const variationsMap = new Map();
+    
+    // Calculer les variations
+    dataJ.forEach(itemJ => {
+        const itemJ1 = dataJ1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
+        const valueJ1 = itemJ1 ? itemJ1.LCR_ECO_IMPACT_LCR_Bn : 0;
+        const variation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        
+        variationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
+            j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
+            j1: valueJ1,
+            variation: variation
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+                    <th class="text-center header-j">D (Today)</th>
+                    <th class="text-center header-variation">Variation</th>
+                </tr>
+                <tr>
+                    <th class="text-center header-j">LCR ECO Impact (Bn €)</th>
+                    <th class="text-center header-variation">Abs. Value</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Générer les lignes
+    dataJ.forEach(item => {
+        const varData = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        const absVariation = Math.abs(varData.variation);
+        const isPositive = varData.variation >= 0;
+        
+        html += '<tr>';
+        html += `<td class="fw-bold">${item.LCR_ECO_GROUPE_METIERS}</td>`;
+        html += `<td class="text-end numeric-value">${item.LCR_ECO_IMPACT_LCR_Bn.toFixed(3)}</td>`;
+        html += `<td class="text-end numeric-value">
+                    ${absVariation.toFixed(3)}
+                    <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
+                        ${isPositive ? '▲' : '▼'}
+                    </span>
+                 </td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère la section RESOURCES
+ */
+function generateResourcesSection(resourcesData) {
+    if (resourcesData.error) {
+        return `
+            <div class="alert alert-danger">
+                <h5>Erreur RESOURCES</h5>
+                <p>${resourcesData.error}</p>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">${resourcesData.title}</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    ${generateResourcesTableHTML(resourcesData.data)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau RESOURCES
+ */
+function generateResourcesTableHTML(resourcesData) {
+    if (!resourcesData.j || !resourcesData.jMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau RESOURCES</div>';
+    }
+    
+    const dataJ = resourcesData.j;
+    const dataJ1 = resourcesData.jMinus1;
+    
+    // Créer un mapping pour les variations
+    const variationsMap = new Map();
+    
+    // Calculer les variations
+    dataJ.forEach(itemJ => {
+        const itemJ1 = dataJ1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
+        const valueJ1 = itemJ1 ? itemJ1.LCR_ECO_IMPACT_LCR_Bn : 0;
+        const variation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        
+        variationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
+            j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
+            j1: valueJ1,
+            variation: variation
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+                    <th class="text-center header-j">D (Today)</th>
+                    <th class="text-center header-variation">Variation</th>
+                </tr>
+                <tr>
+                    <th class="text-center header-j">LCR ECO Impact (Bn €)</th>
+                    <th class="text-center header-variation">Abs. Value</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Générer les lignes
+    dataJ.forEach(item => {
+        const varData = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        const absVariation = Math.abs(varData.variation);
+        const isPositive = varData.variation >= 0;
+        
+        html += '<tr>';
+        html += `<td class="fw-bold">${item.LCR_ECO_GROUPE_METIERS}</td>`;
+        html += `<td class="text-end numeric-value">${item.LCR_ECO_IMPACT_LCR_Bn.toFixed(3)}</td>`;
+        html += `<td class="text-end numeric-value">
+                    ${absVariation.toFixed(3)}
+                    <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
+                        ${isPositive ? '▲' : '▼'}
+                    </span>
+                 </td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère la section CAPPAGE
+ */
+function generateCappageSection(cappageData) {
+    if (cappageData.error) {
+        return `
+            <div class="alert alert-danger">
+                <h5>Erreur CAPPAGE</h5>
+                <p>${cappageData.error}</p>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">${cappageData.title}</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    ${generateCappageTableHTML(cappageData.data)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau CAPPAGE avec structure pivot
+ */
+function generateCappageTableHTML(cappageData) {
+    if (!cappageData.j || !cappageData.jMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CAPPAGE</div>';
+    }
+    
+    const dataJ = cappageData.j;
+    
+    if (!dataJ.data || dataJ.data.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée CAPPAGE disponible</div>';
+    }
+    
+    const dates = dataJ.dates || [];
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">SI Remettant</th>
+                    <th rowspan="2" class="align-middle">Commentaire</th>
+    `;
+    
+    // En-têtes des dates
+    dates.forEach(date => {
+        html += `<th class="text-center header-j">${date}</th>`;
+    });
+    
+    html += `
+                </tr>
+                <tr>
+    `;
+    
+    // Sous-en-têtes pour les dates
+    dates.forEach(() => {
+        html += `<th class="text-center header-j">LCR Assiette Pondérée (Bn €)</th>`;
+    });
+    
+    html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Générer les lignes
+    dataJ.data.forEach(item => {
+        const rowClass = item.is_detail ? '' : 'total-row';
+        
+        html += `<tr class="${rowClass}">`;
+        html += `<td class="fw-bold">${item.si_remettant}</td>`;
+        html += `<td>${item.commentaire}</td>`;
+        
+        // Valeurs pour chaque date
+        dates.forEach(date => {
+            const value = item.dates[date] || 0;
+            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère la section BUFFER & NCO (deux tableaux empilés)
+ */
+function generateBufferNcoSection(bufferNcoData) {
+    if (bufferNcoData.error) {
+        return `
+            <div class="alert alert-danger">
+                <h5>Erreur BUFFER & NCO</h5>
+                <p>${bufferNcoData.error}</p>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">${bufferNcoData.title}</h3>
+            </div>
+            <div class="card-body p-0">
+                <!-- Tableau BUFFER -->
+                <h5 class="text-primary mb-3 px-3 pt-3">1. BUFFER (LCR_Catégorie = "1- Buffer")</h5>
+                <div class="table-container mb-4">
+                    ${generateBufferNcoBufferTableHTML(bufferNcoData.data)}
+                </div>
+                
+                <!-- Tableau NCO -->
+                <h5 class="text-primary mb-3 px-3">2. NCO (All Categories)</h5>
+                <div class="table-container">
+                    ${generateBufferNcoNcoTableHTML(bufferNcoData.data)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau BUFFER (premier tableau)
+ */
+function generateBufferNcoBufferTableHTML(bufferNcoData) {
+    if (!bufferNcoData.j) {
+        return '<div class="alert alert-warning">Données BUFFER insuffisantes</div>';
+    }
+    
+    const dataJ = bufferNcoData.j;
+    const bufferData = dataJ.buffer_data || [];
+    const dates = dataJ.dates || [];
+    
+    if (bufferData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée BUFFER disponible</div>';
+    }
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">Hierarchy</th>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center header-j">${date}</th>`;
+    });
+    
+    html += `
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(() => {
+        html += `<th class="text-center header-j">LCR Assiette Pondérée (Bn €)</th>`;
+    });
+    
+    html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Organiser par section
+    const sectionGroups = {};
+    bufferData.forEach(item => {
+        if (!sectionGroups[item.lcr_template_section]) {
+            sectionGroups[item.lcr_template_section] = [];
+        }
+        sectionGroups[item.lcr_template_section].push(item);
+    });
+    
+    // Générer avec hiérarchie
+    Object.keys(sectionGroups).forEach(section => {
+        const items = sectionGroups[section];
+        
+        // Ligne d'en-tête de section
+        html += `<tr class="section-header">`;
+        html += `<td class="fw-bold text-primary">${section}</td>`;
+        dates.forEach(() => {
+            html += `<td class="text-muted text-center"><em>─</em></td>`;
+        });
+        html += '</tr>';
+        
+        // Lignes de détail avec indentation
+        items.forEach(item => {
+            html += `<tr class="detail-row">`;
+            html += `<td class="ps-4">├─ ${item.libelle_client}</td>`;
+            
+            dates.forEach(date => {
+                const value = item.dates[date] || 0;
+                html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+            });
+            
+            html += '</tr>';
+        });
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau NCO (deuxième tableau)
+ */
+function generateBufferNcoNcoTableHTML(bufferNcoData) {
+    if (!bufferNcoData.j) {
+        return '<div class="alert alert-warning">Données NCO insuffisantes</div>';
+    }
+    
+    const dataJ = bufferNcoData.j;
+    const ncoData = dataJ.nco_data || [];
+    const dates = dataJ.dates || [];
+    
+    if (ncoData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée NCO disponible</div>';
+    }
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">LCR Catégorie</th>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center header-j">${date}</th>`;
+    });
+    
+    html += `
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(() => {
+        html += `<th class="text-center header-j">LCR Assiette Pondérée (Bn €)</th>`;
+    });
+    
+    html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    ncoData.forEach(item => {
+        html += '<tr>';
+        html += `<td class="fw-bold">${item.lcr_categorie}</td>`;
+        
+        dates.forEach(date => {
+            const value = item.dates[date] || 0;
+            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
 
 
 // ================================= CHATBOT =================================
