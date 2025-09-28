@@ -1,4 +1,4 @@
-   /* static/css/styles.css
+/* static/css/styles.css
  * Steering ALM Metrics - Styles principaux
  * =======================================
  */
@@ -6,11 +6,48 @@
 /* ================================= VARIABLES CSS ================================= */
 
 :root {
+    /* Palette principale Natixis */
     --natixis-blue: #76279b;
     --natixis-light-blue: #ab54d4;
     --natixis-very-light-blue: #D3A5E9;
     --success-green: #28a745;
     --danger-red: #dc3545;
+    
+    /* Palette BUFFER - Bleus professionnels */
+    --buffer-primary: #2E5BBA;
+    --buffer-secondary: #4A90E2;
+    --buffer-light: #E8F2FF;
+    --buffer-border: #B8D4F0;
+    
+    /* Palette CONSUMPTION - Verts métier */
+    --consumption-primary: #2D8659;
+    --consumption-secondary: #52B788;
+    --consumption-light: #E8F5E8;
+    --consumption-border: #B7E4C7;
+    
+    /* Palette RESOURCES - Orange énergique */
+    --resources-primary: #D97706;
+    --resources-secondary: #F59E0B;
+    --resources-light: #FEF3C7;
+    --resources-border: #FCD34D;
+    
+    /* Palette CAPPAGE - Violets sophistiqués */
+    --cappage-primary: #7C3AED;
+    --cappage-secondary: #A855F7;
+    --cappage-light: #F3E8FF;
+    --cappage-border: #C4B5FD;
+    
+    /* Palette BUFFER & NCO - Roses professionnels */
+    --buffer-nco-primary: #BE185D;
+    --buffer-nco-secondary: #EC4899;
+    --buffer-nco-light: #e7fcf1;
+    --buffer-nco-border: #F9A8D4;
+    
+    /* Palette CONSUMPTION & RESOURCES - Teal moderne */
+    --cons-res-primary: #0F766E;
+    --cons-res-secondary: #14B8A6;
+    --cons-res-light: #CCFBF1;
+    --cons-res-border: #5EEAD4;
 }
 
 /* ================================= BASE STYLES ================================= */
@@ -55,6 +92,31 @@ body {
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
+.navbar-logo {
+    height: 40px;
+    margin-right: 15px;
+    transition: transform 0.3s ease;
+}
+
+.navbar-logo:hover {
+    transform: scale(1.05);
+}
+
+.analysis-section { 
+    margin: 40px 0; 
+}
+
+.balance-sheet-separator {
+    border: none;
+    height: 10px;
+    background: var(--natixis-blue);
+    margin: 2rem auto;
+    width: 100%;
+    border-radius: 2px;
+}
+
+/* ================================= UPLOAD AREAS ================================= */
+
 .upload-area { 
     border: 3px dashed var(--natixis-light-blue); 
     padding: 2.5rem; 
@@ -68,7 +130,7 @@ body {
 
 .upload-area:hover { 
     background: linear-gradient(145deg, #f0f8ff, #e3f2fd);
-    border-color: var(--natixis-green);
+    border-color: var(--success-green);
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0,102,204,0.15);
 }
@@ -81,99 +143,295 @@ body {
 }
 
 .upload-area:hover i {
-    color: var(--natixis-green);
+    color: var(--success-green);
     transform: scale(1.1);
 }
 
-
 .upload-area.drag-over {
-    border-color: var(--natixis-green) !important;
+    border-color: var(--success-green) !important;
     background: rgba(0, 166, 81, 0.1) !important;
     transform: scale(1.02);
 }
 
-/* Styles du tableau croisé dynamique */
-.pivot-table, .consumption-table { 
+/* ================================= TABLEAUX - STYLES DE BASE ================================= */
+
+.new-table { 
     font-size: 13px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    border: none;
+    margin-bottom: 0;
 }
 
-.pivot-table th, .consumption-table th { 
-    background: #bf7cde;
-    color: white; 
+.new-table th { 
     font-weight: 600; 
     text-align: center; 
-    padding: 12px 8px; 
+    padding: 16px 12px; 
     border: none;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
-.pivot-table td, .consumption-table td { 
-    padding: 8px; 
-    border: 1px solid #e0e6ed; 
+.new-table td { 
+    padding: 12px; 
+    border: 1px solid rgba(0,0,0,0.06); 
     vertical-align: middle;
+    transition: all 0.2s ease;
 }
 
-.pivot-table tbody tr:hover, .consumption-table tbody tr:hover {
-    background-color: rgba(0, 102, 204, 0.05);
-    transition: background-color 0.2s ease;
+.new-table tbody tr:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 5;
+    position: relative;
 }
 
-/* Styles des lignes spéciales */
+.table-container {
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.06);
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.numeric-value {
+    font-family: 'Courier New', monospace;
+    text-align: right;
+}
+
+/* ================================= TABLEAUX - STYLES SPÉCIFIQUES ================================= */
+
+/* BUFFER TABLES */
+.buffer-table th { 
+    background: linear-gradient(135deg, var(--buffer-primary), var(--buffer-secondary));
+    color: white;
+}
+
+.buffer-table tbody tr:hover {
+    background: var(--buffer-light);
+}
+
+.buffer-table .section-header {
+    background: var(--buffer-light) !important;
+    border-left: 4px solid var(--buffer-primary) !important;
+}
+
+.buffer-table .section-header td {
+    color: var(--buffer-primary) !important;
+}
+
+.buffer-table .detail-row {
+    background: rgba(232, 242, 255, 0.3);
+}
+
+/* CONSUMPTION TABLES */
+.consumption-table th { 
+    background: linear-gradient(135deg, var(--consumption-primary), var(--consumption-secondary));
+    color: white;
+}
+
+.consumption-table tbody tr:hover {
+    background: var(--consumption-light);
+}
+
+/* RESOURCES TABLES */
+.resources-table th { 
+    background: linear-gradient(135deg, var(--resources-primary), var(--resources-secondary));
+    color: white;
+}
+
+.resources-table tbody tr:hover {
+    background: var(--resources-light);
+}
+
+/* Styles pour l'analyse IA de Consumption & Resources */
+.analysis-loading {
+    min-height: 80px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.ai-analysis-content {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    padding: 1rem;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.analysis-text {
+    color: #495057;
+}
+
+.analysis-text h4 {
+    color: var(--natixis-blue);
+    font-size: 1em;
+    margin-bottom: 0.5rem;
+}
+
+.analysis-text h5 {
+    color: var(--natixis-light-blue);
+    font-size: 0.9em;
+    margin-bottom: 0.3rem;
+}
+
+.analysis-text p {
+    margin-bottom: 0.5rem;
+}
+
+.analysis-text ul {
+    margin-bottom: 0.5rem;
+    padding-left: 1.2rem;
+}
+
+.analysis-text li {
+    margin-bottom: 0.2rem;
+}
+
+/* CAPPAGE TABLES */
+.cappage-table th { 
+    background: linear-gradient(135deg, var(--cappage-primary), var(--cappage-secondary));
+    color: white;
+}
+
+.cappage-table tbody tr:hover {
+    background: var(--cappage-light);
+}
+
+/* BUFFER & NCO TABLES */
+.buffer-nco-table th { 
+    background: linear-gradient(135deg, var(--buffer-nco-primary), var(--buffer-nco-secondary));
+    color: white;
+}
+
+.buffer-nco-table tbody tr:hover {
+    background: var(--buffer-nco-light);
+}
+
+/* CONSUMPTION & RESOURCES TABLES */
+.cons-res-table th { 
+    background: linear-gradient(135deg, var(--cons-res-primary), var(--cons-res-secondary));
+    color: white;
+}
+
+.cons-res-table tbody tr:hover {
+    background: var(--cons-res-light);
+}
+
+/* SUMMARY TABLE */
+.summary-table {
+    font-size: 12px;
+    margin-top: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.summary-table th {
+    background: linear-gradient(135deg, #475569, #64748B) !important;
+    color: white;
+    font-size: 11px;
+    padding: 12px 8px;
+    font-weight: 600;
+}
+
+.summary-table td {
+    padding: 10px 8px;
+    font-size: 11px;
+    background: #F8FAFC;
+}
+
+.summary-table tbody tr:hover {
+    background: #E2E8F0;
+}
+
+/* ================================= TABLEAUX - ÉLÉMENTS COMMUNS ================================= */
+
 .total-row { 
-    background: linear-gradient(135deg, #f3dffc, #f3dffc);
-    font-weight: bold; 
-    border-top: 2px solid var(--natixis-light-blue);
+    background: linear-gradient(135deg, #F1F5F9, #E2E8F0);
+    font-weight: 700; 
+    border-top: 2px solid #64748B;
+    position: relative;
+}
+
+.total-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to bottom, var(--natixis-blue), var(--natixis-light-blue));
 }
 
 .total-row td {
     font-weight: 700;
-    border-top: 2px solid var(--natixis-light-blue);
+    padding: 14px 12px;
 }
 
-/* Styles des variations */
-.variation-positive { 
-    color: var(--success-green); 
-    font-weight: bold;
+.section-header {
     position: relative;
+    font-weight: 600;
+    background: rgba(118, 39, 155, 0.1) !important;
+    border-left: 4px solid var(--natixis-blue) !important;
 }
 
-.variation-positive::before {
-    content: "▲";
-    margin-right: 3px;
-    font-size: 0.8em;
+.section-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--natixis-blue);
 }
 
-.variation-negative { 
-    color: var(--danger-red); 
-    font-weight: bold;
+.section-header td {
+    font-weight: 600 !important;
+    color: var(--natixis-blue) !important;
+}
+
+.detail-row {
+    background: rgba(248, 249, 250, 0.5);
+}
+
+.detail-row td:first-child {
+    font-size: 0.9em;
+    color: #64748B;
     position: relative;
+    padding-left: 2.5rem !important;
+    border-left: 2px solid var(--natixis-light-blue);
 }
 
-.variation-negative::before {
-    content: "▼";
-    margin-right: 3px;
-    font-size: 0.8em;
+.detail-row:hover {
+    background: rgba(248, 250, 252, 0.8) !important;
 }
 
-/* En-têtes de colonnes spécialisés */
-.header-j-minus-1 {
-    background: linear-gradient(135deg, #ab54d4, #ab54d4) !important;
+.variation-indicator {
+    margin-left: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
-.header-j {
-    background: linear-gradient(135deg,  #bf7cde, #bf7cde) !important;
+.variation-indicator.positive {
+    color: #059669;
 }
 
-.header-variation {
-    background: linear-gradient(135deg, #ab54d4, #ab54d4) !important;
+.variation-indicator.negative {
+    color: #DC2626;
 }
 
-/* Cartes de métriques */
+/* ================================= CARTES ET MÉTRIQUES ================================= */
+
 .metric-card { 
     background: #f3dffc; 
     color: black; 
@@ -205,6 +463,20 @@ body {
     color: var(--natixis-blue) !important;
     font-weight: 600;
     margin: 0;
+    position: relative;
+    padding-left: 20px;
+}
+
+.card-header.no-background h3::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(to bottom, var(--natixis-blue), var(--natixis-light-blue));
+    border-radius: 2px;
 }
 
 .card-header.no-background .badge {
@@ -212,7 +484,21 @@ body {
     color: white;
 }
 
-/* Boutons */
+.summary-box {
+    background: #f3dffc;
+    color: black;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.summary-box h5 {
+    color: white;
+    font-weight: 600;
+}
+
+/* ================================= BOUTONS ================================= */
+
 .btn-analyze {
     background: linear-gradient(45deg, var(--natixis-light-blue), var(--natixis-light-blue)); 
     border: none; 
@@ -237,134 +523,8 @@ body {
     box-shadow: none;
 }
 
-/* Alertes et statuts */
-.alert {
-    border: none;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
+/* ================================= CHATBOT ================================= */
 
-.balance-sheet-separator {
-    border: none;
-    height: 10px;
-    background: var(--natixis-blue);
-    margin: 2rem auto;
-    width: 100%;
-    border-radius: 2px;
-}
-
-.analysis-section { 
-    margin: 40px 0; 
-}
-
-/* Animations */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-.pulse {
-    animation: pulse 2s infinite;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.fade-in-up {
-    animation: fadeInUp 0.6s ease forwards;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .pivot-table {
-        font-size: 11px;
-    }
-    
-    .pivot-table th,
-    .pivot-table td {
-        padding: 6px 4px;
-    }
-    
-    .metric-card {
-        padding: 1.5rem;
-    }
-}
-
-/* Table responsive avec scroll horizontal */
-.table-container {
-    max-width: 100%;
-    overflow-x: auto;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-/* Styles pour les valeurs numériques */
-.numeric-value {
-    font-family: 'Courier New', monospace;
-    text-align: right;
-}
-
-/* Légende */
-.table-legend {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    margin-top: 15px;
-    border-left: 4px solid var(--natixis-light-blue);
-}
-
-.chart-container {
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    position: relative;
-    height: 350px;
-}
-
-.chart-container h5 {
-    color: var(--natixis-blue);
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-.chart-container canvas {
-    max-height: 280px !important;
-}
-
-.summary-box {
-    background: #f3dffc;
-    color: black;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.summary-box h5 {
-    color: white;
-    font-weight: 600;
-}
-
-.navbar-logo {
-    height: 40px;
-    margin-right: 15px;
-    transition: transform 0.3s ease;
-}
-
-.navbar-logo:hover {
-    transform: scale(1.05);
-}
-
-/* Styles Chatbot */
 .chatbot-section {
     background: white;
     border-radius: 15px;
@@ -429,61 +589,6 @@ body {
     background: var(--natixis-light-blue);
 }
 
-.document-upload {
-    border: 2px dashed var(--natixis-light-blue);
-    border-radius: 10px;
-    padding: 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    min-height: 80px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.document-upload i {
-    font-size: 2rem;
-    color: var(--natixis-light-blue);
-    margin-bottom: 0.5rem;
-}
-
-.document-upload p {
-    margin: 0;
-    color: #6c757d;
-}
-
-.document-upload.drag-over {
-    border-color: var(--natixis-green) !important;
-    background: rgba(0, 166, 81, 0.1) !important;
-    transform: scale(1.02);
-}
-
-.document-upload {
-    transition: all 0.3s ease;
-}
-
-.document-upload:hover {
-    border-color: var(--natixis-green);
-    background: rgba(0, 166, 81, 0.05);
-}
-
-.uploaded-docs {
-    max-height: 100px;
-    overflow-y: auto;
-}
-
-.doc-item {
-    background: #e3f2fd;
-    padding: 8px 12px;
-    border-radius: 6px;
-    margin-bottom: 5px;
-    font-size: 12px;
-}
-
-/* Ajouter dans la section <style> */
 .ai-response {
     line-height: 1.5;
 }
@@ -517,73 +622,161 @@ body {
     margin-bottom: 10px;
 }
 
-/* Styles pour les nouveaux tableaux */
-.new-table { 
-    font-size: 13px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+/* ================================= DOCUMENTS UPLOAD ================================= */
+
+.document-upload {
+    border: 2px dashed var(--natixis-light-blue);
     border-radius: 10px;
-    overflow: hidden;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.new-table th { 
-    background: #bf7cde;
-    color: white; 
-    font-weight: 600; 
-    text-align: center; 
-    padding: 12px 8px; 
-    border: none;
+.document-upload i {
+    font-size: 2rem;
+    color: var(--natixis-light-blue);
+    margin-bottom: 0.5rem;
 }
 
-.new-table td { 
-    padding: 8px; 
-    border: 1px solid #e0e6ed; 
-    vertical-align: middle;
+.document-upload p {
+    margin: 0;
+    color: #6c757d;
 }
 
-.variation-indicator {
-    margin-left: 5px;
+.document-upload.drag-over {
+    border-color: var(--success-green) !important;
+    background: rgba(0, 166, 81, 0.1) !important;
+    transform: scale(1.02);
+}
+
+.document-upload:hover {
+    border-color: var(--success-green);
+    background: rgba(0, 166, 81, 0.05);
+}
+
+.uploaded-docs {
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.doc-item {
+    background: #e3f2fd;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 5px;
     font-size: 12px;
 }
 
-.variation-indicator.positive {
-    color: #28a745;
+/* ================================= ALERTES ET NOTIFICATIONS ================================= */
+
+.alert {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
-.variation-indicator.negative {
-    color: #dc3545;
+/* ================================= GRAPHIQUES ================================= */
+
+.chart-container {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    height: 350px;
 }
 
-.new-table tbody tr:hover {
-    background-color: rgba(0, 102, 204, 0.05);
-    transition: background-color 0.2s ease;
+.chart-container h5 {
+    color: var(--natixis-blue);
+    font-weight: 600;
+    margin-bottom: 15px;
 }
 
-/* Styles pour la hiérarchie dans les tableaux */
-.section-header {
-    background: rgba(118, 39, 155, 0.1) !important;
-    border-left: 4px solid var(--natixis-blue) !important;
+.chart-container canvas {
+    max-height: 280px !important;
 }
 
-.section-header td {
-    font-weight: 600 !important;
-    color: var(--natixis-blue) !important;
+/* ================================= ANIMATIONS ================================= */
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
-.detail-row {
-    background: rgba(248, 249, 250, 0.5);
+.pulse {
+    animation: pulse 2s infinite;
 }
 
-.detail-row td:first-child {
-    font-size: 0.9em;
-    color: #6c757d;
-    border-left: 2px solid var(--natixis-light-blue);
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.detail-row:hover {
-    background: rgba(171, 84, 212, 0.05) !important;
+.fade-in-up {
+    animation: fadeInUp 0.6s ease forwards;
 }
 
-/* Amélioration du padding pour l'indentation */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.analysis-section {
+    animation: slideInUp 0.6s ease-out forwards;
+}
+
+/* ================================= RESPONSIVE ================================= */
+
+@media (max-width: 768px) {
+    .new-table {
+        font-size: 11px;
+    }
+    
+    .new-table th,
+    .new-table td {
+        padding: 8px 6px;
+    }
+    
+    .summary-table {
+        font-size: 10px;
+    }
+    
+    .metric-card {
+        padding: 1.5rem;
+    }
+}
+
+/* ================================= UTILITAIRES ================================= */
+
 .ps-4 {
     padding-left: 2rem !important;
 }
+
+.table-legend {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    border-left: 4px solid var(--natixis-light-blue);
+}
+

@@ -499,23 +499,29 @@ function displayCompleteResults(analysisResults) {
         
         let html = '';
         
-        // Section avec les deux tableaux côte à côte (BUFFER et CONSUMPTION)
+        // Section avec BUFFER/Summary à gauche et Consumption & Resources à droite
         html += '<div class="analysis-section fade-in-up">';
         html += '<div class="row">';
         
-        // Tableau BUFFER (côté gauche)
+        // Colonne gauche : BUFFER + Summary
         if (analysisResults.buffer) {
             html += '<div class="col-lg-6">';
             html += generateBufferSection(analysisResults.buffer);
+            
+            // Tableau de synthèse juste en dessous du BUFFER (sans titre)
+            if (analysisResults.summary) {
+                html += '<div class="mt-3">';
+                html += generateSummarySection(analysisResults.summary);
+                html += '</div>';
+            }
+            
             html += '</div>';
         }
         
-        // Tableau CONSUMPTION (côté droit)
-        if (analysisResults.consumption) {
-            html += '<div class="col-lg-6">';
-            html += generateConsumptionSection(analysisResults.consumption);
-            html += '</div>';
-        }
+        // Colonne droite : Consumption & Resources avec analyse IA
+        html += '<div class="col-lg-6">';
+        html += generateConsumptionResourcesBlockSection(analysisResults);
+        html += '</div>';
         
         html += '</div>';
         html += '</div>';
@@ -548,6 +554,17 @@ function displayCompleteResults(analysisResults) {
             html += '<div class="row">';
             html += '<div class="col-12">';
             html += generateBufferNcoSection(analysisResults.buffer_nco);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        }
+
+        // Tableaux CONSUMPTION & RESOURCES empilés
+        if (analysisResults.consumption_resources) {
+            html += '<div class="analysis-section fade-in-up">';
+            html += '<div class="row">';
+            html += '<div class="col-12">';
+            html += generateConsumptionResourcesSection(analysisResults.consumption_resources);
             html += '</div>';
             html += '</div>';
             html += '</div>';
@@ -638,6 +655,32 @@ function generateConsumptionSection(consumptionData) {
 }
 
 /**
+ * Génère la section du tableau de synthèse (sans titre)
+ */
+function generateSummarySection(summaryData) {
+    if (summaryData.error) {
+        return `
+            <div class="alert alert-danger">
+                <h5>Erreur Summary</h5>
+                <p>${summaryData.error}</p>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-body p-0">
+                <div class="table-container">
+                    ${generateSummaryTableHTML(summaryData.data)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
  * Génère le HTML du tableau BUFFER
  */
 function generateBufferTableHTML(bufferData) {
@@ -666,7 +709,7 @@ function generateBufferTableHTML(bufferData) {
     });
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table buffer-table">
             <thead>
                 <tr>
                     <th class="align-middle">Hierarchy</th>
@@ -768,7 +811,7 @@ function generateConsumptionTableHTML(consumptionData) {
     });
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table consumption-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
@@ -800,6 +843,60 @@ function generateConsumptionTableHTML(consumptionData) {
                  </td>`;
         html += '</tr>';
     });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau de synthèse
+ */
+function generateSummaryTableHTML(summaryData) {
+    if (!summaryData.j || !summaryData.jMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau de synthèse</div>';
+    }
+    
+    const dataJ = summaryData.j;
+    const dataJ1 = summaryData.jMinus1;
+    
+    let html = `
+        <table class="table table-bordered new-table summary-table">
+            <thead>
+                <tr>
+                    <th class="align-middle">Date d'arrêté</th>
+                    <th class="text-center header-j">LCR Assiette Pondérée<br><small>(Bn €)</small></th>
+                    <th class="text-center header-j">LCR ECO Impact<br><small>(Bn €)</small></th>
+                    <th class="text-center header-variation">Différence<br><small>(Assiette - Impact)</small></th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Ligne pour fichier J-1 (hier)
+    if (dataJ1.length > 0) {
+        const itemJ1 = dataJ1[0]; // Prendre la première date du fichier J-1
+        html += '<tr>';
+        html += `<td class="fw-bold">D (${itemJ1.date})</td>`;
+        html += `<td class="text-end numeric-value">${itemJ1.sum_assiette.toFixed(3)}</td>`;
+        html += `<td class="text-end numeric-value">${itemJ1.sum_impact.toFixed(3)}</td>`;
+        
+        const diffClass = itemJ1.sum_difference >= 0 ? 'text-success' : 'text-danger';
+        html += `<td class="text-end numeric-value ${diffClass}">${itemJ1.sum_difference.toFixed(3)}</td>`;
+        html += '</tr>';
+    }
+    
+    // Ligne pour fichier J (aujourd'hui)
+    if (dataJ.length > 0) {
+        const itemJ = dataJ[0]; // Prendre la première date du fichier J
+        html += '<tr>';
+        html += `<td class="fw-bold">D-1 (${itemJ.date})</td>`;
+        html += `<td class="text-end numeric-value">${itemJ.sum_assiette.toFixed(3)}</td>`;
+        html += `<td class="text-end numeric-value">${itemJ.sum_impact.toFixed(3)}</td>`;
+        
+        const diffClass = itemJ.sum_difference >= 0 ? 'text-success' : 'text-danger';
+        html += `<td class="text-end numeric-value ${diffClass}">${itemJ.sum_difference.toFixed(3)}</td>`;
+        html += '</tr>';
+    }
     
     html += '</tbody></table>';
     return html;
@@ -862,7 +959,7 @@ function generateResourcesTableHTML(resourcesData) {
     });
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table resources-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
@@ -897,6 +994,137 @@ function generateResourcesTableHTML(resourcesData) {
     
     html += '</tbody></table>';
     return html;
+}
+
+/**
+ * Génère le bloc Consumption & Resources avec analyse IA
+ */
+function generateConsumptionResourcesBlockSection(analysisResults) {
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">Consumption & Resources</h3>
+            </div>
+            <div class="card-body p-0">
+    `;
+    
+    // Tableau CONSUMPTION
+    if (analysisResults.consumption) {
+        html += '<h5 class="text-secondary mb-3 px-3 pt-3">Consumption</h5>';
+        html += '<div class="table-container mb-4">';
+        html += generateConsumptionTableHTML(analysisResults.consumption.data);
+        html += '</div>';
+    }
+    
+    // Tableau RESOURCES
+    if (analysisResults.resources) {
+        html += '<h5 class="text-secondary mb-3 px-3">Resources</h5>';
+        html += '<div class="table-container mb-4">';
+        html += generateResourcesTableHTML(analysisResults.resources.data);
+        html += '</div>';
+    }
+    
+    // Zone d'analyse IA
+    html += `
+        <div class="px-3 pb-3">
+            <h5 class="text-secondary mb-3">AI Analysis</h5>
+            <div id="consumption-resources-analysis" class="analysis-loading">
+                <div class="d-flex align-items-center justify-content-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                    <span class="text-muted">Generating analysis...</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    html += '</div></div>';
+    
+    // Déclencher l'analyse IA après un court délai
+    setTimeout(() => {
+        generateConsumptionResourcesAnalysis(analysisResults);
+    }, 1000);
+    
+    return html;
+}
+
+/**
+ * Génère l'analyse IA pour Consumption & Resources
+ */
+async function generateConsumptionResourcesAnalysis(analysisResults) {
+    try {
+        const analysisContainer = document.getElementById('consumption-resources-analysis');
+        
+        if (!analysisContainer) {
+            console.error('Container d\'analyse introuvable');
+            return;
+        }
+        
+        // Préparer le contexte avec les données des deux tableaux
+        const contextData = prepareConsumptionResourcesContext(analysisResults);
+        
+        // Appel à l'IA
+        const response = await fetch('/api/analyze-consumption-resources', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                context_data: contextData
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success) {
+                analysisContainer.innerHTML = `
+                    <div class="ai-analysis-content">
+                        <div class="analysis-text">
+                            ${parseMarkdownToHtml(result.analysis)}
+                        </div>
+                    </div>
+                `;
+            } else {
+                throw new Error(result.message || 'Erreur analyse');
+            }
+        } else {
+            throw new Error('Erreur serveur');
+        }
+        
+    } catch (error) {
+        console.error('Erreur génération analyse IA:', error);
+        
+        const analysisContainer = document.getElementById('consumption-resources-analysis');
+        if (analysisContainer) {
+            analysisContainer.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Analysis temporarily unavailable
+                </div>
+            `;
+        }
+    }
+}
+
+/**
+ * Prépare le contexte pour l'analyse Consumption & Resources
+ */
+function prepareConsumptionResourcesContext(analysisResults) {
+    const context = {
+        consumption_data: null,
+        resources_data: null,
+        timestamp: new Date().toISOString()
+    };
+    
+    if (analysisResults.consumption && analysisResults.consumption.data) {
+        context.consumption_data = analysisResults.consumption.data;
+    }
+    
+    if (analysisResults.resources && analysisResults.resources.data) {
+        context.resources_data = analysisResults.resources.data;
+    }
+    
+    return context;
 }
 
 /**
@@ -945,7 +1173,7 @@ function generateCappageTableHTML(cappageData) {
     const dates = dataJ.dates || [];
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table cappage-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">SI Remettant</th>
@@ -1048,7 +1276,7 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
     }
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table buffer-nco-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">Hierarchy</th>
@@ -1129,7 +1357,7 @@ function generateBufferNcoNcoTableHTML(bufferNcoData) {
     }
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table buffer-nco-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR Catégorie</th>
@@ -1169,6 +1397,160 @@ function generateBufferNcoNcoTableHTML(bufferNcoData) {
     html += '</tbody></table>';
     return html;
 }
+
+/**
+ * Génère la section CONSUMPTION & RESOURCES (deux tableaux empilés)
+ */
+function generateConsumptionResourcesSection(consumptionResourcesData) {
+    if (consumptionResourcesData.error) {
+        return `
+            <div class="alert alert-danger">
+                <h5>Erreur CONSUMPTION & RESOURCES</h5>
+                <p>${consumptionResourcesData.error}</p>
+            </div>
+        `;
+    }
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;" class="mb-1">${consumptionResourcesData.title}</h3>
+            </div>
+            <div class="card-body p-0">
+                <!-- Tableau CONSUMPTION -->
+                <h5 class="text-primary mb-3 px-3 pt-3">1. CONSUMPTION (Filtered Groups)</h5>
+                <div class="table-container mb-4">
+                    ${generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesData.data)}
+                </div>
+                
+                <!-- Tableau RESOURCES -->
+                <h5 class="text-primary mb-3 px-3">2. RESOURCES (Filtered Groups)</h5>
+                <div class="table-container">
+                    ${generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData.data)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau CONSUMPTION (premier tableau)
+ */
+function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesData) {
+    if (!consumptionResourcesData.j) {
+        return '<div class="alert alert-warning">Données CONSUMPTION insuffisantes</div>';
+    }
+    
+    const dataJ = consumptionResourcesData.j;
+    const consumptionData = dataJ.consumption_data || [];
+    const dates = dataJ.dates || [];
+    
+    if (consumptionData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée CONSUMPTION disponible</div>';
+    }
+    
+    let html = `
+        <table class="table table-bordered new-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center header-j">${date}</th>`;
+    });
+    
+    html += `
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(() => {
+        html += `<th class="text-center header-j">LCR ECO Impact (Bn €)</th>`;
+    });
+    
+    html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    consumptionData.forEach(item => {
+        html += '<tr>';
+        html += `<td class="fw-bold">${item.lcr_eco_groupe_metiers}</td>`;
+        
+        dates.forEach(date => {
+            const value = item.dates[date] || 0;
+            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau RESOURCES (deuxième tableau)
+ */
+function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData) {
+    if (!consumptionResourcesData.j) {
+        return '<div class="alert alert-warning">Données RESOURCES insuffisantes</div>';
+    }
+    
+    const dataJ = consumptionResourcesData.j;
+    const resourcesData = dataJ.resources_data || [];
+    const dates = dataJ.dates || [];
+    
+    if (resourcesData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée RESOURCES disponible</div>';
+    }
+    
+    let html = `
+        <table class="table table-bordered new-table cons-res-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center header-j">${date}</th>`;
+    });
+    
+    html += `
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(() => {
+        html += `<th class="text-center header-j">LCR ECO Impact (Bn €)</th>`;
+    });
+    
+    html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    resourcesData.forEach(item => {
+        html += '<tr>';
+        html += `<td class="fw-bold">${item.lcr_eco_groupe_metiers}</td>`;
+        
+        dates.forEach(date => {
+            const value = item.dates[date] || 0;
+            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
 
 // ================================= CHATBOT =================================
 

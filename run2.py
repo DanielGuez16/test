@@ -554,20 +554,24 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
 
         # Nouvelles analyses
         buffer_results = create_buffer_table(dataframes)
+        summary_results = create_summary_table(dataframes)  # NOUVEAU
         consumption_results = create_consumption_table(dataframes)
         resources_results = create_resources_table(dataframes)
         cappage_results = create_cappage_table(dataframes)
         buffer_nco_results = create_buffer_nco_table(dataframes)
+        consumption_resources_results = create_consumption_resources_table(dataframes)
         
         logger.info("Analyses terminées (nouveaux tableaux)")
 
         # SAUVEGARDER LE CONTEXTE CHATBOT
         chatbot_session["context_data"] = {
             "buffer": buffer_results,
+            "summary": summary_results,  # NOUVEAU
             "consumption": consumption_results,
             "resources": resources_results,
             "cappage": cappage_results,
             "buffer_nco": buffer_nco_results,
+            "consumption_resources": consumption_resources_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -587,10 +591,12 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             "context_ready": True,  
             "results": {
                 "buffer": buffer_results,
+                "summary": summary_results,  # NOUVEAU
                 "consumption": consumption_results,
                 "resources": resources_results,
                 "cappage": cappage_results,
-                "buffer_nco": buffer_nco_results
+                "buffer_nco": buffer_nco_results,
+                "consumption_resources": consumption_resources_results
             }
         }
         
@@ -857,16 +863,24 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
 
         # Nouvelles analyses
         buffer_results = create_buffer_table(dataframes)
+        summary_results = create_summary_table(dataframes)  # NOUVEAU
         consumption_results = create_consumption_table(dataframes)
         resources_results = create_resources_table(dataframes)
+        cappage_results = create_cappage_table(dataframes)
+        buffer_nco_results = create_buffer_nco_table(dataframes)
+        consumption_resources_results = create_consumption_resources_table(dataframes)
         
         logger.info("Analyses terminées (nouveaux tableaux)")
 
         # SAUVEGARDER LE CONTEXTE CHATBOT
         chatbot_session["context_data"] = {
             "buffer": buffer_results,
+            "summary": summary_results,  # NOUVEAU
             "consumption": consumption_results,
             "resources": resources_results,
+            "cappage": cappage_results,
+            "buffer_nco": buffer_nco_results,
+            "consumption_resources": consumption_resources_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -886,8 +900,12 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             "context_ready": True,  
             "results": {
                 "buffer": buffer_results,
+                "summary": summary_results,  # NOUVEAU
                 "consumption": consumption_results,
-                "resources": resources_results
+                "resources": resources_results,
+                "cappage": cappage_results,
+                "buffer_nco": buffer_nco_results,
+                "consumption_resources": consumption_resources_results
             }
         }
         
@@ -896,7 +914,45 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
-   
+
+@app.post("/api/analyze-consumption-resources")
+async def analyze_consumption_resources(request: Request, session_token: Optional[str] = Cookie(None)):
+    """
+    Génère une analyse IA des données Consumption & Resources
+    """
+    # Vérifier l'authentification
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        data = await request.json()
+        context_data = data.get("context_data", {})
+        
+        # Préparer le prompt d'analyse
+        analysis_prompt = prepare_consumption_resources_analysis_prompt(context_data)
+        
+        # Obtenir l'analyse de l'IA
+        ai_analysis = llm_connector.get_llm_response(
+            user_prompt="Analyze the Consumption and Resources data provided in the context. Focus on key trends, variations between periods, and strategic insights.",
+            context_prompt=analysis_prompt,
+            modelID="gpt-4o-mini-2024-07-18",
+            temperature=0.3
+        )
+        
+        # Logger l'activité
+        log_activity(current_user["username"], "AI_ANALYSIS", "Generated Consumption & Resources analysis")
+        
+        return {
+            "success": True,
+            "analysis": ai_analysis,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur analyse Consumption & Resources: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur analyse: {str(e)}")
+    
 @app.get("/view-report")
 async def view_current_report(session_token: Optional[str] = Cookie(None)):
     """Affiche le dernier rapport généré"""
@@ -1028,6 +1084,101 @@ def create_buffer_table(dataframes):
             "error": str(e)
         }
 
+
+# ========================== FONCTIONS SUMMARY TABLE ===========================
+
+
+def create_summary_table(dataframes):
+    """
+    Crée le tableau de synthèse sans titre avec comparaison des deux fichiers
+    """
+    try:
+        logger.info("📊 Création du tableau de synthèse")
+        
+        summary_results = {}
+        
+        # Vérification que nous avons les deux fichiers
+        if "j" not in dataframes or "jMinus1" not in dataframes:
+            logger.warning("⚠️ Les deux fichiers sont requis pour le tableau de synthèse")
+            return {
+                "title": "Summary Table",
+                "error": "Les deux fichiers sont requis"
+            }
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement synthèse pour {file_type}")
+            
+            # Vérification des colonnes requises
+            summary_cols = ["Top Conso", "Date d'arrêté", "LCR_Assiette Pondérée", "LCR_ECO_IMPACT_LCR"]
+            missing_cols = [col for col in summary_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour synthèse {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage Top Conso = "O"
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            logger.info(f"📋 Après filtrage Top Conso: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée pour synthèse {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
+                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage du champ date
+            df_filtered["Date d'arrêté"] = df_filtered["Date d'arrêté"].astype(str).str.strip()
+            
+            # Obtenir les dates uniques pour ce fichier
+            dates = sorted(df_filtered["Date d'arrêté"].unique())
+            
+            # Calculer les sommes par date
+            summary_data = []
+            
+            for date in dates:
+                date_data = df_filtered[df_filtered["Date d'arrêté"] == date]
+                
+                sum_assiette = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
+                sum_impact = float(date_data["LCR_ECO_IMPACT_LCR"].sum()) / 1_000_000_000
+                sum_difference = sum_assiette - sum_impact
+                
+                summary_data.append({
+                    "date": date,
+                    "sum_assiette": sum_assiette,
+                    "sum_impact": sum_impact,
+                    "sum_difference": sum_difference,
+                    "file_type": file_type
+                })
+            
+            summary_results[file_type] = summary_data
+            logger.info(f"✅ Synthèse {file_type}: {len(summary_data)} dates")
+        
+        return {
+            "title": "",  # Pas de titre
+            "data": summary_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O"
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création tableau synthèse: {e}")
+        return {
+            "title": "Summary Table - Erreur",
+            "error": str(e)
+        }
+    
 
 # ========================== FONCTIONS CONSUMPTION TABLE ===========================
 
@@ -1199,6 +1350,64 @@ def create_resources_table(dataframes):
             "error": str(e)
         }
     
+def prepare_consumption_resources_analysis_prompt(context_data):
+    """
+    Prépare le prompt d'analyse pour Consumption & Resources
+    """
+    prompt_parts = []
+    
+    prompt_parts.append("ANALYSIS CONTEXT: LCR (Liquidity Coverage Ratio) Banking Analysis")
+    prompt_parts.append("You are analyzing Consumption and Resources data from a bank's LCR reporting.")
+    prompt_parts.append("Values are in billions of euros (Bn €).")
+    prompt_parts.append("Data compares D (Today) vs D-1 (Yesterday).")
+    prompt_parts.append("")
+    
+    # Données Consumption
+    if context_data.get("consumption_data"):
+        prompt_parts.append("=== CONSUMPTION DATA ===")
+        consumption_data = context_data["consumption_data"]
+        
+        if consumption_data.get("j") and consumption_data.get("jMinus1"):
+            prompt_parts.append("CONSUMPTION ANALYSIS (Filtered Business Groups):")
+            
+            # Données D (aujourd'hui)
+            prompt_parts.append("\nD (Today) - Consumption by Business Group:")
+            for item in consumption_data["j"]:
+                prompt_parts.append(f"- {item['LCR_ECO_GROUPE_METIERS']}: {item['LCR_ECO_IMPACT_LCR_Bn']:.3f} Bn €")
+            
+            # Données D-1 (hier)
+            prompt_parts.append("\nD-1 (Yesterday) - Consumption by Business Group:")
+            for item in consumption_data["jMinus1"]:
+                prompt_parts.append(f"- {item['LCR_ECO_GROUPE_METIERS']}: {item['LCR_ECO_IMPACT_LCR_Bn']:.3f} Bn €")
+    
+    # Données Resources
+    if context_data.get("resources_data"):
+        prompt_parts.append("\n=== RESOURCES DATA ===")
+        resources_data = context_data["resources_data"]
+        
+        if resources_data.get("j") and resources_data.get("jMinus1"):
+            prompt_parts.append("RESOURCES ANALYSIS (Filtered Business Groups):")
+            
+            # Données D (aujourd'hui)
+            prompt_parts.append("\nD (Today) - Resources by Business Group:")
+            for item in resources_data["j"]:
+                prompt_parts.append(f"- {item['LCR_ECO_GROUPE_METIERS']}: {item['LCR_ECO_IMPACT_LCR_Bn']:.3f} Bn €")
+            
+            # Données D-1 (hier)
+            prompt_parts.append("\nD-1 (Yesterday) - Resources by Business Group:")
+            for item in resources_data["jMinus1"]:
+                prompt_parts.append(f"- {item['LCR_ECO_GROUPE_METIERS']}: {item['LCR_ECO_IMPACT_LCR_Bn']:.3f} Bn €")
+    
+    prompt_parts.append("\n=== ANALYSIS REQUIREMENTS ===")
+    prompt_parts.append("Please provide:")
+    prompt_parts.append("1. Key variations between D and D-1 for both Consumption and Resources")
+    prompt_parts.append("2. Most significant changes by business group")
+    prompt_parts.append("3. Strategic insights and potential risk implications")
+    prompt_parts.append("4. Summary of net impact on liquidity position")
+    prompt_parts.append("Keep the analysis concise but insightful (max 300 words).")
+    
+    return "\n".join(prompt_parts)
+
 
 # ========================== FONCTIONS CAPPAGE TABLE ===========================
 
@@ -1434,6 +1643,137 @@ def create_buffer_nco_table(dataframes):
         logger.error(f"❌ Erreur création tableaux BUFFER & NCO: {e}")
         return {
             "title": "BUFFER & NCO - Erreur",
+            "error": str(e)
+        }
+    
+
+# ========================== FONCTIONS CONSUMPTION & RESOURCES TABLE ===========================
+
+
+def create_consumption_resources_table(dataframes):
+    """
+    Crée les tableaux CONSUMPTION & RESOURCES avec structure pivot par date
+    """
+    try:
+        logger.info("📊 Création des tableaux CONSUMPTION & RESOURCES")
+        
+        consumption_resources_results = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement CONSUMPTION & RESOURCES pour {file_type}")
+            
+            # Vérification des colonnes requises
+            cons_res_cols = ["Top Conso", "LCR_ECO_GROUPE_METIERS", "Sous-Métier", 
+                            "Date d'arrêté", "LCR_ECO_IMPACT_LCR"]
+            missing_cols = [col for col in cons_res_cols if col not in df.columns]
+            
+            if missing_cols:
+                logger.warning(f"⚠️ Colonnes manquantes pour CONSUMPTION & RESOURCES {file_type}: {missing_cols}")
+                continue
+            
+            # Filtrage Top Conso pour les deux tableaux
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            
+            logger.info(f"📋 Après filtrage Top Conso: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                logger.warning(f"⚠️ Aucune donnée CONSUMPTION & RESOURCES pour {file_type}")
+                continue
+            
+            # Préparation des données
+            df_filtered["LCR_ECO_IMPACT_LCR"] = pd.to_numeric(
+                df_filtered["LCR_ECO_IMPACT_LCR"], errors='coerce'
+            ).fillna(0)
+            
+            # Nettoyage des champs texte
+            df_filtered["LCR_ECO_GROUPE_METIERS"] = df_filtered["LCR_ECO_GROUPE_METIERS"].astype(str).str.strip()
+            df_filtered["Sous-Métier"] = df_filtered["Sous-Métier"].astype(str).str.strip()
+            df_filtered["Date d'arrêté"] = df_filtered["Date d'arrêté"].astype(str).str.strip()
+            
+            # Obtenir toutes les dates uniques
+            dates = sorted(df_filtered["Date d'arrêté"].unique())
+            
+            # TABLEAU 1: CONSUMPTION
+            consumption_data = []
+            allowed_groupes_cons = ["A&WM & Insurance", "CIB Financing", "CIB Markets", "GLOBAL TRADE", "Other Consumption"]
+            excluded_sous_metier_cons = ["GT TREASURY SOLUTIONS", "GT GROUP SERVICES"]
+            
+            df_consumption = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(allowed_groupes_cons)].copy()
+            df_consumption = df_consumption[~df_consumption["Sous-Métier"].isin(excluded_sous_metier_cons)].copy()
+            
+            if len(df_consumption) > 0:
+                for groupe in allowed_groupes_cons:
+                    groupe_data = df_consumption[df_consumption["LCR_ECO_GROUPE_METIERS"] == groupe]
+                    
+                    if len(groupe_data) > 0:
+                        row_data = {
+                            "lcr_eco_groupe_metiers": groupe,
+                            "dates": {}
+                        }
+                        
+                        for date in dates:
+                            date_data = groupe_data[groupe_data["Date d'arrêté"] == date]
+                            total = float(date_data["LCR_ECO_IMPACT_LCR"].sum()) / 1_000_000_000
+                            row_data["dates"][date] = total
+                        
+                        consumption_data.append(row_data)
+            
+            # TABLEAU 2: RESOURCES
+            resources_data = []
+            allowed_groupes_res = ["GLOBAL TRADE", "Other Contribution", "Treasury"]
+            excluded_sous_metier_res = ["GT GROUP SERVICES", "GT COMMODITY", "GT TRADE FINANCE"]
+            
+            df_resources = df_filtered[df_filtered["LCR_ECO_GROUPE_METIERS"].isin(allowed_groupes_res)].copy()
+            df_resources = df_resources[~df_resources["Sous-Métier"].isin(excluded_sous_metier_res)].copy()
+            
+            if len(df_resources) > 0:
+                for groupe in allowed_groupes_res:
+                    groupe_data = df_resources[df_resources["LCR_ECO_GROUPE_METIERS"] == groupe]
+                    
+                    if len(groupe_data) > 0:
+                        row_data = {
+                            "lcr_eco_groupe_metiers": groupe,
+                            "dates": {}
+                        }
+                        
+                        for date in dates:
+                            date_data = groupe_data[groupe_data["Date d'arrêté"] == date]
+                            total = float(date_data["LCR_ECO_IMPACT_LCR"].sum()) / 1_000_000_000
+                            row_data["dates"][date] = total
+                        
+                        resources_data.append(row_data)
+            
+            consumption_resources_results[file_type] = {
+                "consumption_data": consumption_data,
+                "resources_data": resources_data,
+                "dates": dates
+            }
+            
+            logger.info(f"✅ CONSUMPTION & RESOURCES {file_type}: Consumption={len(consumption_data)} lignes, Resources={len(resources_data)} lignes, {len(dates)} dates")
+        
+        return {
+            "title": "CONSUMPTION & RESOURCES",
+            "data": consumption_resources_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "filters_applied": {
+                    "top_conso": "O",
+                    "consumption_filters": {
+                        "groupe_metiers": allowed_groupes_cons,
+                        "excluded_sous_metier": excluded_sous_metier_cons
+                    },
+                    "resources_filters": {
+                        "groupe_metiers": allowed_groupes_res,
+                        "excluded_sous_metier": excluded_sous_metier_res
+                    }
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création tableaux CONSUMPTION & RESOURCES: {e}")
+        return {
+            "title": "CONSUMPTION & RESOURCES - Erreur",
             "error": str(e)
         }
     
