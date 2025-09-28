@@ -10,7 +10,7 @@
 // ================================= VARIABLES GLOBALES  =================================
 
 
-let filesReady = { j: false, j1: false };
+let filesReady = { j: false, j1: false, m1: false };
 let chatMessages = [];
 
 
@@ -124,9 +124,21 @@ function handleFileDrop(e) {
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        const isFileJ = e.currentTarget.closest('.card').querySelector('h5').textContent.includes('D (');
-        const fileType = isFileJ ? 'j' : 'jMinus1';
-        uploadFile(files[0], fileType);
+        const card = e.currentTarget.closest('.card');
+        const title = card.querySelector('h5').textContent;
+        
+        let fileType;
+        if (title.includes('D (')) {
+            fileType = 'j';
+        } else if (title.includes('D-1')) {
+            fileType = 'jMinus1';
+        } else if (title.includes('M-1')) {
+            fileType = 'mMinus1';
+        }
+        
+        if (fileType) {
+            uploadFile(files[0], fileType);
+        }
     }
 }
 
@@ -181,15 +193,33 @@ function initializeFileUploads() {
             uploadFile(this.files[0], 'jMinus1');
         }
     });
+    
+    document.getElementById('fileM1').addEventListener('change', function() {
+        if (this.files[0]) {
+            uploadFile(this.files[0], 'mMinus1');
+        }
+    });
 }
 
 /**
  * Upload d'un fichier vers l'API
  * @param {File} file - Fichier à uploader
- * @param {string} type - Type de fichier ('j' ou 'jMinus1')
+ * @param {string} type - Type de fichier ('j', 'jMinus1', 'mMinus1')
  */
 async function uploadFile(file, type) {
-    const statusDiv = document.getElementById('status' + (type === 'j' ? 'J' : 'J1'));
+    const statusMapping = {
+        'j': 'statusJ',
+        'jMinus1': 'statusJ1',
+        'mMinus1': 'statusM1'
+    };
+    
+    const readyMapping = {
+        'j': 'j',
+        'jMinus1': 'j1',
+        'mMinus1': 'm1'
+    };
+    
+    const statusDiv = document.getElementById(statusMapping[type]);
     
     try {
         console.log(`📤 Upload ${type}:`, file.name);
@@ -252,7 +282,7 @@ async function uploadFile(file, type) {
             `;
             
             // Marquer le fichier comme prêt
-            filesReady[type === 'j' ? 'j' : 'j1'] = true;
+            filesReady[readyMapping[type]] = true;
             
             // Vérifier si on peut activer l'analyse
             checkAnalyzeButtonState();
@@ -263,39 +293,39 @@ async function uploadFile(file, type) {
         }
         
     } catch (error) {
-    clearTimeout(timeoutId);
-    console.error(`❌ Erreur upload ${type}:`, error);
-    
-    // Gestion spécifique pour les timeouts/abort
-    if (error.name === 'AbortError') {
-        statusDiv.innerHTML = `
-            <div class="alert alert-warning fade-in-up">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-clock me-2"></i>
-                    <div>
-                        <strong>Upload timeout</strong><br>
-                        <small>Le fichier est trop volumineux ou la connexion trop lente</small>
+        clearTimeout(timeoutId);
+        console.error(`❌ Erreur upload ${type}:`, error);
+        
+        // Gestion spécifique pour les timeouts/abort
+        if (error.name === 'AbortError') {
+            statusDiv.innerHTML = `
+                <div class="alert alert-warning fade-in-up">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-clock me-2"></i>
+                        <div>
+                            <strong>Upload timeout</strong><br>
+                            <small>Le fichier est trop volumineux ou la connexion trop lente</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
-    } else {
-        statusDiv.innerHTML = `
-            <div class="alert alert-danger fade-in-up">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <div>
-                        <strong>Erreur d'upload</strong><br>
-                        <small>${error.message}</small>
+            `;
+        } else {
+            statusDiv.innerHTML = `
+                <div class="alert alert-danger fade-in-up">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <div>
+                            <strong>Erreur d'upload</strong><br>
+                            <small>${error.message}</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
+        
+        filesReady[readyMapping[type]] = false;
+        checkAnalyzeButtonState();
     }
-    
-    filesReady[type === 'j' ? 'j' : 'j1'] = false;
-    checkAnalyzeButtonState();
-}
 }
 
 /**
@@ -304,12 +334,11 @@ async function uploadFile(file, type) {
 function checkAnalyzeButtonState() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     
-    if (filesReady.j && filesReady.j1) {
+    if (filesReady.j && filesReady.j1 && filesReady.m1) {
         analyzeBtn.disabled = false;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.add('pulse');
         
-        // NOUVEAU: Ajouter bouton de nettoyage si pas déjà présent
         if (!document.getElementById('cleanup-btn')) {
             const cleanupBtn = document.createElement('button');
             cleanupBtn.id = 'cleanup-btn';
@@ -319,13 +348,12 @@ function checkAnalyzeButtonState() {
             analyzeBtn.parentNode.appendChild(cleanupBtn);
         }
         
-        showNotification('Both files are loaded! You can start the analysis.', 'success');
+        showNotification('All three files are loaded! You can start the analysis.', 'success');
     } else {
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.remove('pulse');
         
-        // Supprimer le bouton de nettoyage si présent
         const cleanupBtn = document.getElementById('cleanup-btn');
         if (cleanupBtn) {
             cleanupBtn.remove();
@@ -333,7 +361,7 @@ function checkAnalyzeButtonState() {
     }
 }
 
-// NOUVELLE FONCTION
+
 async function cleanupMemory() {
     try {
         showNotification('Cleaning memory...', 'info');
@@ -525,17 +553,6 @@ function displayCompleteResults(analysisResults) {
         
         html += '</div>';
         html += '</div>';
-        
-        // Tableau RESOURCES en pleine largeur
-        if (analysisResults.resources) {
-            html += '<div class="analysis-section fade-in-up">';
-            html += '<div class="row">';
-            html += '<div class="col-12">';
-            html += generateResourcesSection(analysisResults.resources);
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
-        }
 
         // Tableau CAPPAGE en pleine largeur
         if (analysisResults.cappage) {
@@ -597,13 +614,13 @@ function displayCompleteResults(analysisResults) {
 
 
 /**
- * Génère la section BUFFER
+ * Génère la section BUFFER avec style TCD Excel professionnel
  */
 function generateBufferSection(bufferData) {
     if (bufferData.error) {
         return `
             <div class="alert alert-danger">
-                <h5>Erreur BUFFER</h5>
+                <h5>Erreur BUFFER TCD</h5>
                 <p>${bufferData.error}</p>
             </div>
         `;
@@ -612,7 +629,14 @@ function generateBufferSection(bufferData) {
     let html = `
         <div class="card border-0">
             <div class="card-header no-background">
-                <h3 style="color: #76279b;" class="mb-1">${bufferData.title}</h3>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 style="color: #76279b;" class="mb-1">${bufferData.title}</h3>
+                    <div class="badge bg-info">TCD with Variations</div>
+                </div>
+                <small class="text-muted">
+                    <i class="fas fa-filter me-1"></i>LCR_Catégorie: "1- Buffer" • 
+                    <i class="fas fa-table me-1"></i>Pivot: Section > Client × [D, Δ D-1, Δ M-1]
+                </small>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -681,132 +705,199 @@ function generateSummarySection(summaryData) {
 }
 
 /**
- * Génère le HTML du tableau BUFFER
+ * Génère le HTML du tableau BUFFER avec structure TCD Excel et variations
  */
 function generateBufferTableHTML(bufferData) {
-    if (!bufferData.j || !bufferData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau BUFFER</div>';
+    if (!bufferData || !bufferData.pivot_data) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau BUFFER TCD</div>';
     }
     
-    const dataJ = bufferData.j;
-    const dataJ1 = bufferData.jMinus1;
+    const pivotData = bufferData.pivot_data || [];
     
-    // Créer un mapping pour les variations
-    const variationsMap = new Map();
+    if (pivotData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée BUFFER TCD disponible</div>';
+    }
     
-    // Calculer les variations
-    dataJ.forEach(itemJ => {
-        const key = `${itemJ.section}_${itemJ.client}`;
-        const itemJ1 = dataJ1.find(item => item.section === itemJ.section && item.client === itemJ.client);
-        const valueJ1 = itemJ1 ? itemJ1.total : 0;
-        const variation = itemJ.total - valueJ1;
-        
-        variationsMap.set(key, {
-            j: itemJ.total,
-            j1: valueJ1,
-            variation: variation
-        });
+    // Calculer les grands totaux
+    let grandTotal_J = 0;
+    let grandTotal_DailyVar = 0;
+    let grandTotal_MonthlyVar = 0;
+    
+    pivotData.forEach(sectionGroup => {
+        grandTotal_J += sectionGroup.section_total_j || 0;
+        grandTotal_DailyVar += sectionGroup.section_variation_daily || 0;
+        grandTotal_MonthlyVar += sectionGroup.section_variation_monthly || 0;
     });
     
     let html = `
-        <table class="table table-bordered new-table buffer-table">
-            <thead>
+        <table class="table table-bordered buffer-tcd-table">
+            <thead class="table-dark">
                 <tr>
-                    <th class="align-middle">Hierarchy</th>
-                    <th class="text-center header-j">D (Today)<br><small>LCR Assiette Pondérée (Bn €)</small></th>
-                    <th class="text-center header-variation">Variation<br><small>Abs. Value</small></th>
+                    <th rowspan="2" class="align-middle tcd-header-row">LCR Template Section 1</th>
+                    <th rowspan="2" class="align-middle tcd-header-row">Libellé Client</th>
+                    <th class="text-center tcd-header-col">D (Today)</th>
+                    <th class="text-center tcd-header-variation">Variation Daily</th>
+                    <th class="text-center tcd-header-variation">Variation Monthly</th>
+                </tr>
+                <tr>
+                    <th class="text-center tcd-value-header">Bn €</th>
+                    <th class="text-center tcd-variation-header">D - D-1 (Bn €)</th>
+                    <th class="text-center tcd-variation-header">D - M-1 (Bn €)</th>
                 </tr>
             </thead>
             <tbody>
     `;
     
-    // Organiser les données par section
-    const sectionGroups = {};
-    dataJ.forEach(item => {
-        if (!sectionGroups[item.section]) {
-            sectionGroups[item.section] = [];
-        }
-        sectionGroups[item.section].push(item);
-    });
-    
-    // Générer les lignes avec hiérarchie
-    Object.keys(sectionGroups).forEach(section => {
-        const items = sectionGroups[section];
+    // Génération des lignes TCD avec hiérarchie
+    pivotData.forEach((sectionGroup, sectionIndex) => {
+        const clientDetails = sectionGroup.client_details || [];
+        const totalRowsForSection = clientDetails.length + 1; // +1 pour la ligne de total
         
-        if (section === "1.1- Cash") {
-            // Pour 1.1- Cash, d'abord la ligne de section
-            html += `<tr class="section-header">`;
-            html += `<td class="fw-bold text-primary">${section}</td>`;
-            html += `<td colspan="2" class="text-muted text-center"><em>Détail ci-dessous</em></td>`;
-            html += '</tr>';
+        // Lignes de détail par client
+        clientDetails.forEach((detail, detailIndex) => {
+            html += `<tr class="tcd-detail-row">`;
             
-            // Puis les détails avec indentation
-            items.forEach(item => {
-                const key = `${item.section}_${item.client}`;
-                const varData = variationsMap.get(key);
-                const absVariation = Math.abs(varData.variation);
-                const isPositive = varData.variation >= 0;
-                
-                html += `<tr class="detail-row">`;
-                html += `<td class="ps-4">├─ ${item.client}</td>`;
-                html += `<td class="text-end numeric-value">${item.total.toFixed(3)}</td>`;
-                html += `<td class="text-end numeric-value">
-                            ${absVariation.toFixed(3)}
-                            <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                                ${isPositive ? '▲' : '▼'}
-                            </span>
+            // Cellule Section (fusionnée pour tous les détails + total)
+            if (detailIndex === 0) {
+                html += `<td rowspan="${totalRowsForSection}" class="tcd-section-cell align-middle">
+                            <div class="tcd-section-label">
+                                <i class="fas fa-plus-square text-primary me-2"></i>
+                                <strong>${sectionGroup.section}</strong>
+                            </div>
                          </td>`;
-                html += '</tr>';
-            });
-        } else {
-            // Pour les autres sections, juste la ligne totale
-            const item = items[0]; // Il n'y a qu'un élément "TOTAL" pour ces sections
-            const key = `${item.section}_${item.client}`;
-            const varData = variationsMap.get(key);
-            const absVariation = Math.abs(varData.variation);
-            const isPositive = varData.variation >= 0;
+            }
             
-            html += `<tr class="total-row">`;
-            html += `<td class="fw-bold">${section}</td>`;
-            html += `<td class="text-end numeric-value">${item.total.toFixed(3)}</td>`;
-            html += `<td class="text-end numeric-value">
-                        ${absVariation.toFixed(3)}
-                        <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                            ${isPositive ? '▲' : '▼'}
-                        </span>
+            // Cellule Client avec indentation
+            html += `<td class="tcd-client-detail">
+                        <span class="tcd-indent">└─</span> ${detail.client}
                      </td>`;
+            
+            // Valeur D (Today)
+            const valueJ = detail.value_j || 0;
+            html += `<td class="text-end tcd-data-cell">${valueJ.toFixed(3)}</td>`;
+            
+            // Variation Daily
+            const varDaily = detail.variation_daily || 0;
+            const dailyClass = varDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+            const dailyIcon = varDaily >= 0 ? '▲' : '▼';
+            html += `<td class="text-end ${dailyClass}">
+                        ${varDaily >= 0 ? '+' : ''}${varDaily.toFixed(3)}
+                        <span class="variation-icon">${dailyIcon}</span>
+                     </td>`;
+            
+            // Variation Monthly
+            const varMonthly = detail.variation_monthly || 0;
+            const monthlyClass = varMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+            const monthlyIcon = varMonthly >= 0 ? '▲' : '▼';
+            html += `<td class="text-end ${monthlyClass}">
+                        ${varMonthly >= 0 ? '+' : ''}${varMonthly.toFixed(3)}
+                        <span class="variation-icon">${monthlyIcon}</span>
+                     </td>`;
+            
             html += '</tr>';
+        });
+        
+        // Ligne de total pour la Section
+        html += `<tr class="tcd-section-total-row">`;
+        html += `<td class="tcd-section-total-label"><strong>Total ${sectionGroup.section}</strong></td>`;
+        
+        // Total Section
+        html += `<td class="text-end tcd-section-total">${(sectionGroup.section_total_j || 0).toFixed(3)}</td>`;
+        
+        // Variation Daily Section
+        const sectionVarDaily = sectionGroup.section_variation_daily || 0;
+        const sectionDailyClass = sectionVarDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+        const sectionDailyIcon = sectionVarDaily >= 0 ? '▲' : '▼';
+        html += `<td class="text-end tcd-section-total ${sectionDailyClass}">
+                    ${sectionVarDaily >= 0 ? '+' : ''}${sectionVarDaily.toFixed(3)}
+                    <span class="variation-icon">${sectionDailyIcon}</span>
+                 </td>`;
+        
+        // Variation Monthly Section
+        const sectionVarMonthly = sectionGroup.section_variation_monthly || 0;
+        const sectionMonthlyClass = sectionVarMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+        const sectionMonthlyIcon = sectionVarMonthly >= 0 ? '▲' : '▼';
+        html += `<td class="text-end tcd-section-total ${sectionMonthlyClass}">
+                    ${sectionVarMonthly >= 0 ? '+' : ''}${sectionVarMonthly.toFixed(3)}
+                    <span class="variation-icon">${sectionMonthlyIcon}</span>
+                 </td>`;
+        
+        html += '</tr>';
+        
+        // Ligne de séparation entre les sections (sauf pour la dernière)
+        if (sectionIndex < pivotData.length - 1) {
+            html += `<tr class="tcd-separator"><td colspan="5"></td></tr>`;
         }
     });
     
+    // Ligne de grand total général
+    html += `
+        <tr class="tcd-grand-total-row">
+            <td colspan="2" class="tcd-grand-total-label">
+                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL</strong>
+            </td>
+            <td class="text-end tcd-grand-total-value">${grandTotal_J.toFixed(3)}</td>
+    `;
+    
+    // Grand Total Variation Daily
+    const grandDailyClass = grandTotal_DailyVar >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+    const grandDailyIcon = grandTotal_DailyVar >= 0 ? '▲' : '▼';
+    html += `<td class="text-end tcd-grand-total-value ${grandDailyClass}">
+                ${grandTotal_DailyVar >= 0 ? '+' : ''}${grandTotal_DailyVar.toFixed(3)}
+                <span class="variation-icon">${grandDailyIcon}</span>
+             </td>`;
+    
+    // Grand Total Variation Monthly
+    const grandMonthlyClass = grandTotal_MonthlyVar >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+    const grandMonthlyIcon = grandTotal_MonthlyVar >= 0 ? '▲' : '▼';
+    html += `<td class="text-end tcd-grand-total-value ${grandMonthlyClass}">
+                ${grandTotal_MonthlyVar >= 0 ? '+' : ''}${grandTotal_MonthlyVar.toFixed(3)}
+                <span class="variation-icon">${grandMonthlyIcon}</span>
+             </td>`;
+    
+    html += '</tr>';
     html += '</tbody></table>';
     return html;
 }
 
 /**
- * Génère le HTML du tableau CONSUMPTION
+ * Génère le HTML du tableau CONSUMPTION avec variations quotidiennes et mensuelles
  */
 function generateConsumptionTableHTML(consumptionData) {
-    if (!consumptionData.j || !consumptionData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CONSUMPTION</div>';
+    if (!consumptionData.j || !consumptionData.jMinus1 || !consumptionData.mMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CONSUMPTION (3 fichiers requis)</div>';
     }
     
     const dataJ = consumptionData.j;
     const dataJ1 = consumptionData.jMinus1;
+    const dataM1 = consumptionData.mMinus1;
     
-    // Créer un mapping pour les variations
+    // Créer mappings pour les variations
     const variationsMap = new Map();
+    const monthlyVariationsMap = new Map();
     
-    // Calculer les variations
+    // Calculer les variations J vs J-1 et J vs M-1
     dataJ.forEach(itemJ => {
+        // Variation quotidienne (J vs J-1)
         const itemJ1 = dataJ1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
         const valueJ1 = itemJ1 ? itemJ1.LCR_ECO_IMPACT_LCR_Bn : 0;
-        const variation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        const dailyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        
+        // Variation mensuelle (J vs M-1)
+        const itemM1 = dataM1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
+        const valueM1 = itemM1 ? itemM1.LCR_ECO_IMPACT_LCR_Bn : 0;
+        const monthlyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueM1;
         
         variationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
             j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
             j1: valueJ1,
-            variation: variation
+            variation: dailyVariation
+        });
+        
+        monthlyVariationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
+            j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
+            m1: valueM1,
+            variation: monthlyVariation
         });
     });
     
@@ -815,12 +906,12 @@ function generateConsumptionTableHTML(consumptionData) {
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-                    <th class="text-center header-j">D (Today)</th>
-                    <th class="text-center header-variation">Variation</th>
+                    <th colspan="3" class="text-center header-j">Analysis Results (Bn €)</th>
                 </tr>
                 <tr>
-                    <th class="text-center header-j">LCR ECO Impact (Bn €)</th>
-                    <th class="text-center header-variation">Abs. Value</th>
+                    <th class="text-center header-j">D (Today)</th>
+                    <th class="text-center header-variation">Daily Variation vs D-1</th>
+                    <th class="text-center header-variation">Monthly Variation vs M-1</th>
                 </tr>
             </thead>
             <tbody>
@@ -828,17 +919,28 @@ function generateConsumptionTableHTML(consumptionData) {
     
     // Générer les lignes
     dataJ.forEach(item => {
-        const varData = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
-        const absVariation = Math.abs(varData.variation);
-        const isPositive = varData.variation >= 0;
+        const dailyVar = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        const monthlyVar = monthlyVariationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        
+        const absDailyVariation = Math.abs(dailyVar.variation);
+        const isDailyPositive = dailyVar.variation >= 0;
+        
+        const absMonthlyVariation = Math.abs(monthlyVar.variation);
+        const isMonthlyPositive = monthlyVar.variation >= 0;
         
         html += '<tr>';
         html += `<td class="fw-bold">${item.LCR_ECO_GROUPE_METIERS}</td>`;
         html += `<td class="text-end numeric-value">${item.LCR_ECO_IMPACT_LCR_Bn.toFixed(3)}</td>`;
         html += `<td class="text-end numeric-value">
-                    ${absVariation.toFixed(3)}
-                    <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                        ${isPositive ? '▲' : '▼'}
+                    ${absDailyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isDailyPositive ? 'positive' : 'negative'}">
+                        ${isDailyPositive ? '▲' : '▼'}
+                    </span>
+                 </td>`;
+        html += `<td class="text-end numeric-value">
+                    ${absMonthlyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isMonthlyPositive ? 'positive' : 'negative'}">
+                        ${isMonthlyPositive ? '▲' : '▼'}
                     </span>
                  </td>`;
         html += '</tr>';
@@ -932,29 +1034,43 @@ function generateResourcesSection(resourcesData) {
 }
 
 /**
- * Génère le HTML du tableau RESOURCES
+ * Génère le HTML du tableau RESOURCES avec variations quotidiennes et mensuelles
  */
 function generateResourcesTableHTML(resourcesData) {
-    if (!resourcesData.j || !resourcesData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau RESOURCES</div>';
+    if (!resourcesData.j || !resourcesData.jMinus1 || !resourcesData.mMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau RESOURCES (3 fichiers requis)</div>';
     }
     
     const dataJ = resourcesData.j;
     const dataJ1 = resourcesData.jMinus1;
+    const dataM1 = resourcesData.mMinus1;
     
-    // Créer un mapping pour les variations
+    // Créer mappings pour les variations
     const variationsMap = new Map();
+    const monthlyVariationsMap = new Map();
     
-    // Calculer les variations
+    // Calculer les variations J vs J-1 et J vs M-1
     dataJ.forEach(itemJ => {
+        // Variation quotidienne (J vs J-1)
         const itemJ1 = dataJ1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
         const valueJ1 = itemJ1 ? itemJ1.LCR_ECO_IMPACT_LCR_Bn : 0;
-        const variation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        const dailyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        
+        // Variation mensuelle (J vs M-1)
+        const itemM1 = dataM1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
+        const valueM1 = itemM1 ? itemM1.LCR_ECO_IMPACT_LCR_Bn : 0;
+        const monthlyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueM1;
         
         variationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
             j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
             j1: valueJ1,
-            variation: variation
+            variation: dailyVariation
+        });
+        
+        monthlyVariationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
+            j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
+            m1: valueM1,
+            variation: monthlyVariation
         });
     });
     
@@ -963,12 +1079,12 @@ function generateResourcesTableHTML(resourcesData) {
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-                    <th class="text-center header-j">D (Today)</th>
-                    <th class="text-center header-variation">Variation</th>
+                    <th colspan="3" class="text-center header-j">Analysis Results (Bn €)</th>
                 </tr>
                 <tr>
-                    <th class="text-center header-j">LCR ECO Impact (Bn €)</th>
-                    <th class="text-center header-variation">Abs. Value</th>
+                    <th class="text-center header-j">D (Today)</th>
+                    <th class="text-center header-variation">Daily Variation vs D-1</th>
+                    <th class="text-center header-variation">Monthly Variation vs M-1</th>
                 </tr>
             </thead>
             <tbody>
@@ -976,17 +1092,28 @@ function generateResourcesTableHTML(resourcesData) {
     
     // Générer les lignes
     dataJ.forEach(item => {
-        const varData = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
-        const absVariation = Math.abs(varData.variation);
-        const isPositive = varData.variation >= 0;
+        const dailyVar = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        const monthlyVar = monthlyVariationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        
+        const absDailyVariation = Math.abs(dailyVar.variation);
+        const isDailyPositive = dailyVar.variation >= 0;
+        
+        const absMonthlyVariation = Math.abs(monthlyVar.variation);
+        const isMonthlyPositive = monthlyVar.variation >= 0;
         
         html += '<tr>';
         html += `<td class="fw-bold">${item.LCR_ECO_GROUPE_METIERS}</td>`;
         html += `<td class="text-end numeric-value">${item.LCR_ECO_IMPACT_LCR_Bn.toFixed(3)}</td>`;
         html += `<td class="text-end numeric-value">
-                    ${absVariation.toFixed(3)}
-                    <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                        ${isPositive ? '▲' : '▼'}
+                    ${absDailyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isDailyPositive ? 'positive' : 'negative'}">
+                        ${isDailyPositive ? '▲' : '▼'}
+                    </span>
+                 </td>`;
+        html += `<td class="text-end numeric-value">
+                    ${absMonthlyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isMonthlyPositive ? 'positive' : 'negative'}">
+                        ${isMonthlyPositive ? '▲' : '▼'}
                     </span>
                  </td>`;
         html += '</tr>';
@@ -1128,13 +1255,13 @@ function prepareConsumptionResourcesContext(analysisResults) {
 }
 
 /**
- * Génère la section CAPPAGE
+ * Génère la section CAPPAGE avec style TCD Excel professionnel
  */
 function generateCappageSection(cappageData) {
     if (cappageData.error) {
         return `
             <div class="alert alert-danger">
-                <h5>Erreur CAPPAGE</h5>
+                <h5>Erreur CAPPAGE TCD</h5>
                 <p>${cappageData.error}</p>
             </div>
         `;
@@ -1143,7 +1270,14 @@ function generateCappageSection(cappageData) {
     let html = `
         <div class="card border-0">
             <div class="card-header no-background">
-                <h3 style="color: #76279b;" class="mb-1">${cappageData.title}</h3>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 style="color: #76279b;" class="mb-1">${cappageData.title}</h3>
+                    <div class="badge bg-info">TCD Excel Style</div>
+                </div>
+                <small class="text-muted">
+                    <i class="fas fa-filter me-1"></i>SI Remettant: SHORT_LCR, CAPREOS • 
+                    <i class="fas fa-table me-1"></i>Pivot: SI Remettant > Commentaire × Date d'arrêté
+                </small>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -1157,42 +1291,50 @@ function generateCappageSection(cappageData) {
 }
 
 /**
- * Génère le HTML du tableau CAPPAGE avec structure pivot
+ * Génère le HTML du tableau CAPPAGE avec structure TCD Excel professionnelle
  */
 function generateCappageTableHTML(cappageData) {
-    if (!cappageData.j || !cappageData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CAPPAGE</div>';
+    if (!cappageData.j) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CAPPAGE TCD</div>';
     }
     
     const dataJ = cappageData.j;
-    
-    if (!dataJ.data || dataJ.data.length === 0) {
-        return '<div class="alert alert-warning">Aucune donnée CAPPAGE disponible</div>';
-    }
-    
+    const pivotData = dataJ.pivot_data || [];
     const dates = dataJ.dates || [];
     
-    let html = `
-        <table class="table table-bordered new-table cappage-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="align-middle">SI Remettant</th>
-                    <th rowspan="2" class="align-middle">Commentaire</th>
-    `;
+    if (pivotData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée CAPPAGE TCD disponible</div>';
+    }
     
-    // En-têtes des dates
+    // Calculer les totaux globaux par date
+    const grandTotalsByDate = {};
+    
     dates.forEach(date => {
-        html += `<th class="text-center header-j">${date}</th>`;
+        grandTotalsByDate[date] = 0;
     });
     
-    html += `
+    pivotData.forEach(siGroup => {
+        Object.keys(siGroup.si_totals_by_date).forEach(date => {
+            if (grandTotalsByDate[date] !== undefined) {
+                grandTotalsByDate[date] += siGroup.si_totals_by_date[date];
+            }
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered cappage-tcd-table">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2" class="align-middle tcd-header-row">SI Remettant</th>
+                    <th rowspan="2" class="align-middle tcd-header-row">Commentaire</th>
+                    <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
                 </tr>
                 <tr>
     `;
     
-    // Sous-en-têtes pour les dates
-    dates.forEach(() => {
-        html += `<th class="text-center header-j">LCR Assiette Pondérée (Bn €)</th>`;
+    // En-têtes des dates
+    dates.forEach(date => {
+        html += `<th class="text-center tcd-date-header">${date}</th>`;
     });
     
     html += `
@@ -1201,35 +1343,85 @@ function generateCappageTableHTML(cappageData) {
             <tbody>
     `;
     
-    // Générer les lignes
-    dataJ.data.forEach(item => {
-        const rowClass = item.is_detail ? '' : 'total-row';
+    // Génération des lignes TCD avec hiérarchie
+    pivotData.forEach((siGroup, siIndex) => {
+        const commentaireDetails = siGroup.commentaire_details || [];
+        const totalRowsForSI = commentaireDetails.length + 1; // +1 pour la ligne de total
         
-        html += `<tr class="${rowClass}">`;
-        html += `<td class="fw-bold">${item.si_remettant}</td>`;
-        html += `<td>${item.commentaire}</td>`;
+        // Lignes de détail par commentaire
+        commentaireDetails.forEach((detail, detailIndex) => {
+            html += `<tr class="tcd-detail-row">`;
+            
+            // Cellule SI Remettant (fusionnée pour tous les détails + total)
+            if (detailIndex === 0) {
+                html += `<td rowspan="${totalRowsForSI}" class="tcd-si-cell align-middle">
+                            <div class="tcd-group-label">
+                                <i class="fas fa-plus-square text-primary me-2"></i>
+                                <strong>${siGroup.si_remettant}</strong>
+                            </div>
+                         </td>`;
+            }
+            
+            // Cellule Commentaire avec indentation
+            html += `<td class="tcd-commentaire-detail">
+                        <span class="tcd-indent">└─</span> ${detail.commentaire}
+                     </td>`;
+            
+            // Valeurs par date
+            dates.forEach(date => {
+                const value = detail.date_values[date] || 0;
+                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+            });
+            
+            html += '</tr>';
+        });
         
-        // Valeurs pour chaque date
+        // Ligne de total pour le SI Remettant
+        html += `<tr class="tcd-si-total-row">`;
+        html += `<td class="tcd-total-label"><strong>Total ${siGroup.si_remettant}</strong></td>`;
+        
+        // Totaux par date pour ce SI
         dates.forEach(date => {
-            const value = item.dates[date] || 0;
-            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+            const value = siGroup.si_totals_by_date[date] || 0;
+            html += `<td class="text-end tcd-si-total">${value.toFixed(3)}</td>`;
         });
         
         html += '</tr>';
+        
+        // Ligne de séparation entre les groupes SI (sauf pour le dernier)
+        if (siIndex < pivotData.length - 1) {
+            html += `<tr class="tcd-separator"><td colspan="${dates.length + 2}"></td></tr>`;
+        }
     });
+    
+    // Ligne de grand total général
+    html += `
+        <tr class="tcd-grand-total-row">
+            <td colspan="2" class="tcd-grand-total-label">
+                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL</strong>
+            </td>
+    `;
+    
+    dates.forEach(date => {
+        const value = grandTotalsByDate[date] || 0;
+        html += `<td class="text-end tcd-grand-total-value">${value.toFixed(3)}</td>`;
+    });
+    
+    html += '</tr>';
     
     html += '</tbody></table>';
     return html;
 }
 
 /**
- * Génère la section BUFFER & NCO (deux tableaux empilés)
+ * Génère la section BUFFER & NCO avec style TCD Excel professionnel
  */
 function generateBufferNcoSection(bufferNcoData) {
     if (bufferNcoData.error) {
         return `
             <div class="alert alert-danger">
-                <h5>Erreur BUFFER & NCO</h5>
+                <h5>Erreur BUFFER & NCO TCD</h5>
                 <p>${bufferNcoData.error}</p>
             </div>
         `;
@@ -1238,19 +1430,35 @@ function generateBufferNcoSection(bufferNcoData) {
     let html = `
         <div class="card border-0">
             <div class="card-header no-background">
-                <h3 style="color: #76279b;" class="mb-1">${bufferNcoData.title}</h3>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 style="color: #76279b;" class="mb-1">${bufferNcoData.title}</h3>
+                    <div class="badge bg-info">TCD Excel Style</div>
+                </div>
+                <small class="text-muted">
+                    <i class="fas fa-table me-1"></i>Deux tableaux croisés dynamiques : BUFFER (filtrée) + NCO (complète)
+                </small>
             </div>
             <div class="card-body p-0">
-                <!-- Tableau BUFFER -->
-                <h5 class="text-primary mb-3 px-3 pt-3">1. BUFFER (LCR_Catégorie = "1- Buffer")</h5>
-                <div class="table-container mb-4">
-                    ${generateBufferNcoBufferTableHTML(bufferNcoData.data)}
+                <!-- Tableau 1: BUFFER -->
+                <div class="tcd-table-section">
+                    <h5 class="text-primary mb-3 px-3 pt-3">
+                        <i class="fas fa-shield-alt me-2"></i>1. BUFFER Analysis
+                        <small class="text-muted ms-2">(LCR_Catégorie = "1- Buffer")</small>
+                    </h5>
+                    <div class="table-container mb-4">
+                        ${generateBufferNcoBufferTableHTML(bufferNcoData.data)}
+                    </div>
                 </div>
                 
-                <!-- Tableau NCO -->
-                <h5 class="text-primary mb-3 px-3">2. NCO (All Categories)</h5>
-                <div class="table-container">
-                    ${generateBufferNcoNcoTableHTML(bufferNcoData.data)}
+                <!-- Tableau 2: NCO -->
+                <div class="tcd-table-section">
+                    <h5 class="text-primary mb-3 px-3">
+                        <i class="fas fa-chart-bar me-2"></i>2. NCO Analysis
+                        <small class="text-muted ms-2">(All Categories)</small>
+                    </h5>
+                    <div class="table-container">
+                        ${generateBufferNcoNcoTableHTML(bufferNcoData.data)}
+                    </div>
                 </div>
             </div>
         </div>
@@ -1260,7 +1468,7 @@ function generateBufferNcoSection(bufferNcoData) {
 }
 
 /**
- * Génère le HTML du tableau BUFFER (premier tableau)
+ * Génère le HTML du tableau BUFFER avec structure TCD Excel hiérarchique
  */
 function generateBufferNcoBufferTableHTML(bufferNcoData) {
     if (!bufferNcoData.j) {
@@ -1268,31 +1476,41 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
     }
     
     const dataJ = bufferNcoData.j;
-    const bufferData = dataJ.buffer_data || [];
+    const bufferPivotData = dataJ.buffer_pivot_data || [];
     const dates = dataJ.dates || [];
     
-    if (bufferData.length === 0) {
-        return '<div class="alert alert-warning">Aucune donnée BUFFER disponible</div>';
+    if (bufferPivotData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée BUFFER TCD disponible</div>';
     }
     
-    let html = `
-        <table class="table table-bordered new-table buffer-nco-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="align-middle">Hierarchy</th>
-    `;
-    
+    // Calculer les totaux globaux par date pour BUFFER
+    const grandTotalsByDate = {};
     dates.forEach(date => {
-        html += `<th class="text-center header-j">${date}</th>`;
+        grandTotalsByDate[date] = 0;
     });
     
-    html += `
+    bufferPivotData.forEach(sectionGroup => {
+        Object.keys(sectionGroup.section_totals_by_date).forEach(date => {
+            if (grandTotalsByDate[date] !== undefined) {
+                grandTotalsByDate[date] += sectionGroup.section_totals_by_date[date];
+            }
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered buffer-nco-tcd-table">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2" class="align-middle tcd-header-row">LCR Template Section 1</th>
+                    <th rowspan="2" class="align-middle tcd-header-row">Libellé Client</th>
+                    <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
                 </tr>
                 <tr>
     `;
     
-    dates.forEach(() => {
-        html += `<th class="text-center header-j">LCR Assiette Pondérée (Bn €)</th>`;
+    // En-têtes des dates
+    dates.forEach(date => {
+        html += `<th class="text-center tcd-date-header">${date}</th>`;
     });
     
     html += `
@@ -1301,47 +1519,78 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
             <tbody>
     `;
     
-    // Organiser par section
-    const sectionGroups = {};
-    bufferData.forEach(item => {
-        if (!sectionGroups[item.lcr_template_section]) {
-            sectionGroups[item.lcr_template_section] = [];
-        }
-        sectionGroups[item.lcr_template_section].push(item);
-    });
-    
-    // Générer avec hiérarchie
-    Object.keys(sectionGroups).forEach(section => {
-        const items = sectionGroups[section];
+    // Génération des lignes TCD avec hiérarchie Section > Client
+    bufferPivotData.forEach((sectionGroup, sectionIndex) => {
+        const clientDetails = sectionGroup.client_details || [];
+        const totalRowsForSection = clientDetails.length + 1; // +1 pour la ligne de total
         
-        // Ligne d'en-tête de section
-        html += `<tr class="section-header">`;
-        html += `<td class="fw-bold text-primary">${section}</td>`;
-        dates.forEach(() => {
-            html += `<td class="text-muted text-center"><em>─</em></td>`;
-        });
-        html += '</tr>';
-        
-        // Lignes de détail avec indentation
-        items.forEach(item => {
-            html += `<tr class="detail-row">`;
-            html += `<td class="ps-4">├─ ${item.libelle_client}</td>`;
+        // Lignes de détail par client
+        clientDetails.forEach((detail, detailIndex) => {
+            html += `<tr class="tcd-detail-row">`;
             
+            // Cellule Section (fusionnée pour tous les clients + total)
+            if (detailIndex === 0) {
+                html += `<td rowspan="${totalRowsForSection}" class="tcd-section-cell align-middle">
+                            <div class="tcd-group-label">
+                                <i class="fas fa-folder-open text-success me-2"></i>
+                                <strong>${sectionGroup.section}</strong>
+                            </div>
+                         </td>`;
+            }
+            
+            // Cellule Client avec indentation
+            html += `<td class="tcd-client-detail">
+                        <span class="tcd-indent">├─</span> ${detail.client}
+                     </td>`;
+            
+            // Valeurs par date
             dates.forEach(date => {
-                const value = item.dates[date] || 0;
-                html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+                const value = detail.date_values[date] || 0;
+                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
             });
             
             html += '</tr>';
         });
+        
+        // Ligne de total pour la Section
+        html += `<tr class="tcd-section-total-row">`;
+        html += `<td class="tcd-total-label"><strong>Total ${sectionGroup.section}</strong></td>`;
+        
+        // Totaux par date pour cette section
+        dates.forEach(date => {
+            const value = sectionGroup.section_totals_by_date[date] || 0;
+            html += `<td class="text-end tcd-section-total">${value.toFixed(3)}</td>`;
+        });
+        
+        html += '</tr>';
+        
+        // Ligne de séparation entre les sections (sauf pour la dernière)
+        if (sectionIndex < bufferPivotData.length - 1) {
+            html += `<tr class="tcd-separator"><td colspan="${dates.length + 2}"></td></tr>`;
+        }
     });
     
+    // Ligne de grand total BUFFER
+    html += `
+        <tr class="tcd-grand-total-row">
+            <td colspan="2" class="tcd-grand-total-label">
+                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL BUFFER</strong>
+            </td>
+    `;
+    
+    dates.forEach(date => {
+        const value = grandTotalsByDate[date] || 0;
+        html += `<td class="text-end tcd-grand-total-value">${value.toFixed(3)}</td>`;
+    });
+    
+    html += '</tr>';
     html += '</tbody></table>';
     return html;
 }
 
 /**
- * Génère le HTML du tableau NCO (deuxième tableau)
+ * Génère le HTML du tableau NCO avec structure TCD simple
  */
 function generateBufferNcoNcoTableHTML(bufferNcoData) {
     if (!bufferNcoData.j) {
@@ -1349,31 +1598,40 @@ function generateBufferNcoNcoTableHTML(bufferNcoData) {
     }
     
     const dataJ = bufferNcoData.j;
-    const ncoData = dataJ.nco_data || [];
+    const ncoPivotData = dataJ.nco_pivot_data || [];
     const dates = dataJ.dates || [];
     
-    if (ncoData.length === 0) {
-        return '<div class="alert alert-warning">Aucune donnée NCO disponible</div>';
+    if (ncoPivotData.length === 0) {
+        return '<div class="alert alert-warning">Aucune donnée NCO TCD disponible</div>';
     }
     
-    let html = `
-        <table class="table table-bordered new-table buffer-nco-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="align-middle">LCR Catégorie</th>
-    `;
-    
+    // Calculer les totaux globaux par date pour NCO
+    const grandTotalsByDate = {};
     dates.forEach(date => {
-        html += `<th class="text-center header-j">${date}</th>`;
+        grandTotalsByDate[date] = 0;
     });
     
-    html += `
+    ncoPivotData.forEach(categorieGroup => {
+        Object.keys(categorieGroup.date_values).forEach(date => {
+            if (grandTotalsByDate[date] !== undefined) {
+                grandTotalsByDate[date] += categorieGroup.date_values[date];
+            }
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered buffer-nco-tcd-table nco-table">
+            <thead class="table-success">
+                <tr>
+                    <th rowspan="2" class="align-middle tcd-header-row-nco">LCR Catégorie</th>
+                    <th colspan="${dates.length}" class="text-center tcd-header-col-nco">LCR Assiette Pondérée par Date (Bn €)</th>
                 </tr>
                 <tr>
     `;
     
-    dates.forEach(() => {
-        html += `<th class="text-center header-j">LCR Assiette Pondérée (Bn €)</th>`;
+    // En-têtes des dates
+    dates.forEach(date => {
+        html += `<th class="text-center tcd-date-header-nco">${date}</th>`;
     });
     
     html += `
@@ -1382,18 +1640,37 @@ function generateBufferNcoNcoTableHTML(bufferNcoData) {
             <tbody>
     `;
     
-    ncoData.forEach(item => {
-        html += '<tr>';
-        html += `<td class="fw-bold">${item.lcr_categorie}</td>`;
+    // Génération des lignes NCO (simple, pas de hiérarchie)
+    ncoPivotData.forEach((categorieGroup, index) => {
+        html += `<tr class="tcd-nco-row">`;
+        html += `<td class="tcd-categorie-cell">
+                    <strong>${categorieGroup.categorie}</strong>
+                 </td>`;
         
+        // Valeurs par date
         dates.forEach(date => {
-            const value = item.dates[date] || 0;
-            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+            const value = categorieGroup.date_values[date] || 0;
+            const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell-nco';
+            html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
         });
         
         html += '</tr>';
     });
     
+    // Ligne de grand total NCO
+    html += `
+        <tr class="tcd-grand-total-row-nco">
+            <td class="tcd-grand-total-label-nco">
+                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL NCO</strong>
+            </td>
+    `;
+    
+    dates.forEach(date => {
+        const value = grandTotalsByDate[date] || 0;
+        html += `<td class="text-end tcd-grand-total-value-nco">${value.toFixed(3)}</td>`;
+    });
+    
+    html += '</tr>';
     html += '</tbody></table>';
     return html;
 }
@@ -1436,7 +1713,7 @@ function generateConsumptionResourcesSection(consumptionResourcesData) {
 }
 
 /**
- * Génère le HTML du tableau CONSUMPTION (premier tableau)
+ * Génère le HTML du tableau CONSUMPTION avec style Excel professionnel
  */
 function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesData) {
     if (!consumptionResourcesData.j) {
@@ -1451,24 +1728,35 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
         return '<div class="alert alert-warning">Aucune donnée CONSUMPTION disponible</div>';
     }
     
-    let html = `
-        <table class="table table-bordered new-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-    `;
+    // Calculer les totaux par date
+    const totalsByDate = {};
+    let grandTotal = 0;
     
     dates.forEach(date => {
-        html += `<th class="text-center header-j">${date}</th>`;
+        totalsByDate[date] = 0;
     });
     
-    html += `
+    consumptionData.forEach(item => {
+        dates.forEach(date => {
+            const value = item.dates[date] || 0;
+            totalsByDate[date] += value;
+            grandTotal += value;
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered consumption-excel-table">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2" class="align-middle cons-header-row">LCR ECO Groupe Métiers</th>
+                    <th colspan="${dates.length}" class="text-center cons-header-col">LCR ECO Impact by Date (Bn €)</th>
+                    <th rowspan="2" class="align-middle cons-total-header">Total (Bn €)</th>
                 </tr>
                 <tr>
     `;
     
-    dates.forEach(() => {
-        html += `<th class="text-center header-j">LCR ECO Impact (Bn €)</th>`;
+    dates.forEach(date => {
+        html += `<th class="text-center cons-date-header">${date}</th>`;
     });
     
     html += `
@@ -1477,24 +1765,53 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
             <tbody>
     `;
     
-    consumptionData.forEach(item => {
-        html += '<tr>';
-        html += `<td class="fw-bold">${item.lcr_eco_groupe_metiers}</td>`;
+    // Lignes de données avec totaux par ligne
+    consumptionData.forEach((item, index) => {
+        let rowTotal = 0;
+        html += `<tr class="cons-data-row">`;
+        html += `<td class="cons-groupe-cell">
+                    <div class="cons-group-label">
+                        <i class="fas fa-chart-line text-primary me-2"></i>
+                        <strong>${item.lcr_eco_groupe_metiers}</strong>
+                    </div>
+                 </td>`;
         
         dates.forEach(date => {
             const value = item.dates[date] || 0;
-            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+            rowTotal += value;
+            const cellClass = value === 0 ? 'cons-zero-value' : 'cons-data-cell';
+            html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
         });
         
+        // Total par ligne
+        html += `<td class="text-end cons-row-total">${rowTotal.toFixed(3)}</td>`;
         html += '</tr>';
     });
+    
+    // Ligne de totaux
+    html += `
+        <tr class="cons-grand-total-row">
+            <td class="cons-grand-total-label">
+                <strong><i class="fas fa-calculator me-2"></i>TOTAL CONSUMPTION</strong>
+            </td>
+    `;
+    
+    let finalGrandTotal = 0;
+    dates.forEach(date => {
+        const value = totalsByDate[date];
+        finalGrandTotal += value;
+        html += `<td class="text-end cons-grand-total-value">${value.toFixed(3)}</td>`;
+    });
+    
+    html += `<td class="text-end cons-grand-total-final">${finalGrandTotal.toFixed(3)}</td>`;
+    html += '</tr>';
     
     html += '</tbody></table>';
     return html;
 }
 
 /**
- * Génère le HTML du tableau RESOURCES (deuxième tableau)
+ * Génère le HTML du tableau RESOURCES avec style Excel professionnel
  */
 function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData) {
     if (!consumptionResourcesData.j) {
@@ -1509,24 +1826,35 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
         return '<div class="alert alert-warning">Aucune donnée RESOURCES disponible</div>';
     }
     
-    let html = `
-        <table class="table table-bordered new-table cons-res-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-    `;
+    // Calculer les totaux par date
+    const totalsByDate = {};
+    let grandTotal = 0;
     
     dates.forEach(date => {
-        html += `<th class="text-center header-j">${date}</th>`;
+        totalsByDate[date] = 0;
     });
     
-    html += `
+    resourcesData.forEach(item => {
+        dates.forEach(date => {
+            const value = item.dates[date] || 0;
+            totalsByDate[date] += value;
+            grandTotal += value;
+        });
+    });
+    
+    let html = `
+        <table class="table table-bordered resources-excel-table">
+            <thead class="table-success">
+                <tr>
+                    <th rowspan="2" class="align-middle res-header-row">LCR ECO Groupe Métiers</th>
+                    <th colspan="${dates.length}" class="text-center res-header-col">LCR ECO Impact by Date (Bn €)</th>
+                    <th rowspan="2" class="align-middle res-total-header">Total (Bn €)</th>
                 </tr>
                 <tr>
     `;
     
-    dates.forEach(() => {
-        html += `<th class="text-center header-j">LCR ECO Impact (Bn €)</th>`;
+    dates.forEach(date => {
+        html += `<th class="text-center res-date-header">${date}</th>`;
     });
     
     html += `
@@ -1535,17 +1863,46 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
             <tbody>
     `;
     
-    resourcesData.forEach(item => {
-        html += '<tr>';
-        html += `<td class="fw-bold">${item.lcr_eco_groupe_metiers}</td>`;
+    // Lignes de données avec totaux par ligne
+    resourcesData.forEach((item, index) => {
+        let rowTotal = 0;
+        html += `<tr class="res-data-row">`;
+        html += `<td class="res-groupe-cell">
+                    <div class="res-group-label">
+                        <i class="fas fa-coins text-success me-2"></i>
+                        <strong>${item.lcr_eco_groupe_metiers}</strong>
+                    </div>
+                 </td>`;
         
         dates.forEach(date => {
             const value = item.dates[date] || 0;
-            html += `<td class="text-end numeric-value">${value.toFixed(3)}</td>`;
+            rowTotal += value;
+            const cellClass = value === 0 ? 'res-zero-value' : 'res-data-cell';
+            html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
         });
         
+        // Total par ligne
+        html += `<td class="text-end res-row-total">${rowTotal.toFixed(3)}</td>`;
         html += '</tr>';
     });
+    
+    // Ligne de totaux
+    html += `
+        <tr class="res-grand-total-row">
+            <td class="res-grand-total-label">
+                <strong><i class="fas fa-calculator me-2"></i>TOTAL RESOURCES</strong>
+            </td>
+    `;
+    
+    let finalGrandTotal = 0;
+    dates.forEach(date => {
+        const value = totalsByDate[date];
+        finalGrandTotal += value;
+        html += `<td class="text-end res-grand-total-value">${value.toFixed(3)}</td>`;
+    });
+    
+    html += `<td class="text-end res-grand-total-final">${finalGrandTotal.toFixed(3)}</td>`;
+    html += '</tr>';
     
     html += '</tbody></table>';
     return html;
@@ -1566,7 +1923,7 @@ function showChatbot() {
     
     // Message initial du bot
     if (chatMessages.length === 0) {
-        addChatMessage('assistant', 'Hello! I can help you analyze the LCR data that was just processed. You can ask me questions about the Balance Sheet variations, Consumption trends, or upload additional documents for context.');
+        addChatMessage('assistant', 'Hello! I am your LCR (Liquidity Coverage Ratio) banking analyst. I have just processed your comprehensive LCR analysis including BUFFER, CONSUMPTION, RESOURCES, CAPPAGE, and NCO tables across multiple time periods (D, D-1, M-1). \n\nI can help you:\n- Analyze variations and trends in your liquidity data\n- Identify regulatory compliance issues\n- Explain business group performance\n- Provide strategic recommendations\n- Deep-dive into specific metrics or time periods\n\nWhat aspects of your LCR analysis would you like to explore?');
     }
 }
 

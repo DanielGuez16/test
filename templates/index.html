@@ -49,11 +49,10 @@
                 <small><strong>Tip:</strong> For optimal performance, please upload one file at a time and wait for processing confirmation before uploading the next file.</small>
             </div>
             </div>
-            
-            <!-- Section Upload -->
 
+            <!-- Section Upload -->
             <div class="row mb-4">
-                <div class="col-lg-6 mb-3">
+                <div class="col-lg-4 mb-3">
                     <div class="card h-100 border-0 fade-in-up">
                         <div class="card-header bg-secondary text-white">
                             <h5 class="mb-0">File D (Today)</h5>
@@ -70,8 +69,7 @@
                     </div>
                 </div>
 
-                
-                <div class="col-lg-6 mb-3">
+                <div class="col-lg-4 mb-3">
                     <div class="card h-100 border-0 fade-in-up" style="animation-delay: 0.2s;">
                         <div class="card-header bg-secondary text-white">
                             <h5 class="mb-0">File D-1 (Yesterday)</h5>
@@ -87,8 +85,25 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="col-lg-4 mb-3">
+                    <div class="card h-100 border-0 fade-in-up" style="animation-delay: 0.4s;">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">File M-1 (Last Month)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="upload-area" onclick="document.getElementById('fileM1').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h5>Select file on M-1</h5>
+                                <p class="text-muted mb-0">Excel, CSV, TSV (.xlsx, .xls, .csv, .tsv, .txt)</p>
+                            </div>
+                            <input type="file" id="fileM1" accept=".xlsx,.xls,.xlsm,.xlsb,.csv,.tsv,.txt" style="display:none">
+                            <div id="statusM1"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            
+
             <!-- Bouton d'analyse -->
             <div class="text-center mb-4 fade-in-up" style="animation-delay: 0.4s;">
                 <button id="analyzeBtn" class="btn btn-analyze btn-lg" onclick="analyze()" disabled>

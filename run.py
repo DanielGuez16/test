@@ -426,17 +426,17 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     try:
         logger.info("Début de l'analyse depuis DataFrames en mémoire")
         
-        # Vérification de la présence des deux fichiers
-        if len(file_session.get("files", {})) < 2:
-            raise HTTPException(status_code=400, detail="Les deux fichiers sont requis")
+        # Vérification de la présence des TROIS fichiers
+        if len(file_session.get("files", {})) < 3:
+            raise HTTPException(status_code=400, detail="Les trois fichiers sont requis")
         
-        if "j" not in file_session["files"] or "jMinus1" not in file_session["files"]:
+        if "j" not in file_session["files"] or "jMinus1" not in file_session["files"] or "mMinus1" not in file_session["files"]:
             raise HTTPException(status_code=400, detail="Fichiers manquants")
         
         # Récupérer les DataFrames directement depuis la session
         dataframes = {}
         for file_type, file_info in file_session["files"].items():
-            df = file_info["dataframe"]  # DataFrame déjà en mémoire
+            df = file_info["dataframe"]
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
 
@@ -821,15 +821,25 @@ async def view_current_report(session_token: Optional[str] = Cookie(None)):
 
 def create_buffer_table(dataframes):
     """
-    Crée le tableau BUFFER avec filtres spécifiques
+    Crée le tableau BUFFER avec structure TCD Excel
+    Filtre: LCR_Catégorie = "1- Buffer"
+    Lignes: LCR_Template Section 1 + Libellé Client (hiérarchie)
+    Valeurs: D (Today), Variation D vs D-1, Variation D vs M-1
     """
     try:
-        logger.info("📊 Création du tableau BUFFER")
+        logger.info("📊 Création du tableau BUFFER - Style TCD Excel avec variations")
+        
+        # Vérification que nous avons les trois fichiers nécessaires
+        if not all(key in dataframes for key in ['j', 'jMinus1', 'mMinus1']):
+            return {
+                "title": "BUFFER - Erreur",
+                "error": "Les trois fichiers (J, J-1, M-1) sont requis pour calculer les variations"
+            }
         
         buffer_results = {}
         
         for file_type, df in dataframes.items():
-            logger.info(f"📄 Traitement BUFFER pour {file_type}")
+            logger.info(f"📄 Traitement BUFFER TCD pour {file_type}")
             
             # Vérification des colonnes requises
             buffer_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", 
@@ -840,14 +850,18 @@ def create_buffer_table(dataframes):
                 logger.warning(f"⚠️ Colonnes manquantes pour BUFFER {file_type}: {missing_cols}")
                 continue
             
-            # Filtrage des données
+            # Filtrage des données - TCD Style
             df_filtered = df[df["Top Conso"] == "O"].copy()
             df_filtered = df_filtered[df_filtered["LCR_Catégorie"] == "1- Buffer"].copy()
             
-            logger.info(f"📋 Après filtrage BUFFER: {len(df_filtered)} lignes")
+            logger.info(f"📋 Après filtrage BUFFER TCD: {len(df_filtered)} lignes")
             
             if len(df_filtered) == 0:
                 logger.warning(f"⚠️ Aucune donnée BUFFER pour {file_type}")
+                buffer_results[file_type] = {
+                    "pivot_data": [],
+                    "sections": []
+                }
                 continue
             
             # Préparation des données
@@ -859,56 +873,153 @@ def create_buffer_table(dataframes):
             df_filtered["LCR_Template Section 1"] = df_filtered["LCR_Template Section 1"].astype(str).str.strip()
             df_filtered["Libellé Client"] = df_filtered["Libellé Client"].astype(str).str.strip()
             
-            # Groupement
-            grouped_data = []
+            # Grouper les données pour créer la structure pivot
+            pivot_data = []
+            sections = sorted(df_filtered["LCR_Template Section 1"].unique())
             
-            # Grouper par LCR_Template Section 1
-            for section in df_filtered["LCR_Template Section 1"].unique():
+            for section in sections:
                 section_data = df_filtered[df_filtered["LCR_Template Section 1"] == section]
+                clients = sorted(section_data["Libellé Client"].unique())
                 
-                if section == "1.1- Cash":
-                    # Pour 1.1- Cash, montrer le détail par Libellé Client
-                    for client in section_data["Libellé Client"].unique():
-                        client_data = section_data[section_data["Libellé Client"] == client]
-                        total = float(client_data["LCR_Assiette Pondérée"].sum())
-                        grouped_data.append({
-                            "section": section,
-                            "client": client,
-                            "total": total / 1_000_000_000,  # Conversion en milliards
-                            "is_detail": True
-                        })
-                else:
-                    # Pour les autres sections, montrer seulement le total
-                    total = float(section_data["LCR_Assiette Pondérée"].sum())
-                    grouped_data.append({
-                        "section": section,
-                        "client": "TOTAL",
-                        "total": total / 1_000_000_000,  # Conversion en milliards
-                        "is_detail": False
+                # Calculer les totaux de section pour toutes les périodes
+                section_total_j = section_data["LCR_Assiette Pondérée"].sum() / 1_000_000_000
+                
+                # Données clients détaillées
+                client_details = []
+                
+                for client in clients:
+                    client_data = section_data[section_data["Libellé Client"] == client]
+                    value_j = client_data["LCR_Assiette Pondérée"].sum() / 1_000_000_000
+                    
+                    client_details.append({
+                        "client": client,
+                        "value_j": float(value_j),
+                        "is_detail": True
                     })
+                
+                # Ajouter le groupe de section avec ses détails
+                pivot_data.append({
+                    "section": section,
+                    "client_details": client_details,
+                    "section_total_j": float(section_total_j),
+                    "is_section_group": True
+                })
             
-            buffer_results[file_type] = grouped_data
-            logger.info(f"✅ BUFFER {file_type}: {len(grouped_data)} entrées")
+            buffer_results[file_type] = {
+                "pivot_data": pivot_data,
+                "sections": sections
+            }
+            
+            logger.info(f"✅ BUFFER TCD {file_type}: {len(pivot_data)} sections")
+        
+        # Calculer les variations entre les périodes
+        if 'j' in buffer_results and 'jMinus1' in buffer_results and 'mMinus1' in buffer_results:
+            buffer_results_with_variations = calculate_buffer_variations(
+                buffer_results['j'], 
+                buffer_results['jMinus1'], 
+                buffer_results['mMinus1']
+            )
+        else:
+            buffer_results_with_variations = buffer_results.get('j', {"pivot_data": [], "sections": []})
         
         return {
-            "title": "BUFFER",
-            "data": buffer_results,
+            "title": "BUFFER - TCD Analysis with Variations",
+            "data": buffer_results_with_variations,
             "metadata": {
                 "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "lcr_categorie": "1- Buffer"
+                "tcd_config": {
+                    "filters": {"lcr_categorie": "1- Buffer", "top_conso": "O"},
+                    "rows": ["LCR_Template Section 1", "Libellé Client"],
+                    "values": ["D (Today) Bn €", "Variation D vs D-1", "Variation D vs M-1"]
                 }
             }
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur création tableau BUFFER: {e}")
+        logger.error(f"❌ Erreur création tableau BUFFER TCD: {e}")
         return {
             "title": "BUFFER - Erreur",
             "error": str(e)
         }
 
+def calculate_buffer_variations(data_j, data_j1, data_m1):
+    """
+    Calcule les variations pour le tableau BUFFER
+    """
+    try:
+        # Créer des mappings pour les recherches rapides
+        j1_map = {}
+        m1_map = {}
+        
+        # Mapper les données J-1
+        for section_group in data_j1.get("pivot_data", []):
+            section = section_group["section"]
+            for client_detail in section_group.get("client_details", []):
+                key = f"{section}|{client_detail['client']}"
+                j1_map[key] = client_detail["value_j"]
+        
+        # Mapper les données M-1
+        for section_group in data_m1.get("pivot_data", []):
+            section = section_group["section"]
+            for client_detail in section_group.get("client_details", []):
+                key = f"{section}|{client_detail['client']}"
+                m1_map[key] = client_detail["value_j"]
+        
+        # Calculer les variations pour les données J
+        result_data = {"pivot_data": [], "sections": data_j.get("sections", [])}
+        
+        for section_group in data_j.get("pivot_data", []):
+            section = section_group["section"]
+            
+            # Calculer les variations pour chaque client
+            client_details_with_variations = []
+            section_total_j = 0
+            section_total_j1 = 0
+            section_total_m1 = 0
+            
+            for client_detail in section_group.get("client_details", []):
+                client = client_detail["client"]
+                key = f"{section}|{client}"
+                
+                value_j = client_detail["value_j"]
+                value_j1 = j1_map.get(key, 0)
+                value_m1 = m1_map.get(key, 0)
+                
+                variation_daily = value_j - value_j1
+                variation_monthly = value_j - value_m1
+                
+                # Cumuler pour les totaux de section
+                section_total_j += value_j
+                section_total_j1 += value_j1
+                section_total_m1 += value_m1
+                
+                client_details_with_variations.append({
+                    "client": client,
+                    "value_j": float(value_j),
+                    "variation_daily": float(variation_daily),
+                    "variation_monthly": float(variation_monthly),
+                    "is_detail": True
+                })
+            
+            # Calculer les variations de section
+            section_variation_daily = section_total_j - section_total_j1
+            section_variation_monthly = section_total_j - section_total_m1
+            
+            result_data["pivot_data"].append({
+                "section": section,
+                "client_details": client_details_with_variations,
+                "section_total_j": float(section_total_j),
+                "section_variation_daily": float(section_variation_daily),
+                "section_variation_monthly": float(section_variation_monthly),
+                "is_section_group": True
+            })
+        
+        return result_data
+        
+    except Exception as e:
+        logger.error(f"Erreur calcul variations BUFFER: {e}")
+        return data_j
+    
 
 # ========================== FONCTIONS SUMMARY TABLE ===========================
 
@@ -1239,15 +1350,19 @@ def prepare_consumption_resources_analysis_prompt(context_data):
 
 def create_cappage_table(dataframes):
     """
-    Crée le tableau CAPPAGE & Short_LCR avec structure pivot par date
+    Crée le tableau CAPPAGE avec structure TCD Excel style
+    Filtre: SI Remettant = SHORT_LCR ou CAPREOS
+    Lignes: SI Remettant + Commentaire (hiérarchie)
+    Colonnes: Date d'arrêté
+    Valeurs: Somme LCR_Assiette Pondérée
     """
     try:
-        logger.info("📊 Création du tableau CAPPAGE & Short_LCR")
+        logger.info("📊 Création du tableau CAPPAGE - Style TCD Excel")
         
         cappage_results = {}
         
         for file_type, df in dataframes.items():
-            logger.info(f"📄 Traitement CAPPAGE pour {file_type}")
+            logger.info(f"📄 Traitement CAPPAGE TCD pour {file_type}")
             
             # Vérification des colonnes requises
             cappage_cols = ["Top Conso", "SI Remettant", "Commentaire", 
@@ -1258,20 +1373,25 @@ def create_cappage_table(dataframes):
                 logger.warning(f"⚠️ Colonnes manquantes pour CAPPAGE {file_type}: {missing_cols}")
                 continue
             
-            # Filtrage des données
+            # Filtrage des données - TCD Style
             df_filtered = df[df["Top Conso"] == "O"].copy()
             
-            # Filtres spécifiques CAPPAGE
+            # Filtre principal: SI Remettant
             allowed_si_remettant = ["SHORT_LCR", "CAPREOS"]
             df_filtered = df_filtered[df_filtered["SI Remettant"].isin(allowed_si_remettant)].copy()
             
-            logger.info(f"📋 Après filtrage CAPPAGE: {len(df_filtered)} lignes")
+            logger.info(f"📋 Après filtrage CAPPAGE TCD: {len(df_filtered)} lignes")
             
             if len(df_filtered) == 0:
                 logger.warning(f"⚠️ Aucune donnée CAPPAGE pour {file_type}")
+                cappage_results[file_type] = {
+                    "pivot_data": [],
+                    "dates": [],
+                    "si_remettant_groups": []
+                }
                 continue
             
-            # Préparation des données
+            # Préparation des données pour le TCD
             df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
                 df_filtered["LCR_Assiette Pondérée"], errors='coerce'
             ).fillna(0)
@@ -1281,77 +1401,89 @@ def create_cappage_table(dataframes):
             df_filtered["Commentaire"] = df_filtered["Commentaire"].astype(str).str.strip()
             df_filtered["Date d'arrêté"] = df_filtered["Date d'arrêté"].astype(str).str.strip()
             
-            # Structure de données pour le tableau croisé
-            cappage_data = []
-            
-            # Obtenir toutes les dates uniques
+            # Récupérer toutes les dates uniques (colonnes du TCD)
             dates = sorted(df_filtered["Date d'arrêté"].unique())
             
-            # Traitement par SI Remettant
+            # Créer la structure TCD hiérarchique
+            pivot_structure = []
+            
+            # Grouper par SI Remettant (niveau 1 de hiérarchie)
             for si_remettant in allowed_si_remettant:
                 si_data = df_filtered[df_filtered["SI Remettant"] == si_remettant]
                 
-                if si_remettant == "CAPREOS":
-                    # Pour CAPREOS, montrer le détail par Commentaire
-                    for commentaire in si_data["Commentaire"].unique():
-                        commentaire_data = si_data[si_data["Commentaire"] == commentaire]
-                        
-                        # Créer une ligne pour chaque commentaire avec toutes les dates
-                        row_data = {
-                            "si_remettant": si_remettant,
-                            "commentaire": commentaire,
-                            "is_detail": True,
-                            "dates": {}
-                        }
-                        
-                        for date in dates:
-                            date_data = commentaire_data[commentaire_data["Date d'arrêté"] == date]
-                            total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
-                            row_data["dates"][date] = total
-                        
-                        cappage_data.append(row_data)
-                else:
-                    # Pour SHORT_LCR, montrer seulement le total
-                    row_data = {
-                        "si_remettant": si_remettant,
-                        "commentaire": "TOTAL",
-                        "is_detail": False,
-                        "dates": {}
-                    }
+                if len(si_data) == 0:
+                    continue
+                
+                # Sous-groupes par Commentaire (niveau 2 de hiérarchie)
+                commentaires = sorted(si_data["Commentaire"].unique())
+                
+                # Données détaillées par commentaire
+                commentaire_details = []
+                si_totals_by_date = {}
+                
+                for commentaire in commentaires:
+                    commentaire_data = si_data[si_data["Commentaire"] == commentaire]
                     
+                    # Calculer les valeurs par date pour ce commentaire
+                    date_values = {}
                     for date in dates:
-                        date_data = si_data[si_data["Date d'arrêté"] == date]
-                        total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
-                        row_data["dates"][date] = total
+                        date_total = commentaire_data[
+                            commentaire_data["Date d'arrêté"] == date
+                        ]["LCR_Assiette Pondérée"].sum()
+                        
+                        # Conversion en milliards
+                        date_values[date] = float(date_total) / 1_000_000_000
+                        
+                        # Cumuler pour les totaux SI Remettant
+                        if date not in si_totals_by_date:
+                            si_totals_by_date[date] = 0
+                        si_totals_by_date[date] += date_values[date]
                     
-                    cappage_data.append(row_data)
+                    # Ajouter cette ligne de détail
+                    commentaire_details.append({
+                        "commentaire": commentaire,
+                        "date_values": date_values,
+                        "is_detail": True,
+                        "total": sum(date_values.values())
+                    })
+                
+                # Ajouter le groupe SI Remettant avec ses détails
+                pivot_structure.append({
+                    "si_remettant": si_remettant,
+                    "commentaire_details": commentaire_details,
+                    "si_totals_by_date": si_totals_by_date,
+                    "grand_total": sum(si_totals_by_date.values()),
+                    "is_si_group": True
+                })
             
             cappage_results[file_type] = {
-                "data": cappage_data,
-                "dates": dates
+                "pivot_data": pivot_structure,
+                "dates": dates,
+                "si_remettant_groups": allowed_si_remettant
             }
             
-            logger.info(f"✅ CAPPAGE {file_type}: {len(cappage_data)} lignes, {len(dates)} dates")
+            logger.info(f"✅ CAPPAGE TCD {file_type}: {len(pivot_structure)} groupes SI, {len(dates)} dates")
         
         return {
-            "title": "CAPPAGE & Short_LCR",
+            "title": "CAPPAGE & Short_LCR - TCD Analysis",
             "data": cappage_results,
             "metadata": {
                 "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "si_remettant": allowed_si_remettant
+                "tcd_config": {
+                    "filters": {"si_remettant": allowed_si_remettant, "top_conso": "O"},
+                    "rows": ["SI Remettant", "Commentaire"],
+                    "columns": ["Date d'arrêté"],
+                    "values": "Somme LCR_Assiette Pondérée (Bn €)"
                 }
             }
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur création tableau CAPPAGE: {e}")
+        logger.error(f"❌ Erreur création tableau CAPPAGE TCD: {e}")
         return {
             "title": "CAPPAGE & Short_LCR - Erreur",
             "error": str(e)
         }
-
 
 
 # ========================== FONCTIONS BUFFER & NCO TABLE ===========================
@@ -1359,15 +1491,27 @@ def create_cappage_table(dataframes):
 
 def create_buffer_nco_table(dataframes):
     """
-    Crée les tableaux BUFFER & NCO avec structure pivot par date
+    Crée les tableaux BUFFER & NCO avec structure TCD Excel style
+    
+    Tableau 1 - BUFFER:
+    - Filtre: LCR_Catégorie = "1- Buffer"
+    - Lignes: LCR_Template Section 1 + Libellé Client (hiérarchie)
+    - Colonnes: Date d'arrêté
+    - Valeurs: Somme LCR_Assiette Pondérée
+    
+    Tableau 2 - NCO:
+    - Pas de filtre
+    - Lignes: LCR_Catégorie
+    - Colonnes: Date d'arrêté
+    - Valeurs: Somme LCR_Assiette Pondérée
     """
     try:
-        logger.info("📊 Création des tableaux BUFFER & NCO")
+        logger.info("📊 Création des tableaux BUFFER & NCO - Style TCD Excel")
         
         buffer_nco_results = {}
         
         for file_type, df in dataframes.items():
-            logger.info(f"📄 Traitement BUFFER & NCO pour {file_type}")
+            logger.info(f"📄 Traitement BUFFER & NCO TCD pour {file_type}")
             
             # Vérification des colonnes requises
             buffer_nco_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", 
@@ -1401,77 +1545,123 @@ def create_buffer_nco_table(dataframes):
             # Obtenir toutes les dates uniques
             dates = sorted(df_filtered["Date d'arrêté"].unique())
             
+            # =============================================================================
             # TABLEAU 1: BUFFER (avec filtre LCR_Catégorie = "1- Buffer")
-            buffer_data = []
+            # =============================================================================
+            buffer_pivot_data = []
             df_buffer = df_filtered[df_filtered["LCR_Catégorie"] == "1- Buffer"].copy()
             
             if len(df_buffer) > 0:
-                # Grouper par LCR_Template Section 1 et Libellé Client
-                for section in df_buffer["LCR_Template Section 1"].unique():
+                # Grouper par LCR_Template Section 1 (niveau 1 de hiérarchie)
+                sections = sorted(df_buffer["LCR_Template Section 1"].unique())
+                
+                for section in sections:
                     section_data = df_buffer[df_buffer["LCR_Template Section 1"] == section]
                     
-                    for client in section_data["Libellé Client"].unique():
+                    # Sous-groupes par Libellé Client (niveau 2 de hiérarchie)
+                    clients = sorted(section_data["Libellé Client"].unique())
+                    
+                    # Données détaillées par client
+                    client_details = []
+                    section_totals_by_date = {}
+                    
+                    for client in clients:
                         client_data = section_data[section_data["Libellé Client"] == client]
                         
-                        row_data = {
-                            "lcr_template_section": section,
-                            "libelle_client": client,
-                            "dates": {}
-                        }
-                        
+                        # Calculer les valeurs par date pour ce client
+                        date_values = {}
                         for date in dates:
-                            date_data = client_data[client_data["Date d'arrêté"] == date]
-                            total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
-                            row_data["dates"][date] = total
+                            date_total = client_data[
+                                client_data["Date d'arrêté"] == date
+                            ]["LCR_Assiette Pondérée"].sum()
+                            
+                            # Conversion en milliards
+                            date_values[date] = float(date_total) / 1_000_000_000
+                            
+                            # Cumuler pour les totaux de section
+                            if date not in section_totals_by_date:
+                                section_totals_by_date[date] = 0
+                            section_totals_by_date[date] += date_values[date]
                         
-                        buffer_data.append(row_data)
+                        # Ajouter cette ligne de détail client
+                        client_details.append({
+                            "client": client,
+                            "date_values": date_values,
+                            "is_detail": True
+                        })
+                    
+                    # Ajouter le groupe Section avec ses détails
+                    buffer_pivot_data.append({
+                        "section": section,
+                        "client_details": client_details,
+                        "section_totals_by_date": section_totals_by_date,
+                        "is_section_group": True
+                    })
             
-            # TABLEAU 2: NCO (sans filtre, groupé par LCR_Catégorie)
-            nco_data = []
+            # =============================================================================
+            # TABLEAU 2: NCO (pas de filtre, groupé par LCR_Catégorie)
+            # =============================================================================
+            nco_pivot_data = []
             
-            for categorie in df_filtered["LCR_Catégorie"].unique():
+            # Grouper par LCR_Catégorie
+            categories = sorted(df_filtered["LCR_Catégorie"].unique())
+            
+            for categorie in categories:
                 categorie_data = df_filtered[df_filtered["LCR_Catégorie"] == categorie]
                 
-                row_data = {
-                    "lcr_categorie": categorie,
-                    "dates": {}
-                }
-                
+                # Calculer les valeurs par date pour cette catégorie
+                date_values = {}
                 for date in dates:
-                    date_data = categorie_data[categorie_data["Date d'arrêté"] == date]
-                    total = float(date_data["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
-                    row_data["dates"][date] = total
+                    date_total = categorie_data[
+                        categorie_data["Date d'arrêté"] == date
+                    ]["LCR_Assiette Pondérée"].sum()
+                    
+                    # Conversion en milliards
+                    date_values[date] = float(date_total) / 1_000_000_000
                 
-                nco_data.append(row_data)
+                # Ajouter cette catégorie
+                nco_pivot_data.append({
+                    "categorie": categorie,
+                    "date_values": date_values
+                })
             
             buffer_nco_results[file_type] = {
-                "buffer_data": buffer_data,
-                "nco_data": nco_data,
+                "buffer_pivot_data": buffer_pivot_data,
+                "nco_pivot_data": nco_pivot_data,
                 "dates": dates
             }
             
-            logger.info(f"✅ BUFFER & NCO {file_type}: Buffer={len(buffer_data)} lignes, NCO={len(nco_data)} lignes, {len(dates)} dates")
+            logger.info(f"✅ BUFFER & NCO TCD {file_type}: Buffer={len(buffer_pivot_data)} sections, NCO={len(nco_pivot_data)} catégories, {len(dates)} dates")
         
         return {
-            "title": "BUFFER & NCO",
+            "title": "BUFFER & NCO - TCD Analysis",
             "data": buffer_nco_results,
             "metadata": {
                 "analysis_date": datetime.now().isoformat(),
-                "filters_applied": {
-                    "top_conso": "O",
-                    "buffer_filter": "LCR_Catégorie = '1- Buffer'",
-                    "nco_filter": "Aucun filtre supplémentaire"
+                "tcd_config": {
+                    "buffer_table": {
+                        "filters": {"lcr_categorie": "1- Buffer", "top_conso": "O"},
+                        "rows": ["LCR_Template Section 1", "Libellé Client"],
+                        "columns": ["Date d'arrêté"],
+                        "values": "Somme LCR_Assiette Pondérée (Bn €)"
+                    },
+                    "nco_table": {
+                        "filters": {"top_conso": "O"},
+                        "rows": ["LCR_Catégorie"],
+                        "columns": ["Date d'arrêté"],
+                        "values": "Somme LCR_Assiette Pondérée (Bn €)"
+                    }
                 }
             }
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur création tableaux BUFFER & NCO: {e}")
+        logger.error(f"❌ Erreur création tableaux BUFFER & NCO TCD: {e}")
         return {
             "title": "BUFFER & NCO - Erreur",
             "error": str(e)
         }
-    
+      
 
 # ========================== FONCTIONS CONSUMPTION & RESOURCES TABLE ===========================
 
@@ -1607,83 +1797,189 @@ def create_consumption_resources_table(dataframes):
 # ========================== FONCTIONS CONTEXTE CHATBOT ===========================
 
 
+def prepare_system_prompt() -> str:
+    """
+    Prepare the system prompt in English for LCR banking analysis
+    """
+    return """You are an expert LCR (Liquidity Coverage Ratio) banking analyst and financial consultant. 
+
+Your role is to:
+- Analyze complex banking liquidity data from multiple pivot tables
+- Provide strategic insights on LCR compliance and risk management
+- Explain variations between time periods (D vs D-1 vs M-1)
+- Identify trends, anomalies, and business implications
+- Offer actionable recommendations for liquidity management
+
+You have access to comprehensive LCR analysis including:
+- BUFFER analysis (LCR Template sections and client details)
+- SUMMARY comparisons (LCR Assiette Pondérée vs ECO Impact)
+- CONSUMPTION analysis by business groups (A&WM, CIB, GLOBAL TRADE, etc.)
+- RESOURCES analysis by business groups (Treasury, Other Contribution, etc.)
+- CAPPAGE & Short_LCR pivot analysis by SI Remettant
+- BUFFER & NCO detailed breakdowns by categories and dates
+- CONSUMPTION & RESOURCES time-series analysis
+
+Key context:
+- All values are in billions of euros (Bn €)
+- Data compares current day (D) vs previous day (D-1) vs previous month (M-1)
+- Focus on regulatory compliance, risk management, and business impact
+- Consider both quantitative analysis and qualitative insights
+
+Communication style:
+- Be precise and professional
+- Use banking terminology appropriately
+- Provide both summary and detailed analysis when relevant
+- Highlight significant variations and their potential causes
+- Suggest actionable next steps when appropriate"""
+
 def prepare_analysis_context() -> str:
     """
-    Prépare le contexte détaillé depuis les données sauvegardées
+    Prepare detailed context from all saved analysis data
     """
     context_parts = []
     
-    # Contexte métier de base
-    context_parts.append("CONTEXTE MÉTIER:")
-    context_parts.append("- Application d'analyse LCR (Liquidity Coverage Ratio) pour banque")
-    context_parts.append("- Analyse Balance Sheet (ACTIF/PASSIF) en milliards d'euros")
-    context_parts.append("- Analyse Consumption par groupes métiers en milliards")
-    context_parts.append("- Comparaison J vs J-1 (aujourd'hui vs hier)")
+    # Base business context in English
+    context_parts.append("BUSINESS CONTEXT:")
+    context_parts.append("- LCR (Liquidity Coverage Ratio) banking analysis application")
+    context_parts.append("- Multi-table pivot analysis with Excel-style presentation")
+    context_parts.append("- Comparison between D (Today) vs D-1 (Yesterday) vs M-1 (Month-1)")
+    context_parts.append("- All monetary values in billions of euros (Bn €)")
     
-    # Données d'analyse si disponibles
+    # Analysis data if available
     if chatbot_session.get("context_data"):
         data = chatbot_session["context_data"]
         
-        context_parts.append(f"\nANALYSE EFFECTUÉE LE : {data.get('analysis_timestamp', 'Inconnue')}")
+        context_parts.append(f"\nANALYSIS PERFORMED ON: {data.get('analysis_timestamp', 'Unknown')}")
         
-        # Balance Sheet
-        if data.get("balance_sheet") and not data["balance_sheet"].get("error"):
-            bs = data["balance_sheet"]
-            context_parts.append("\n=== BALANCE SHEET RESULTS ===")
-            context_parts.append(f"Titre: {bs.get('title', 'Balance Sheet')}")
+        # BUFFER Table Analysis
+        if data.get("buffer") and not data["buffer"].get("error"):
+            buffer = data["buffer"]
+            context_parts.append("\n=== BUFFER TABLE ANALYSIS ===")
+            context_parts.append(f"Title: {buffer.get('title', 'BUFFER')}")
+            context_parts.append("Filter: LCR_Catégorie = '1- Buffer', Top Conso = 'O'")
             
-            if bs.get("variations"):
-                context_parts.append("Variations détaillées:")
-                for category, var_data in bs["variations"].items():
-                    context_parts.append(f"- {category}: D-1 = {var_data['j_minus_1']} Md€, D = {var_data['j']} Md€")
-                    context_parts.append(f"  → Variation = {var_data['variation']} Md€")
-            
-            if bs.get("summary"):
-                context_parts.append(f"Résumé exécutif: {bs['summary']}")
+            if buffer.get("data"):
+                context_parts.append("Key Buffer sections by file:")
+                for file_type, buffer_data in buffer["data"].items():
+                    if buffer_data:
+                        context_parts.append(f"\n{file_type.upper()} file - Buffer data:")
+                        for item in buffer_data[:5]:  # First 5 entries
+                            context_parts.append(f"- {item.get('section', 'N/A')} > {item.get('client', 'N/A')}: {item.get('total', 0):.3f} Bn €")
         
-        # Consumption
+        # SUMMARY Table Analysis  
+        if data.get("summary") and not data["summary"].get("error"):
+            summary = data["summary"]
+            context_parts.append("\n=== SUMMARY TABLE ANALYSIS ===")
+            context_parts.append("Comparison of LCR Assiette Pondérée vs LCR ECO Impact")
+            
+            if summary.get("data"):
+                for file_type, summary_data in summary["data"].items():
+                    if summary_data:
+                        context_parts.append(f"\n{file_type.upper()} summary:")
+                        for item in summary_data[:2]:  # First 2 dates
+                            context_parts.append(f"- Date {item.get('date', 'N/A')}: Assiette={item.get('sum_assiette', 0):.3f}, Impact={item.get('sum_impact', 0):.3f}, Diff={item.get('sum_difference', 0):.3f} Bn €")
+        
+        # CONSUMPTION Table Analysis
         if data.get("consumption") and not data["consumption"].get("error"):
-            cons = data["consumption"]
-            context_parts.append("\n=== CONSUMPTION LCR RESULTS ===")
-            context_parts.append(f"Titre: {cons.get('title', 'Consumption Analysis')}")
+            consumption = data["consumption"]
+            context_parts.append("\n=== CONSUMPTION TABLE ANALYSIS ===")
+            context_parts.append("Filtered business groups: A&WM & Insurance, CIB Financing, CIB Markets, GLOBAL TRADE, Other Consumption")
             
-            # Variation globale
-            if cons.get("variations", {}).get("global"):
-                global_var = cons["variations"]["global"]
-                context_parts.append(f"Consumption total: D-1 = {global_var['j_minus_1']} Md, D = {global_var['j']} Md")
-                context_parts.append(f"Variation globale = {global_var['variation']} Md")
-            
-            # Variations par groupe métier
-            if cons.get("variations", {}).get("by_groupe_metiers"):
-                context_parts.append("\nVariations par groupe métier:")
-                for groupe, var_data in cons["variations"]["by_groupe_metiers"].items():
-                    if abs(var_data["variation"]) > 0.01:  # Seulement les variations > 10M€
-                        context_parts.append(f"- {groupe}: {var_data['variation']} Md (D-1: {var_data['j_minus_1']}, D: {var_data['j']})")
-            
-            # Analyses textuelles
-            if cons.get("analysis_text"):
-                context_parts.append(f"\nAnalyse principale: {cons['analysis_text']}")
-            
-            if cons.get("metier_detailed_analysis"):
-                context_parts.append(f"Analyse détaillée: {cons['metier_detailed_analysis']}")
-            
-            # Groupes significatifs
-            if cons.get("significant_groups"):
-                context_parts.append(f"Groupes avec variations significatives: {', '.join(cons['significant_groups'])}")
+            if consumption.get("data"):
+                for file_type, cons_data in consumption["data"].items():
+                    if cons_data:
+                        context_parts.append(f"\n{file_type.upper()} consumption by business group:")
+                        for item in cons_data:
+                            context_parts.append(f"- {item.get('LCR_ECO_GROUPE_METIERS', 'N/A')}: {item.get('LCR_ECO_IMPACT_LCR_Bn', 0):.3f} Bn €")
         
-        # Informations sur les fichiers source
+        # RESOURCES Table Analysis
+        if data.get("resources") and not data["resources"].get("error"):
+            resources = data["resources"]
+            context_parts.append("\n=== RESOURCES TABLE ANALYSIS ===")
+            context_parts.append("Filtered business groups: GLOBAL TRADE, Other Contribution, Treasury")
+            
+            if resources.get("data"):
+                for file_type, res_data in resources["data"].items():
+                    if res_data:
+                        context_parts.append(f"\n{file_type.upper()} resources by business group:")
+                        for item in res_data:
+                            context_parts.append(f"- {item.get('LCR_ECO_GROUPE_METIERS', 'N/A')}: {item.get('LCR_ECO_IMPACT_LCR_Bn', 0):.3f} Bn €")
+        
+        # CAPPAGE Table Analysis
+        if data.get("cappage") and not data["cappage"].get("error"):
+            cappage = data["cappage"]
+            context_parts.append("\n=== CAPPAGE & SHORT_LCR TCD ANALYSIS ===")
+            context_parts.append("Pivot Table: SI Remettant (SHORT_LCR, CAPREOS) × Commentaire × Date d'arrêté")
+            
+            if cappage.get("data"):
+                for file_type, cappage_data in cappage["data"].items():
+                    if cappage_data.get("pivot_data"):
+                        context_parts.append(f"\n{file_type.upper()} CAPPAGE pivot data:")
+                        for si_group in cappage_data["pivot_data"]:
+                            si_name = si_group.get("si_remettant", "N/A")
+                            total_by_date = si_group.get("si_totals_by_date", {})
+                            context_parts.append(f"- {si_name} totals by date: {', '.join([f'{date}={total:.3f}' for date, total in total_by_date.items()])}")
+        
+        # BUFFER & NCO Table Analysis
+        if data.get("buffer_nco") and not data["buffer_nco"].get("error"):
+            buffer_nco = data["buffer_nco"]
+            context_parts.append("\n=== BUFFER & NCO TCD ANALYSIS ===")
+            context_parts.append("Two pivot tables: 1) BUFFER filtered by LCR_Catégorie='1- Buffer', 2) NCO all categories")
+            
+            if buffer_nco.get("data"):
+                for file_type, bnco_data in buffer_nco["data"].items():
+                    context_parts.append(f"\n{file_type.upper()} Buffer & NCO:")
+                    
+                    # Buffer data
+                    if bnco_data.get("buffer_pivot_data"):
+                        context_parts.append("Buffer sections:")
+                        for section_group in bnco_data["buffer_pivot_data"][:3]:  # First 3 sections
+                            section_name = section_group.get("section", "N/A")
+                            context_parts.append(f"- {section_name} with {len(section_group.get('client_details', []))} clients")
+                    
+                    # NCO data
+                    if bnco_data.get("nco_pivot_data"):
+                        context_parts.append("NCO categories:")
+                        for category in bnco_data["nco_pivot_data"][:3]:  # First 3 categories
+                            cat_name = category.get("categorie", "N/A")
+                            context_parts.append(f"- {cat_name}")
+        
+        # CONSUMPTION & RESOURCES Table Analysis
+        if data.get("consumption_resources") and not data["consumption_resources"].get("error"):
+            cons_res = data["consumption_resources"]
+            context_parts.append("\n=== CONSUMPTION & RESOURCES TCD ANALYSIS ===")
+            context_parts.append("Two pivot tables with date columns: Consumption (filtered groups) + Resources (filtered groups)")
+            
+            if cons_res.get("data"):
+                for file_type, cr_data in cons_res["data"].items():
+                    context_parts.append(f"\n{file_type.upper()} Consumption & Resources by date:")
+                    
+                    dates = cr_data.get("dates", [])
+                    context_parts.append(f"Available dates: {', '.join(dates)}")
+                    
+                    # Consumption data summary
+                    if cr_data.get("consumption_data"):
+                        context_parts.append("Consumption groups:")
+                        for cons_item in cr_data["consumption_data"]:
+                            group_name = cons_item.get("lcr_eco_groupe_metiers", "N/A")
+                            context_parts.append(f"- {group_name}")
+                    
+                    # Resources data summary
+                    if cr_data.get("resources_data"):
+                        context_parts.append("Resources groups:")
+                        for res_item in cr_data["resources_data"]:
+                            group_name = res_item.get("lcr_eco_groupe_metiers", "N/A")
+                            context_parts.append(f"- {group_name}")
+        
+        # Source files information
         if data.get("raw_dataframes_info"):
-            context_parts.append("\n=== FICHIERS SOURCE ===")
+            context_parts.append("\n=== SOURCE FILES INFORMATION ===")
             for file_type, info in data["raw_dataframes_info"].items():
-                context_parts.append(f"Fichier {file_type}: {info['shape'][0]} lignes, {info['shape'][1]} colonnes")
-                context_parts.append(f"Colonnes: {', '.join(info['columns'])}")
-                if info.get("sample_data"):
-                    context_parts.append("Échantillon de données:")
-                    for i, row in enumerate(info["sample_data"][:2]):  # 2 premières lignes
-                        context_parts.append(f"  Ligne {i+1}: {str(row)[:200]}...")
+                context_parts.append(f"File {file_type}: {info['shape'][0]} rows, {info['shape'][1]} columns")
+                context_parts.append(f"Key columns: {', '.join(info['columns'][:10])}...")  # First 10 columns
     
     else:
-        context_parts.append("\nAucune analyse disponible - les analyses doivent être lancées d'abord.")
+        context_parts.append("\nNo analysis available - analyses must be run first.")
     
     return "\n".join(context_parts)
 
@@ -1704,25 +2000,29 @@ def prepare_documents_context() -> str:
 
 def prepare_conversation_context() -> str:
     """
-    Prépare le contexte complet incluant analyses + documents + historique
+    Prepare complete context including system prompt + analysis + documents + history
     """
     context_parts = []
     
-    # Contexte des analyses
+    # System prompt in English
+    context_parts.append(prepare_system_prompt())
+    context_parts.append("\n" + "="*80 + "\n")
+    
+    # Analysis context
     context_parts.append(prepare_analysis_context())
     
-    # Documents uploadés
+    # Uploaded documents context
     docs_context = prepare_documents_context()
     if docs_context:
-        context_parts.append(f"\n\nContext Documents:\n{docs_context}")
+        context_parts.append(f"\n\nADDITIONAL CONTEXT DOCUMENTS:\n{docs_context}")
     
-    # Historique de conversation (derniers 10 messages pour éviter de surcharger)
+    # Conversation history (last 10 messages to avoid overloading)
     if chatbot_session["messages"]:
-        context_parts.append("\n\nHistory of conversation:")
+        context_parts.append("\n\nCONVERSATION HISTORY:")
         for msg in chatbot_session["messages"][-10:]:
-            role = "Utilisateur" if msg["type"] == "user" else "Assistant"
+            role = "USER" if msg["type"] == "user" else "ASSISTANT"
             context_parts.append(f"{role}: {msg['message']}")
-        context_parts.append("\n--- End of history of conversation ---")
+        context_parts.append("\n--- End of conversation history ---")
     
     return "\n".join(context_parts)
 

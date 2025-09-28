@@ -10,7 +10,7 @@
 // ================================= VARIABLES GLOBALES  =================================
 
 
-let filesReady = { j: false, j1: false };
+let filesReady = { j: false, j1: false, m1: false };
 let chatMessages = [];
 
 
@@ -124,9 +124,21 @@ function handleFileDrop(e) {
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        const isFileJ = e.currentTarget.closest('.card').querySelector('h5').textContent.includes('D (');
-        const fileType = isFileJ ? 'j' : 'jMinus1';
-        uploadFile(files[0], fileType);
+        const card = e.currentTarget.closest('.card');
+        const title = card.querySelector('h5').textContent;
+        
+        let fileType;
+        if (title.includes('D (')) {
+            fileType = 'j';
+        } else if (title.includes('D-1')) {
+            fileType = 'jMinus1';
+        } else if (title.includes('M-1')) {
+            fileType = 'mMinus1';
+        }
+        
+        if (fileType) {
+            uploadFile(files[0], fileType);
+        }
     }
 }
 
@@ -181,15 +193,33 @@ function initializeFileUploads() {
             uploadFile(this.files[0], 'jMinus1');
         }
     });
+    
+    document.getElementById('fileM1').addEventListener('change', function() {
+        if (this.files[0]) {
+            uploadFile(this.files[0], 'mMinus1');
+        }
+    });
 }
 
 /**
  * Upload d'un fichier vers l'API
  * @param {File} file - Fichier à uploader
- * @param {string} type - Type de fichier ('j' ou 'jMinus1')
+ * @param {string} type - Type de fichier ('j', 'jMinus1', 'mMinus1')
  */
 async function uploadFile(file, type) {
-    const statusDiv = document.getElementById('status' + (type === 'j' ? 'J' : 'J1'));
+    const statusMapping = {
+        'j': 'statusJ',
+        'jMinus1': 'statusJ1',
+        'mMinus1': 'statusM1'
+    };
+    
+    const readyMapping = {
+        'j': 'j',
+        'jMinus1': 'j1',
+        'mMinus1': 'm1'
+    };
+    
+    const statusDiv = document.getElementById(statusMapping[type]);
     
     try {
         console.log(`📤 Upload ${type}:`, file.name);
@@ -252,7 +282,7 @@ async function uploadFile(file, type) {
             `;
             
             // Marquer le fichier comme prêt
-            filesReady[type === 'j' ? 'j' : 'j1'] = true;
+            filesReady[readyMapping[type]] = true;
             
             // Vérifier si on peut activer l'analyse
             checkAnalyzeButtonState();
@@ -263,39 +293,39 @@ async function uploadFile(file, type) {
         }
         
     } catch (error) {
-    clearTimeout(timeoutId);
-    console.error(`❌ Erreur upload ${type}:`, error);
-    
-    // Gestion spécifique pour les timeouts/abort
-    if (error.name === 'AbortError') {
-        statusDiv.innerHTML = `
-            <div class="alert alert-warning fade-in-up">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-clock me-2"></i>
-                    <div>
-                        <strong>Upload timeout</strong><br>
-                        <small>Le fichier est trop volumineux ou la connexion trop lente</small>
+        clearTimeout(timeoutId);
+        console.error(`❌ Erreur upload ${type}:`, error);
+        
+        // Gestion spécifique pour les timeouts/abort
+        if (error.name === 'AbortError') {
+            statusDiv.innerHTML = `
+                <div class="alert alert-warning fade-in-up">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-clock me-2"></i>
+                        <div>
+                            <strong>Upload timeout</strong><br>
+                            <small>Le fichier est trop volumineux ou la connexion trop lente</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
-    } else {
-        statusDiv.innerHTML = `
-            <div class="alert alert-danger fade-in-up">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <div>
-                        <strong>Erreur d'upload</strong><br>
-                        <small>${error.message}</small>
+            `;
+        } else {
+            statusDiv.innerHTML = `
+                <div class="alert alert-danger fade-in-up">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <div>
+                            <strong>Erreur d'upload</strong><br>
+                            <small>${error.message}</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
+        
+        filesReady[readyMapping[type]] = false;
+        checkAnalyzeButtonState();
     }
-    
-    filesReady[type === 'j' ? 'j' : 'j1'] = false;
-    checkAnalyzeButtonState();
-}
 }
 
 function initializeDateSelection() {
@@ -422,12 +452,11 @@ async function loadFilesByDate() {
 function checkAnalyzeButtonState() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     
-    if (filesReady.j && filesReady.j1) {
+    if (filesReady.j && filesReady.j1 && filesReady.m1) {
         analyzeBtn.disabled = false;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.add('pulse');
         
-        // NOUVEAU: Ajouter bouton de nettoyage si pas déjà présent
         if (!document.getElementById('cleanup-btn')) {
             const cleanupBtn = document.createElement('button');
             cleanupBtn.id = 'cleanup-btn';
@@ -437,13 +466,12 @@ function checkAnalyzeButtonState() {
             analyzeBtn.parentNode.appendChild(cleanupBtn);
         }
         
-        showNotification('Both files are loaded! You can start the analysis.', 'success');
+        showNotification('All three files are loaded! You can start the analysis.', 'success');
     } else {
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = 'BEGIN DAILY LCR ANALYSIS';
         analyzeBtn.classList.remove('pulse');
         
-        // Supprimer le bouton de nettoyage si présent
         const cleanupBtn = document.getElementById('cleanup-btn');
         if (cleanupBtn) {
             cleanupBtn.remove();
@@ -642,18 +670,6 @@ function displayCompleteResults(analysisResults) {
         
         html += '</div>';
         html += '</div>';
-
-        
-        // Tableau RESOURCES en pleine largeur
-        if (analysisResults.resources) {
-            html += '<div class="analysis-section fade-in-up">';
-            html += '<div class="row">';
-            html += '<div class="col-12">';
-            html += generateResourcesSection(analysisResults.resources);
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
-        }
 
         // Tableau CAPPAGE en pleine largeur
         if (analysisResults.cappage) {
@@ -856,143 +872,160 @@ function generateSummaryTableHTML(summaryData) {
  * Génère le HTML du tableau BUFFER 
  */
 function generateBufferTableHTML(bufferData) {
-    if (!bufferData.j || !bufferData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau BUFFER</div>';
+    if (!bufferData.j || !bufferData.jMinus1 || !bufferData.mMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau BUFFER (3 fichiers requis)</div>';
     }
     
     const dataJ = bufferData.j;
     const dataJ1 = bufferData.jMinus1;
+    const dataM1 = bufferData.mMinus1;
     
-    // Créer un mapping pour les variations
-    const variationsMap = new Map();
+    // Créer une structure hiérarchique comme un TCD Excel
+    const pivotStructure = new Map();
     
-    // Calculer les variations
-    dataJ.forEach(itemJ => {
-        const key = `${itemJ.section}_${itemJ.client}`;
-        const itemJ1 = dataJ1.find(item => item.section === itemJ.section && item.client === itemJ.client);
-        const valueJ1 = itemJ1 ? itemJ1.total : 0;
-        const variation = itemJ.total - valueJ1;
+    // Remplir la structure avec les données du jour J
+    dataJ.forEach(item => {
+        const sectionKey = item.section;
+        const clientKey = item.client;
         
-        variationsMap.set(key, {
-            j: itemJ.total,
-            j1: valueJ1,
-            variation: variation
+        if (!pivotStructure.has(sectionKey)) {
+            pivotStructure.set(sectionKey, new Map());
+        }
+        
+        // Trouver les valeurs correspondantes dans J-1 et M-1
+        const itemJ1 = dataJ1.find(i => i.section === item.section && i.client === item.client);
+        const itemM1 = dataM1.find(i => i.section === item.section && i.client === item.client);
+        
+        const valueJ = item.total;
+        const valueJ1 = itemJ1 ? itemJ1.total : 0;
+        const valueM1 = itemM1 ? itemM1.total : 0;
+        
+        pivotStructure.get(sectionKey).set(clientKey, {
+            valueJ: valueJ,
+            variationDaily: valueJ - valueJ1,
+            variationMonthly: valueJ - valueM1,
+            isDetail: item.is_detail
         });
     });
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table buffer-table">
             <thead>
                 <tr>
-                    <th class="align-middle">Hierarchy</th>
-                    <th class="text-center header-j">D (Today)<br><small>LCR Assiette Pondérée (Bn €)</small></th>
-                    <th class="text-center header-variation">Variation<br><small>Abs. Value</small></th>
+                    <th rowspan="2" class="align-middle">LCR Template Section 1</th>
+                    <th rowspan="2" class="align-middle">Libellé Client</th>
+                    <th class="text-center header-j">LCR Assiette Pondérée</th>
+                    <th class="text-center header-variation">Variation vs D-1</th>
+                    <th class="text-center header-variation">Variation vs M-1</th>
+                </tr>
+                <tr>
+                    <th class="text-center header-j">D (Today) - Bn €</th>
+                    <th class="text-center header-variation">D - D-1 (Bn €)</th>
+                    <th class="text-center header-variation">D - M-1 (Bn €)</th>
                 </tr>
             </thead>
             <tbody>
     `;
     
-    // Organiser les données par section
-    const sectionGroups = {};
-    dataJ.forEach(item => {
-        if (!sectionGroups[item.section]) {
-            sectionGroups[item.section] = [];
-        }
-        sectionGroups[item.section].push(item);
-    });
-    
-    // Générer les lignes avec hiérarchie
-    Object.keys(sectionGroups).forEach(section => {
-        const items = sectionGroups[section];
+    // Générer les lignes du TCD
+    for (const [section, clients] of pivotStructure) {
+        let isFirstRowOfSection = true;
+        const clientEntries = Array.from(clients.entries());
         
-        if (section === "1.1- Cash") {
-            // Pour 1.1- Cash, d'abord la ligne de section
-            html += `<tr class="section-header">`;
-            html += `<td class="fw-bold text-primary">${section}</td>`;
-            html += `<td colspan="2" class="text-muted text-center"><em>Détail ci-dessous</em></td>`;
-            html += '</tr>';
+        if (clientEntries.length === 1 && clientEntries[0][1].isDetail === false) {
+            // Section avec un seul total (pas de détail)
+            const [client, data] = clientEntries[0];
             
-            // Puis les détails avec indentation
-            items.forEach(item => {
-                const key = `${item.section}_${item.client}`;
-                const varData = variationsMap.get(key);
-                const absVariation = Math.abs(varData.variation);
-                const isPositive = varData.variation >= 0;
-                
-                html += `<tr class="detail-row">`;
-                html += `<td class="ps-4">├─ ${item.client}</td>`;
-                html += `<td class="text-end numeric-value">${item.total.toFixed(3)}</td>`;
-                html += `<td class="text-end numeric-value">
-                            ${absVariation.toFixed(3)}
-                            <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                                ${isPositive ? '▲' : '▼'}
-                            </span>
-                         </td>`;
-                html += '</tr>';
-            });
-        } else {
-            // Pour les autres sections, juste la ligne totale
-            const item = items[0]; // Il n'y a qu'un élément "TOTAL" pour ces sections
-            const key = `${item.section}_${item.client}`;
-            const varData = variationsMap.get(key);
-            const absVariation = Math.abs(varData.variation);
-            const isPositive = varData.variation >= 0;
-            
-            html += `<tr class="total-row">`;
-            html += `<td class="fw-bold">${section}</td>`;
-            html += `<td class="text-end numeric-value">${item.total.toFixed(3)}</td>`;
-            html += `<td class="text-end numeric-value">
-                        ${absVariation.toFixed(3)}
-                        <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                            ${isPositive ? '▲' : '▼'}
-                        </span>
+            html += `<tr class="section-total-row">`;
+            html += `<td class="section-cell">${section}</td>`;
+            html += `<td class="client-cell">${client}</td>`;
+            html += `<td class="text-end numeric-value">${data.valueJ.toFixed(3)}</td>`;
+            html += `<td class="text-end numeric-value ${data.variationDaily >= 0 ? 'positive-var' : 'negative-var'}">
+                        ${data.variationDaily >= 0 ? '+' : ''}${data.variationDaily.toFixed(3)}
+                     </td>`;
+            html += `<td class="text-end numeric-value ${data.variationMonthly >= 0 ? 'positive-var' : 'negative-var'}">
+                        ${data.variationMonthly >= 0 ? '+' : ''}${data.variationMonthly.toFixed(3)}
                      </td>`;
             html += '</tr>';
+        } else {
+            // Section avec détails (comme 1.1- Cash)
+            for (const [client, data] of clientEntries) {
+                html += `<tr class="detail-row">`;
+                
+                if (isFirstRowOfSection) {
+                    html += `<td rowspan="${clientEntries.length}" class="section-cell-detail">${section}</td>`;
+                    isFirstRowOfSection = false;
+                }
+                
+                html += `<td class="client-cell-detail">${client}</td>`;
+                html += `<td class="text-end numeric-value">${data.valueJ.toFixed(3)}</td>`;
+                html += `<td class="text-end numeric-value ${data.variationDaily >= 0 ? 'positive-var' : 'negative-var'}">
+                            ${data.variationDaily >= 0 ? '+' : ''}${data.variationDaily.toFixed(3)}
+                         </td>`;
+                html += `<td class="text-end numeric-value ${data.variationMonthly >= 0 ? 'positive-var' : 'negative-var'}">
+                            ${data.variationMonthly >= 0 ? '+' : ''}${data.variationMonthly.toFixed(3)}
+                         </td>`;
+                html += '</tr>';
+            }
         }
-    });
+    }
     
     html += '</tbody></table>';
     return html;
 }
 
 /**
- * Génère le HTML du tableau CONSUMPTION
+ * Génère le HTML du tableau CONSUMPTION avec variations quotidiennes et mensuelles
  */
 function generateConsumptionTableHTML(consumptionData) {
-    if (!consumptionData.j || !consumptionData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CONSUMPTION</div>';
+    if (!consumptionData.j || !consumptionData.jMinus1 || !consumptionData.mMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CONSUMPTION (3 fichiers requis)</div>';
     }
     
     const dataJ = consumptionData.j;
     const dataJ1 = consumptionData.jMinus1;
+    const dataM1 = consumptionData.mMinus1;
     
-    // Créer un mapping pour les variations
+    // Créer mappings pour les variations
     const variationsMap = new Map();
+    const monthlyVariationsMap = new Map();
     
-    // Calculer les variations
+    // Calculer les variations J vs J-1 et J vs M-1
     dataJ.forEach(itemJ => {
+        // Variation quotidienne (J vs J-1)
         const itemJ1 = dataJ1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
         const valueJ1 = itemJ1 ? itemJ1.LCR_ECO_IMPACT_LCR_Bn : 0;
-        const variation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        const dailyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        
+        // Variation mensuelle (J vs M-1)
+        const itemM1 = dataM1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
+        const valueM1 = itemM1 ? itemM1.LCR_ECO_IMPACT_LCR_Bn : 0;
+        const monthlyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueM1;
         
         variationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
             j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
             j1: valueJ1,
-            variation: variation
+            variation: dailyVariation
+        });
+        
+        monthlyVariationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
+            j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
+            m1: valueM1,
+            variation: monthlyVariation
         });
     });
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table consumption-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-                    <th class="text-center header-j">D (Today)</th>
-                    <th class="text-center header-variation">Variation</th>
+                    <th colspan="3" class="text-center header-j">Analysis Results (Bn €)</th>
                 </tr>
                 <tr>
-                    <th class="text-center header-j">LCR ECO Impact (Bn €)</th>
-                    <th class="text-center header-variation">Abs. Value</th>
+                    <th class="text-center header-j">D (Today)</th>
+                    <th class="text-center header-variation">Daily Variation vs D-1</th>
+                    <th class="text-center header-variation">Monthly Variation vs M-1</th>
                 </tr>
             </thead>
             <tbody>
@@ -1000,17 +1033,28 @@ function generateConsumptionTableHTML(consumptionData) {
     
     // Générer les lignes
     dataJ.forEach(item => {
-        const varData = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
-        const absVariation = Math.abs(varData.variation);
-        const isPositive = varData.variation >= 0;
+        const dailyVar = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        const monthlyVar = monthlyVariationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        
+        const absDailyVariation = Math.abs(dailyVar.variation);
+        const isDailyPositive = dailyVar.variation >= 0;
+        
+        const absMonthlyVariation = Math.abs(monthlyVar.variation);
+        const isMonthlyPositive = monthlyVar.variation >= 0;
         
         html += '<tr>';
         html += `<td class="fw-bold">${item.LCR_ECO_GROUPE_METIERS}</td>`;
         html += `<td class="text-end numeric-value">${item.LCR_ECO_IMPACT_LCR_Bn.toFixed(3)}</td>`;
         html += `<td class="text-end numeric-value">
-                    ${absVariation.toFixed(3)}
-                    <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                        ${isPositive ? '▲' : '▼'}
+                    ${absDailyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isDailyPositive ? 'positive' : 'negative'}">
+                        ${isDailyPositive ? '▲' : '▼'}
+                    </span>
+                 </td>`;
+        html += `<td class="text-end numeric-value">
+                    ${absMonthlyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isMonthlyPositive ? 'positive' : 'negative'}">
+                        ${isMonthlyPositive ? '▲' : '▼'}
                     </span>
                  </td>`;
         html += '</tr>';
@@ -1050,61 +1094,86 @@ function generateResourcesSection(resourcesData) {
 }
 
 /**
- * Génère le HTML du tableau RESOURCES
+ * Génère le HTML du tableau RESOURCES avec variations quotidiennes et mensuelles
  */
 function generateResourcesTableHTML(resourcesData) {
-    if (!resourcesData.j || !resourcesData.jMinus1) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau RESOURCES</div>';
+    if (!resourcesData.j || !resourcesData.jMinus1 || !resourcesData.mMinus1) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau RESOURCES (3 fichiers requis)</div>';
     }
     
     const dataJ = resourcesData.j;
     const dataJ1 = resourcesData.jMinus1;
+    const dataM1 = resourcesData.mMinus1;
     
-    // Créer un mapping pour les variations
+    // Créer mappings pour les variations
     const variationsMap = new Map();
+    const monthlyVariationsMap = new Map();
     
-    // Calculer les variations
+    // Calculer les variations J vs J-1 et J vs M-1
     dataJ.forEach(itemJ => {
+        // Variation quotidienne (J vs J-1)
         const itemJ1 = dataJ1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
         const valueJ1 = itemJ1 ? itemJ1.LCR_ECO_IMPACT_LCR_Bn : 0;
-        const variation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        const dailyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueJ1;
+        
+        // Variation mensuelle (J vs M-1)
+        const itemM1 = dataM1.find(item => item.LCR_ECO_GROUPE_METIERS === itemJ.LCR_ECO_GROUPE_METIERS);
+        const valueM1 = itemM1 ? itemM1.LCR_ECO_IMPACT_LCR_Bn : 0;
+        const monthlyVariation = itemJ.LCR_ECO_IMPACT_LCR_Bn - valueM1;
         
         variationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
             j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
             j1: valueJ1,
-            variation: variation
+            variation: dailyVariation
+        });
+        
+        monthlyVariationsMap.set(itemJ.LCR_ECO_GROUPE_METIERS, {
+            j: itemJ.LCR_ECO_IMPACT_LCR_Bn,
+            m1: valueM1,
+            variation: monthlyVariation
         });
     });
     
     let html = `
-        <table class="table table-bordered new-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
-                    <th class="text-center header-j">D (Today)</th>
-                    <th class="text-center header-variation">Variation</th>
-                </tr>
-                <tr>
-                    <th class="text-center header-j">LCR ECO Impact (Bn €)</th>
-                    <th class="text-center header-variation">Abs. Value</th>
-                </tr>
-            </thead>
-            <tbody>
+    <table class="table table-bordered new-table resources-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+                <th colspan="3" class="text-center header-j">Analysis Results (Bn €)</th>
+            </tr>
+            <tr>
+                <th class="text-center header-j">D (Today)</th>
+                <th class="text-center header-variation">Daily Variation vs D-1</th>
+                <th class="text-center header-variation">Monthly Variation vs M-1</th>
+            </tr>
+        </thead>
+        <tbody>
     `;
     
     // Générer les lignes
     dataJ.forEach(item => {
-        const varData = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
-        const absVariation = Math.abs(varData.variation);
-        const isPositive = varData.variation >= 0;
+        const dailyVar = variationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        const monthlyVar = monthlyVariationsMap.get(item.LCR_ECO_GROUPE_METIERS);
+        
+        const absDailyVariation = Math.abs(dailyVar.variation);
+        const isDailyPositive = dailyVar.variation >= 0;
+        
+        const absMonthlyVariation = Math.abs(monthlyVar.variation);
+        const isMonthlyPositive = monthlyVar.variation >= 0;
         
         html += '<tr>';
         html += `<td class="fw-bold">${item.LCR_ECO_GROUPE_METIERS}</td>`;
         html += `<td class="text-end numeric-value">${item.LCR_ECO_IMPACT_LCR_Bn.toFixed(3)}</td>`;
         html += `<td class="text-end numeric-value">
-                    ${absVariation.toFixed(3)}
-                    <span class="variation-indicator ${isPositive ? 'positive' : 'negative'}">
-                        ${isPositive ? '▲' : '▼'}
+                    ${absDailyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isDailyPositive ? 'positive' : 'negative'}">
+                        ${isDailyPositive ? '▲' : '▼'}
+                    </span>
+                 </td>`;
+        html += `<td class="text-end numeric-value">
+                    ${absMonthlyVariation.toFixed(3)}
+                    <span class="variation-indicator ${isMonthlyPositive ? 'positive' : 'negative'}">
+                        ${isMonthlyPositive ? '▲' : '▼'}
                     </span>
                  </td>`;
         html += '</tr>';
@@ -1574,15 +1643,19 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+                    <th colspan="${dates.length}" class="text-center header-j">LCR ECO Impact by Date (Bn €)</th>
+                </tr>
+                <tr>
     `;
-    
+
     dates.forEach(date => {
         html += `<th class="text-center header-j">${date}</th>`;
     });
-    
+
     html += `
                 </tr>
-                <tr>
+            </thead>
+            <tbody>
     `;
     
     dates.forEach(() => {
@@ -1628,19 +1701,23 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
     }
     
     let html = `
-        <table class="table table-bordered new-table">
+        <table class="table table-bordered new-table cons-res-table">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">LCR ECO Groupe Métiers</th>
+                    <th colspan="${dates.length}" class="text-center header-j">LCR ECO Impact by Date (Bn €)</th>
+                </tr>
+                <tr>
     `;
-    
+
     dates.forEach(date => {
         html += `<th class="text-center header-j">${date}</th>`;
     });
-    
+
     html += `
                 </tr>
-                <tr>
+            </thead>
+            <tbody>
     `;
     
     dates.forEach(() => {

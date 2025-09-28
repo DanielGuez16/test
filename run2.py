@@ -847,17 +847,17 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
     try:
         logger.info("Début de l'analyse depuis DataFrames en mémoire")
         
-        # Vérification de la présence des deux fichiers
-        if len(file_session.get("files", {})) < 2:
-            raise HTTPException(status_code=400, detail="Les deux fichiers sont requis")
+        # Vérification de la présence des TROIS fichiers
+        if len(file_session.get("files", {})) < 3:
+            raise HTTPException(status_code=400, detail="Les trois fichiers sont requis")
         
-        if "j" not in file_session["files"] or "jMinus1" not in file_session["files"]:
+        if "j" not in file_session["files"] or "jMinus1" not in file_session["files"] or "mMinus1" not in file_session["files"]:
             raise HTTPException(status_code=400, detail="Fichiers manquants")
         
         # Récupérer les DataFrames directement depuis la session
         dataframes = {}
         for file_type, file_info in file_session["files"].items():
-            df = file_info["dataframe"]  # DataFrame déjà en mémoire
+            df = file_info["dataframe"]
             dataframes[file_type] = df
             logger.info(f"{file_type}: {len(df)} lignes (depuis mémoire)")
 
@@ -1053,14 +1053,17 @@ def create_buffer_table(dataframes):
                             "is_detail": True
                         })
                 else:
-                    # Pour les autres sections, montrer seulement le total
-                    total = float(section_data["LCR_Assiette Pondérée"].sum())
-                    grouped_data.append({
-                        "section": section,
-                        "client": "TOTAL",
-                        "total": total / 1_000_000_000,  # Conversion en milliards
-                        "is_detail": False
-                    })
+                    # Pour les autres sections, grouper par LibellÉ Client aussi
+                    for client in section_data["Libellé Client"].unique():
+                        client_data = section_data[section_data["Libellé Client"] == client]
+                        total = float(client_data["LCR_Assiette Pondérée"].sum())
+                        if total != 0:  # Ne garder que les clients avec des montants non nuls
+                            grouped_data.append({
+                                "section": section,
+                                "client": client,
+                                "total": total / 1_000_000_000,
+                                "is_detail": False
+                            })
             
             buffer_results[file_type] = grouped_data
             logger.info(f"✅ BUFFER {file_type}: {len(grouped_data)} entrées")

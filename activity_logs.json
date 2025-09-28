@@ -592,5 +592,1211 @@
     "username": "franck.pokou-ext@natixis.com",
     "action": "AI_ANALYSIS",
     "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T18:53:09.833255",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T18:53:09.842389",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:43.757821",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:43.774047",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:51.321562",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:53.174518",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:54.807701",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:55.601865",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T18:55:56.719179",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T18:57:37.108101",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T18:57:39.294335",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T18:57:40.925467",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T18:57:42.476789",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T18:57:43.117482",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T18:57:44.226248",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:04:39.261004",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:04:45.792376",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:04:47.345712",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:04:49.032183",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:04:49.699035",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:04:50.804890",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:06:10.393735",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:06:12.402343",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:06:13.892205",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:06:15.392178",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:06:16.104834",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:06:17.231773",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:49.719401",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:49.737370",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:51.768607",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:53.081765",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:55.393674",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:55.983678",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:07:57.091697",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:27.101465",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:27.135807",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:33.237448",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:34.655856",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:37.605961",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:38.152427",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:16:39.251200",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:31.542445",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:33.532804",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:34.845385",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:36.203840",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:36.674499",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:37.778098",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:49.428340",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:49.436712",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:51.621416",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:52.839657",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:54.108100",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:54.627565",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:19:55.735199",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:29:09.537381",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:29:11.830169",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:29:13.212030",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:29:14.491628",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:29:15.038430",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:29:16.148253",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:32:39.747822",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:32:41.889890",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:32:43.492932",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:32:44.846344",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:32:45.377656",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:32:46.485321",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:36:56.350708",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:36:58.736943",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:37:00.084024",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:37:01.429501",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:37:01.887225",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:37:02.988581",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:00.277116",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:00.287248",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:02.268847",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:03.565407",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:05.700869",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:06.417475",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:39:07.513042",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:17.747989",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:19.875420",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:21.689518",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:22.942324",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:23.551396",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:24.652187",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:46.431676",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:46.452461",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:48.560194",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:49.880870",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:51.231884",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:51.791240",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:40:52.895201",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:39.414308",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:39.438220",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:41.511646",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:42.834699",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:43.993895",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:44.491001",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:42:45.612923",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:45:48.184418",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "MEMORY_CLEANUP",
+    "details": "Freed -1.0 MB"
+  },
+  {
+    "timestamp": "2025-09-28T19:50:09.589934",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:50:11.903213",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:50:13.380566",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:50:14.828797",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:50:15.401981",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:50:16.524340",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:52.087150",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:52.098624",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:54.145222",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:55.540063",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:57.371932",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:57.937950",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T19:52:59.058170",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:22.148771",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:22.163876",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:26.202169",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:27.666387",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:29.195965",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:29.783604",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:21:30.915568",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:32.881551",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:32.894302",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:38.077353",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:39.780114",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:41.351776",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:42.086115",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:27:43.211778",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:30:57.138728",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:30:59.627845",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:00.922646",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:02.141431",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:02.804244",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:03.924362",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:23.890663",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:23.911030",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:26.473805",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:27.996505",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:29.823068",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:30.357212",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:31:31.485138",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:40.984886",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:40.994649",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:43.461757",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:44.943367",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:46.342511",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:46.860812",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:32:47.991561",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:33:42.741483",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:33:45.379684",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:33:46.733806",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:33:48.311478",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:33:48.932678",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:33:50.056802",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:10.184164",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:10.193875",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:12.151705",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:13.373141",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:14.599625",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:15.190373",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:34:16.312205",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:18.408782",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:18.422243",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:23.490790",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:24.925817",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:26.408289",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:27.014120",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:47:28.141199",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:49:15.466229",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:49:17.728101",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:49:19.336726",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:49:20.704489",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:49:21.252117",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:49:22.374069",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:15.929727",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:15.939832",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:19.123876",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:20.640624",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:22.136604",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:22.813982",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-28T23:56:23.940667",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:49.692825",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:49.703043",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:53.936243",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:55.521910",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:57.085923",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:57.723760",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-29T00:01:58.849456",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:34.515404",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:34.527917",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:36.798752",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:38.198251",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:39.575758",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:40.212796",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-29T00:08:41.340163",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:48.075317",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "LOGIN",
+    "details": "Successful login"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:48.089423",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ACCESS",
+    "details": "Accessed main page"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:50.389135",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-09.xlsx as j"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:52.041694",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as jMinus1"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:53.807703",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "FILE_UPLOAD",
+    "details": "Uploaded LCR_2025-09-10.xlsx as mMinus1"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:54.490826",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "ANALYSIS",
+    "details": "Started LCR analysis"
+  },
+  {
+    "timestamp": "2025-09-29T00:16:55.621167",
+    "username": "franck.pokou-ext@natixis.com",
+    "action": "AI_ANALYSIS",
+    "details": "Generated Consumption & Resources analysis"
   }
 ]
