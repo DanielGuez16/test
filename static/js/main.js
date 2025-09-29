@@ -776,40 +776,45 @@ function generateBufferTableHTML(bufferData) {
         html += `</tr>`;
         
         // LIGNES DE DÉTAIL : Clients indentés
-        clientDetails.forEach((detail, detailIndex) => {
-            html += `<tr class="tcd-detail-row">`;
-            
-            // Client indenté dans la même colonne
-            html += `<td class="tcd-client-detail">
-                        <div class="tcd-hierarchy-level-1">
-                            ${detail.client}
-                        </div>
-                     </td>`;
-            
-            // Valeur D (Today)
-            const valueJ = detail.value_j || 0;
-            html += `<td class="text-end tcd-data-cell">${valueJ.toFixed(3)}</td>`;
-            
-            // Variation Daily
-            const varDaily = detail.variation_daily || 0;
-            const dailyClass = varDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
-            const dailyIcon = varDaily >= 0 ? '▲' : '▼';
-            html += `<td class="text-end ${dailyClass}">
-                        ${varDaily >= 0 ? '+' : ''}${varDaily.toFixed(3)}
-                        <span class="variation-icon">${dailyIcon}</span>
-                     </td>`;
-            
-            // Variation Monthly
-            const varMonthly = detail.variation_monthly || 0;
-            const monthlyClass = varMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
-            const monthlyIcon = varMonthly >= 0 ? '▲' : '▼';
-            html += `<td class="text-end ${monthlyClass}">
-                        ${varMonthly >= 0 ? '+' : ''}${varMonthly.toFixed(3)}
-                        <span class="variation-icon">${monthlyIcon}</span>
-                     </td>`;
-            
-            html += '</tr>';
-        });
+        // N'afficher les détails QUE pour la section "1.1- Cash"
+        if (sectionGroup.section === "1.1- Cash") {
+            clientDetails.forEach((detail, detailIndex) => {
+                html += `<tr class="tcd-detail-row">`;
+                
+                // Client indenté dans la même colonne
+                html += `<td class="tcd-client-detail">
+                            <div class="tcd-hierarchy-level-1">
+                                ${detail.client}
+                            </div>
+                        </td>`;
+                
+                // Valeur D (Today)
+                const valueJ = detail.value_j || 0;
+                html += `<td class="text-end tcd-data-cell">${valueJ.toFixed(3)}</td>`;
+                
+                // Variation Daily
+                const varDaily = detail.variation_daily || 0;
+                const dailyClass = varDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+                const dailyIcon = varDaily >= 0 ? '▲' : '▼';
+                html += `<td class="text-end ${dailyClass}">
+                            ${varDaily >= 0 ? '+' : ''}${varDaily.toFixed(3)}
+                            <span class="variation-icon">${dailyIcon}</span>
+                        </td>`;
+                
+                // Variation Monthly
+                const varMonthly = detail.variation_monthly || 0;
+                const monthlyClass = varMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+                const monthlyIcon = varMonthly >= 0 ? '▲' : '▼';
+                html += `<td class="text-end ${monthlyClass}">
+                            ${varMonthly >= 0 ? '+' : ''}${varMonthly.toFixed(3)}
+                            <span class="variation-icon">${monthlyIcon}</span>
+                        </td>`;
+                
+                html += '</tr>';
+            });
+        }
+        // Pour toutes les autres sections, on ne montre PAS les détails clients
+        // On passe directement à la ligne de séparation
         
         // Ligne de séparation entre les sections (sauf pour la dernière)
         if (sectionIndex < pivotData.length - 1) {
@@ -1346,25 +1351,29 @@ function generateCappageTableHTML(cappageData) {
         html += `</tr>`;
         
         // LIGNES DE DÉTAIL : Commentaires indentés
-        commentaireDetails.forEach((detail, detailIndex) => {
-            html += `<tr class="tcd-detail-row">`;
-            
-            // Commentaire indenté
-            html += `<td class="tcd-commentaire-detail">
-                        <div class="tcd-hierarchy-level-1">
-                            ${detail.commentaire}
-                        </div>
-                    </td>`;
-            
-            // Valeurs par date pour ce commentaire
-            dates.forEach(date => {
-                const value = detail.date_values[date] || 0;
-                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
-                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        // N'afficher les détails QUE pour SI Remettant "CAPREOS"
+        if (siGroup.si_remettant === "CAPREOS") {
+            commentaireDetails.forEach((detail, detailIndex) => {
+                html += `<tr class="tcd-detail-row">`;
+                
+                // Commentaire indenté
+                html += `<td class="tcd-commentaire-detail">
+                            <div class="tcd-hierarchy-level-1">
+                                ${detail.commentaire}
+                            </div>
+                        </td>`;
+                
+                // Valeurs par date pour ce commentaire
+                dates.forEach(date => {
+                    const value = detail.date_values[date] || 0;
+                    const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                    html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+                });
+                
+                html += '</tr>';
             });
-            
-            html += '</tr>';
-        });
+        }
+        // Pour SHORT_LCR et autres, on ne montre PAS les détails
         
         // Ligne de séparation entre les SI (sauf pour le dernier)
         if (siIndex < pivotData.length - 1) {
@@ -1512,25 +1521,29 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
         html += `</tr>`;
         
         // LIGNES DE DÉTAIL : Clients indentés
-        clientDetails.forEach((detail, detailIndex) => {
-            html += `<tr class="tcd-detail-row">`;
-            
-            // Client indenté
-            html += `<td class="tcd-client-detail">
-                        <div class="tcd-hierarchy-level-1">
-                            ${detail.client}
-                        </div>
-                    </td>`;
-            
-            // Valeurs par date
-            dates.forEach(date => {
-                const value = detail.date_values[date] || 0;
-                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
-                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        // N'afficher les détails QUE pour la section "1.1- Cash"
+        if (sectionGroup.section === "1.1- Cash") {
+            clientDetails.forEach((detail, detailIndex) => {
+                html += `<tr class="tcd-detail-row">`;
+                
+                // Client indenté
+                html += `<td class="tcd-client-detail">
+                            <div class="tcd-hierarchy-level-1">
+                                ${detail.client}
+                            </div>
+                        </td>`;
+                
+                // Valeurs par date
+                dates.forEach(date => {
+                    const value = detail.date_values[date] || 0;
+                    const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                    html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+                });
+                
+                html += '</tr>';
             });
-            
-            html += '</tr>';
-        });
+        }
+        // Pour toutes les autres sections, on ne montre PAS les détails clients
         
         // Ligne de séparation
         if (sectionIndex < bufferPivotData.length - 1) {
