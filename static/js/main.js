@@ -631,11 +631,9 @@ function generateBufferSection(bufferData) {
             <div class="card-header no-background">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3 style="color: #76279b;" class="mb-1">${bufferData.title}</h3>
-                    <div class="badge bg-info">TCD with Variations</div>
                 </div>
                 <small class="text-muted">
-                    <i class="fas fa-filter me-1"></i>LCR_Catégorie: "1- Buffer" • 
-                    <i class="fas fa-table me-1"></i>Pivot: Section > Client × [D, Δ D-1, Δ M-1]
+                    <i class="fas fa-filter me-1"></i>LCR_Catégorie: "1- Buffer"
                 </small>
             </div>
             <div class="card-body p-0">
@@ -733,43 +731,59 @@ function generateBufferTableHTML(bufferData) {
         <table class="table table-bordered buffer-tcd-table">
             <thead class="table-dark">
                 <tr>
-                    <th rowspan="2" class="align-middle tcd-header-row">LCR Template Section 1</th>
-                    <th rowspan="2" class="align-middle tcd-header-row">Libellé Client</th>
-                    <th class="text-center tcd-header-col">D (Today)</th>
-                    <th class="text-center tcd-header-variation">Variation Daily</th>
-                    <th class="text-center tcd-header-variation">Variation Monthly</th>
-                </tr>
-                <tr>
-                    <th class="text-center tcd-value-header">Bn €</th>
-                    <th class="text-center tcd-variation-header">D - D-1 (Bn €)</th>
-                    <th class="text-center tcd-variation-header">D - M-1 (Bn €)</th>
+                    <th class="align-middle tcd-header-row" style="width: 40%">Section / Client</th>
+                    <th class="text-center tcd-header-col">D (Bn €)</th>
+                    <th class="text-center tcd-header-variation">Var. Daily (Bn €)</th>
+                    <th class="text-center tcd-header-variation">Var. Monthly (Bn €)</th>
                 </tr>
             </thead>
             <tbody>
     `;
     
-    // Génération des lignes TCD avec hiérarchie
+    // Génération des lignes TCD avec vraie hiérarchie Excel-like
     pivotData.forEach((sectionGroup, sectionIndex) => {
         const clientDetails = sectionGroup.client_details || [];
-        const totalRowsForSection = clientDetails.length + 1; // +1 pour la ligne de total
         
-        // Lignes de détail par client
+        // LIGNE DE SECTION - avec données directement (pas de ligne vide)
+        html += `<tr class="tcd-section-row">`;
+        html += `<td class="tcd-section-cell">
+                    <div class="tcd-hierarchy-level-0">
+                        <strong>${sectionGroup.section}</strong>
+                    </div>
+                 </td>`;
+        
+        // Données DIRECTES pour la section (comme Excel)
+        html += `<td class="text-end tcd-data-cell"><strong>${(sectionGroup.section_total_j || 0).toFixed(3)}</strong></td>`;
+        
+        // Variation Daily Section
+        const sectionVarDaily = sectionGroup.section_variation_daily || 0;
+        const sectionDailyClass = sectionVarDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+        const sectionDailyIcon = sectionVarDaily >= 0 ? '▲' : '▼';
+        html += `<td class="text-end ${sectionDailyClass}">
+                    ${sectionVarDaily >= 0 ? '+' : ''}${sectionVarDaily.toFixed(3)}
+                    <span class="variation-icon">${sectionDailyIcon}</span>
+                 </td>`;
+        
+        // Variation Monthly Section
+        const sectionVarMonthly = sectionGroup.section_variation_monthly || 0;
+        const sectionMonthlyClass = sectionVarMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+        const sectionMonthlyIcon = sectionVarMonthly >= 0 ? '▲' : '▼';
+        html += `<td class="text-end ${sectionMonthlyClass}">
+                    ${sectionVarMonthly >= 0 ? '+' : ''}${sectionVarMonthly.toFixed(3)}
+                    <span class="variation-icon">${sectionMonthlyIcon}</span>
+                 </td>`;
+        
+        html += `</tr>`;
+        
+        // LIGNES DE DÉTAIL : Clients indentés
         clientDetails.forEach((detail, detailIndex) => {
             html += `<tr class="tcd-detail-row">`;
             
-            // Cellule Section (fusionnée pour tous les détails + total)
-            if (detailIndex === 0) {
-                html += `<td rowspan="${totalRowsForSection}" class="tcd-section-cell align-middle">
-                            <div class="tcd-section-label">
-                                <i class="fas fa-plus-square text-primary me-2"></i>
-                                <strong>${sectionGroup.section}</strong>
-                            </div>
-                         </td>`;
-            }
-            
-            // Cellule Client avec indentation
+            // Client indenté dans la même colonne
             html += `<td class="tcd-client-detail">
-                        <span class="tcd-indent">└─</span> ${detail.client}
+                        <div class="tcd-hierarchy-level-1">
+                            ${detail.client}
+                        </div>
                      </td>`;
             
             // Valeur D (Today)
@@ -797,44 +811,17 @@ function generateBufferTableHTML(bufferData) {
             html += '</tr>';
         });
         
-        // Ligne de total pour la Section
-        html += `<tr class="tcd-section-total-row">`;
-        html += `<td class="tcd-section-total-label"><strong>Total ${sectionGroup.section}</strong></td>`;
-        
-        // Total Section
-        html += `<td class="text-end tcd-section-total">${(sectionGroup.section_total_j || 0).toFixed(3)}</td>`;
-        
-        // Variation Daily Section
-        const sectionVarDaily = sectionGroup.section_variation_daily || 0;
-        const sectionDailyClass = sectionVarDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
-        const sectionDailyIcon = sectionVarDaily >= 0 ? '▲' : '▼';
-        html += `<td class="text-end tcd-section-total ${sectionDailyClass}">
-                    ${sectionVarDaily >= 0 ? '+' : ''}${sectionVarDaily.toFixed(3)}
-                    <span class="variation-icon">${sectionDailyIcon}</span>
-                 </td>`;
-        
-        // Variation Monthly Section
-        const sectionVarMonthly = sectionGroup.section_variation_monthly || 0;
-        const sectionMonthlyClass = sectionVarMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
-        const sectionMonthlyIcon = sectionVarMonthly >= 0 ? '▲' : '▼';
-        html += `<td class="text-end tcd-section-total ${sectionMonthlyClass}">
-                    ${sectionVarMonthly >= 0 ? '+' : ''}${sectionVarMonthly.toFixed(3)}
-                    <span class="variation-icon">${sectionMonthlyIcon}</span>
-                 </td>`;
-        
-        html += '</tr>';
-        
         // Ligne de séparation entre les sections (sauf pour la dernière)
         if (sectionIndex < pivotData.length - 1) {
-            html += `<tr class="tcd-separator"><td colspan="5"></td></tr>`;
+            html += `<tr class="tcd-separator"><td colspan="4"></td></tr>`;
         }
     });
     
     // Ligne de grand total général
     html += `
         <tr class="tcd-grand-total-row">
-            <td colspan="2" class="tcd-grand-total-label">
-                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL</strong>
+            <td class="tcd-grand-total-label">
+                <strong>TOTAL</strong>
             </td>
             <td class="text-end tcd-grand-total-value">${grandTotal_J.toFixed(3)}</td>
     `;
@@ -1272,12 +1259,7 @@ function generateCappageSection(cappageData) {
             <div class="card-header no-background">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3 style="color: #76279b;" class="mb-1">${cappageData.title}</h3>
-                    <div class="badge bg-info">TCD Excel Style</div>
                 </div>
-                <small class="text-muted">
-                    <i class="fas fa-filter me-1"></i>SI Remettant: SHORT_LCR, CAPREOS • 
-                    <i class="fas fa-table me-1"></i>Pivot: SI Remettant > Commentaire × Date d'arrêté
-                </small>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -1325,18 +1307,18 @@ function generateCappageTableHTML(cappageData) {
         <table class="table table-bordered cappage-tcd-table">
             <thead class="table-dark">
                 <tr>
-                    <th rowspan="2" class="align-middle tcd-header-row">SI Remettant</th>
-                    <th rowspan="2" class="align-middle tcd-header-row">Commentaire</th>
+                    <th class="align-middle tcd-header-row" style="width: 30%">SI Remettant / Commentaire</th>
                     <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
                 </tr>
                 <tr>
     `;
-    
+
     // En-têtes des dates
+    html += `<th></th>`; // Colonne vide pour aligner avec "SI Remettant / Commentaire"
     dates.forEach(date => {
         html += `<th class="text-center tcd-date-header">${date}</th>`;
     });
-    
+
     html += `
                 </tr>
             </thead>
@@ -1346,28 +1328,35 @@ function generateCappageTableHTML(cappageData) {
     // Génération des lignes TCD avec hiérarchie
     pivotData.forEach((siGroup, siIndex) => {
         const commentaireDetails = siGroup.commentaire_details || [];
-        const totalRowsForSI = commentaireDetails.length + 1; // +1 pour la ligne de total
         
-        // Lignes de détail par commentaire
+        // LIGNE DE SI REMETTANT - avec totaux directement
+        html += `<tr class="tcd-section-row">`;
+        html += `<td class="tcd-si-cell">
+                    <div class="tcd-hierarchy-level-0">
+                        <strong>${siGroup.si_remettant}</strong>
+                    </div>
+                </td>`;
+        
+        // Totaux SI Remettant pour chaque date
+        dates.forEach(date => {
+            const value = siGroup.si_totals_by_date[date] || 0;
+            html += `<td class="text-end tcd-data-cell"><strong>${value.toFixed(3)}</strong></td>`;
+        });
+        
+        html += `</tr>`;
+        
+        // LIGNES DE DÉTAIL : Commentaires indentés
         commentaireDetails.forEach((detail, detailIndex) => {
             html += `<tr class="tcd-detail-row">`;
             
-            // Cellule SI Remettant (fusionnée pour tous les détails + total)
-            if (detailIndex === 0) {
-                html += `<td rowspan="${totalRowsForSI}" class="tcd-si-cell align-middle">
-                            <div class="tcd-group-label">
-                                <i class="fas fa-plus-square text-primary me-2"></i>
-                                <strong>${siGroup.si_remettant}</strong>
-                            </div>
-                         </td>`;
-            }
-            
-            // Cellule Commentaire avec indentation
+            // Commentaire indenté
             html += `<td class="tcd-commentaire-detail">
-                        <span class="tcd-indent">└─</span> ${detail.commentaire}
-                     </td>`;
+                        <div class="tcd-hierarchy-level-1">
+                            ${detail.commentaire}
+                        </div>
+                    </td>`;
             
-            // Valeurs par date
+            // Valeurs par date pour ce commentaire
             dates.forEach(date => {
                 const value = detail.date_values[date] || 0;
                 const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
@@ -1377,37 +1366,25 @@ function generateCappageTableHTML(cappageData) {
             html += '</tr>';
         });
         
-        // Ligne de total pour le SI Remettant
-        html += `<tr class="tcd-si-total-row">`;
-        html += `<td class="tcd-total-label"><strong>Total ${siGroup.si_remettant}</strong></td>`;
-        
-        // Totaux par date pour ce SI
-        dates.forEach(date => {
-            const value = siGroup.si_totals_by_date[date] || 0;
-            html += `<td class="text-end tcd-si-total">${value.toFixed(3)}</td>`;
-        });
-        
-        html += '</tr>';
-        
-        // Ligne de séparation entre les groupes SI (sauf pour le dernier)
+        // Ligne de séparation entre les SI (sauf pour le dernier)
         if (siIndex < pivotData.length - 1) {
-            html += `<tr class="tcd-separator"><td colspan="${dates.length + 2}"></td></tr>`;
+            html += `<tr class="tcd-separator"><td colspan="${dates.length + 1}"></td></tr>`;
         }
     });
-    
-    // Ligne de grand total général
+
+    // Ligne de grand total
     html += `
         <tr class="tcd-grand-total-row">
-            <td colspan="2" class="tcd-grand-total-label">
-                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL</strong>
+            <td class="tcd-grand-total-label">
+                <strong>TOTAL</strong>
             </td>
     `;
-    
+
     dates.forEach(date => {
         const value = grandTotalsByDate[date] || 0;
         html += `<td class="text-end tcd-grand-total-value">${value.toFixed(3)}</td>`;
     });
-    
+
     html += '</tr>';
     
     html += '</tbody></table>';
@@ -1432,17 +1409,13 @@ function generateBufferNcoSection(bufferNcoData) {
             <div class="card-header no-background">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3 style="color: #76279b;" class="mb-1">${bufferNcoData.title}</h3>
-                    <div class="badge bg-info">TCD Excel Style</div>
                 </div>
-                <small class="text-muted">
-                    <i class="fas fa-table me-1"></i>Deux tableaux croisés dynamiques : BUFFER (filtrée) + NCO (complète)
-                </small>
             </div>
             <div class="card-body p-0">
                 <!-- Tableau 1: BUFFER -->
                 <div class="tcd-table-section">
                     <h5 class="text-primary mb-3 px-3 pt-3">
-                        <i class="fas fa-shield-alt me-2"></i>1. BUFFER Analysis
+                        1. BUFFER Analysis
                         <small class="text-muted ms-2">(LCR_Catégorie = "1- Buffer")</small>
                     </h5>
                     <div class="table-container mb-4">
@@ -1453,8 +1426,7 @@ function generateBufferNcoSection(bufferNcoData) {
                 <!-- Tableau 2: NCO -->
                 <div class="tcd-table-section">
                     <h5 class="text-primary mb-3 px-3">
-                        <i class="fas fa-chart-bar me-2"></i>2. NCO Analysis
-                        <small class="text-muted ms-2">(All Categories)</small>
+                        2. NCO Analysis
                     </h5>
                     <div class="table-container">
                         ${generateBufferNcoNcoTableHTML(bufferNcoData.data)}
@@ -1501,47 +1473,54 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
         <table class="table table-bordered buffer-nco-tcd-table">
             <thead class="table-dark">
                 <tr>
-                    <th rowspan="2" class="align-middle tcd-header-row">LCR Template Section 1</th>
-                    <th rowspan="2" class="align-middle tcd-header-row">Libellé Client</th>
+                    <th class="align-middle tcd-header-row" style="width: 35%">Section / Client</th>
                     <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
                 </tr>
                 <tr>
     `;
-    
+
     // En-têtes des dates
+    html += `<th></th>`; // Colonne vide pour aligner avec "Section / Client"
     dates.forEach(date => {
         html += `<th class="text-center tcd-date-header">${date}</th>`;
     });
-    
+
     html += `
                 </tr>
             </thead>
             <tbody>
     `;
-    
+        
     // Génération des lignes TCD avec hiérarchie Section > Client
     bufferPivotData.forEach((sectionGroup, sectionIndex) => {
         const clientDetails = sectionGroup.client_details || [];
-        const totalRowsForSection = clientDetails.length + 1; // +1 pour la ligne de total
         
-        // Lignes de détail par client
+        // LIGNE DE SECTION - avec totaux directement
+        html += `<tr class="tcd-section-row">`;
+        html += `<td class="tcd-section-cell">
+                    <div class="tcd-hierarchy-level-0">
+                        <strong>${sectionGroup.section}</strong>
+                    </div>
+                </td>`;
+        
+        // Totaux Section pour chaque date
+        dates.forEach(date => {
+            const value = sectionGroup.section_totals_by_date[date] || 0;
+            html += `<td class="text-end tcd-data-cell"><strong>${value.toFixed(3)}</strong></td>`;
+        });
+        
+        html += `</tr>`;
+        
+        // LIGNES DE DÉTAIL : Clients indentés
         clientDetails.forEach((detail, detailIndex) => {
             html += `<tr class="tcd-detail-row">`;
             
-            // Cellule Section (fusionnée pour tous les clients + total)
-            if (detailIndex === 0) {
-                html += `<td rowspan="${totalRowsForSection}" class="tcd-section-cell align-middle">
-                            <div class="tcd-group-label">
-                                <i class="fas fa-folder-open text-success me-2"></i>
-                                <strong>${sectionGroup.section}</strong>
-                            </div>
-                         </td>`;
-            }
-            
-            // Cellule Client avec indentation
+            // Client indenté
             html += `<td class="tcd-client-detail">
-                        <span class="tcd-indent">├─</span> ${detail.client}
-                     </td>`;
+                        <div class="tcd-hierarchy-level-1">
+                            ${detail.client}
+                        </div>
+                    </td>`;
             
             // Valeurs par date
             dates.forEach(date => {
@@ -1553,29 +1532,17 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
             html += '</tr>';
         });
         
-        // Ligne de total pour la Section
-        html += `<tr class="tcd-section-total-row">`;
-        html += `<td class="tcd-total-label"><strong>Total ${sectionGroup.section}</strong></td>`;
-        
-        // Totaux par date pour cette section
-        dates.forEach(date => {
-            const value = sectionGroup.section_totals_by_date[date] || 0;
-            html += `<td class="text-end tcd-section-total">${value.toFixed(3)}</td>`;
-        });
-        
-        html += '</tr>';
-        
-        // Ligne de séparation entre les sections (sauf pour la dernière)
+        // Ligne de séparation
         if (sectionIndex < bufferPivotData.length - 1) {
-            html += `<tr class="tcd-separator"><td colspan="${dates.length + 2}"></td></tr>`;
+            html += `<tr class="tcd-separator"><td colspan="${dates.length + 1}"></td></tr>`;
         }
     });
-    
-    // Ligne de grand total BUFFER
+
+    // Grand total BUFFER
     html += `
         <tr class="tcd-grand-total-row">
-            <td colspan="2" class="tcd-grand-total-label">
-                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL BUFFER</strong>
+            <td class="tcd-grand-total-label">
+                <strong>TOTAL BUFFER</strong>
             </td>
     `;
     
@@ -1661,7 +1628,7 @@ function generateBufferNcoNcoTableHTML(bufferNcoData) {
     html += `
         <tr class="tcd-grand-total-row-nco">
             <td class="tcd-grand-total-label-nco">
-                <strong><i class="fas fa-calculator me-2"></i>GRAND TOTAL NCO</strong>
+                <strong>TOTAL NCO</strong>
             </td>
     `;
     
@@ -1695,13 +1662,13 @@ function generateConsumptionResourcesSection(consumptionResourcesData) {
             </div>
             <div class="card-body p-0">
                 <!-- Tableau CONSUMPTION -->
-                <h5 class="text-primary mb-3 px-3 pt-3">1. CONSUMPTION (Filtered Groups)</h5>
+                <h5 class="text-primary mb-3 px-3 pt-3">1. CONSUMPTION</h5>
                 <div class="table-container mb-4">
                     ${generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesData.data)}
                 </div>
                 
                 <!-- Tableau RESOURCES -->
-                <h5 class="text-primary mb-3 px-3">2. RESOURCES (Filtered Groups)</h5>
+                <h5 class="text-primary mb-3 px-3">2. RESOURCES</h5>
                 <div class="table-container">
                     ${generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData.data)}
                 </div>
@@ -1771,7 +1738,6 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
         html += `<tr class="cons-data-row">`;
         html += `<td class="cons-groupe-cell">
                     <div class="cons-group-label">
-                        <i class="fas fa-chart-line text-primary me-2"></i>
                         <strong>${item.lcr_eco_groupe_metiers}</strong>
                     </div>
                  </td>`;
@@ -1792,7 +1758,7 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
     html += `
         <tr class="cons-grand-total-row">
             <td class="cons-grand-total-label">
-                <strong><i class="fas fa-calculator me-2"></i>TOTAL CONSUMPTION</strong>
+                <strong>TOTAL CONSUMPTION</strong>
             </td>
     `;
     
@@ -1869,7 +1835,6 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
         html += `<tr class="res-data-row">`;
         html += `<td class="res-groupe-cell">
                     <div class="res-group-label">
-                        <i class="fas fa-coins text-success me-2"></i>
                         <strong>${item.lcr_eco_groupe_metiers}</strong>
                     </div>
                  </td>`;
@@ -1890,7 +1855,7 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
     html += `
         <tr class="res-grand-total-row">
             <td class="res-grand-total-label">
-                <strong><i class="fas fa-calculator me-2"></i>TOTAL RESOURCES</strong>
+                <strong>TOTAL RESOURCES</strong>
             </td>
     `;
     

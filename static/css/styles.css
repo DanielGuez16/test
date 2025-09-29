@@ -20,14 +20,14 @@
     --buffer-light: #E8F2FF;
     --buffer-border: #B8D4F0;
     
-    --consumption-primary: #2D8659;
-    --consumption-secondary: #52B788;
-    --consumption-light: #E8F5E8;
+    --consumption-primary: #51A0A2;
+    --consumption-secondary: #54d1d3;
+    --consumption-light: #c5ebec;
     --consumption-border: #B7E4C7;
     
-    --resources-primary: #D97706;
-    --resources-secondary: #F59E0B;
-    --resources-light: #FEF3C7;
+    --resources-primary: #76279b;
+    --resources-secondary: #ab54d4;
+    --resources-light: #D3A5E9;
     --resources-border: #FCD34D;
     
     --cappage-primary: #7C3AED;
@@ -392,23 +392,22 @@ body {
 }
 
 .buffer-table tbody tr:hover {
-    background: var(--buffer-light);
+    background: var(--natixis-light);
 }
 
 .buffer-table .section-header {
-    background: var(--buffer-light) !important;
+    background: var(--natixis-light) !important;
     border-left: 4px solid var(--buffer-primary) !important;
 }
 
 .buffer-table .section-header td {
-    color: var(--buffer-primary) !important;
+    color: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
 }
 
 .buffer-table .detail-row {
     background: rgba(232, 242, 255, 0.3);
 }
 
-/* BUFFER TCD Excel */
 .buffer-tcd-table {
     font-size: 0.9rem;
     border-collapse: collapse !important;
@@ -416,27 +415,26 @@ body {
 }
 
 .tcd-header-variation {
-    background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
     color: white !important;
     font-weight: 600;
 }
 
 .tcd-value-header {
-    background: linear-gradient(135deg, #3498db, #2980b9) !important;
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
     color: white !important;
     font-weight: 500;
 }
 
 .tcd-variation-header {
-    background: linear-gradient(135deg, #e67e22, #d35400) !important;
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
     color: white !important;
     font-weight: 500;
     font-size: 0.85rem;
 }
 
 .tcd-section-cell {
-    background: linear-gradient(135deg, #e8f4fd, #d1ecf1) !important;
-    border-left: 4px solid #76279b !important;
+    background: #f2dcfe !important;
     vertical-align: middle !important;
     font-weight: 600;
     padding: 15px 10px !important;
@@ -472,13 +470,11 @@ body {
 }
 
 .tcd-section-total-row {
-    background: linear-gradient(135deg, #fff3cd, #fef7e0) !important;
-    border-top: 2px solid #76279b !important;
-    border-bottom: 2px solid #76279b !important;
+    background: linear-gradient(135deg, #bdacc4, #e2cbed) !important;
 }
 
 .tcd-section-total-label {
-    background: linear-gradient(135deg, #ffc107, #e0a800) !important;
+    background: linear-gradient(135deg, #bdacc4, #e2cbed) !important;
     color: #000 !important;
     font-weight: 700;
     text-align: center;
@@ -492,13 +488,11 @@ body {
 }
 
 .tcd-grand-total-row {
-    background: linear-gradient(135deg, #28a745, #20c997) !important;
-    border-top: 3px solid #76279b !important;
-    border-bottom: 3px solid #76279b !important;
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
 }
 
 .tcd-grand-total-label {
-    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
     color: white !important;
     font-weight: 700;
     text-align: center;
@@ -510,8 +504,17 @@ body {
     font-family: 'Courier New', monospace;
     font-weight: 700;
     color: white !important;
-    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
     font-size: 1rem;
+}
+
+.tcd-section-row {
+    background: #f2dcfe !important;
+}
+
+.tcd-section-placeholder {
+    background: #e8f4fd !important;
+    border: none !important;
 }
 
 /* ================================= TABLEAUX CONSUMPTION ================================= */
@@ -554,8 +557,13 @@ body {
     margin-bottom: 0;
 }
 
+.cappage-tcd-table thead th:empty {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    border: none !important;
+}
+
 .tcd-header-row, .tcd-header-col, .tcd-total-col {
-    background: linear-gradient(135deg, #2c3e50, #34495e) !important;
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
     color: white !important;
     font-weight: 600;
     text-align: center;
@@ -563,7 +571,7 @@ body {
 }
 
 .tcd-date-header {
-    background: linear-gradient(135deg, #3498db, #2980b9) !important;
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
     color: white !important;
     font-weight: 500;
     font-size: 0.85rem;
@@ -571,8 +579,7 @@ body {
 }
 
 .tcd-si-cell {
-    background: linear-gradient(135deg, #e8f4fd, #d1ecf1) !important;
-    border-left: 4px solid #76279b !important;
+    background: #f2dcfe !important;
     vertical-align: middle !important;
     font-weight: 600;
     padding: 15px 10px !important;
@@ -619,9 +626,7 @@ body {
 }
 
 .tcd-si-total-row {
-    background: linear-gradient(135deg, #fff3cd, #fef7e0) !important;
-    border-top: 2px solid #76279b !important;
-    border-bottom: 2px solid #76279b !important;
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
 }
 
 .tcd-total-label {
@@ -661,16 +666,94 @@ body {
     padding: 0 !important;
 }
 
-/* ================================= TABLEAUX BUFFER & NCO ================================= */
+/* ================================= TABLEAU BUFFER & NCO  BUFFER ================================= */
 
 .buffer-nco-table th { 
-    background: linear-gradient(135deg, var(--buffer-nco-primary), var(--buffer-nco-secondary));
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue));
     color: white;
 }
 
 .buffer-nco-table tbody tr:hover {
     background: var(--buffer-nco-light);
 }
+
+.buffer-nco-tcd-table thead th:empty {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    border: none !important;
+}
+
+/* ================================= TABLEAUX BUFFER & NCO  NCO ================================= */
+
+
+/* Styles spécifiques pour le tableau NCO */
+.nco-table {
+    margin-top: 2rem;
+}
+
+.tcd-header-row-nco {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 600;
+    text-align: center;
+}
+
+.tcd-header-col-nco {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.tcd-date-header-nco {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 500;
+    font-size: 0.85rem;
+    min-width: 120px;
+}
+
+.tcd-nco-row {
+    transition: background-color 0.2s ease;
+}
+
+.tcd-nco-row:hover {
+    background-color: #f1f3f4 !important;
+}
+
+.tcd-categorie-cell {
+    background: #f2dcfe !important;
+    font-weight: 600;
+    padding: 10px !important;
+}
+
+.tcd-data-cell-nco {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    color: #2c3e50;
+    padding: 8px 12px !important;
+}
+
+.tcd-grand-total-row-nco {
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
+}
+
+.tcd-grand-total-label-nco {
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
+    color: white !important;
+    font-weight: 700;
+    text-align: center;
+    font-size: 1rem;
+    padding: 12px !important;
+}
+
+.tcd-grand-total-value-nco {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    color: white !important;
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
+    font-size: 1rem;
+}
+
+
 
 /* ================================= TABLEAUX CONSUMPTION & RESOURCES ================================= */
 
@@ -693,7 +776,7 @@ body {
 }
 
 .summary-table th {
-    background: linear-gradient(135deg, #475569, #64748B) !important;
+    background: linear-gradient(135deg, #805BED, #9f86e9) !important;
     color: white;
     font-size: 11px;
     padding: 12px 8px;
@@ -708,6 +791,176 @@ body {
 
 .summary-table tbody tr:hover {
     background: #E2E8F0;
+}
+
+/* ================================= TABLEAU RESSOURCES - CONSUMPTION ================================= */
+
+/* Styles pour tableaux CONSUMPTION et RESOURCES avec dates */
+.consumption-excel-table,
+.resources-excel-table {
+    font-size: 0.9rem;
+    border-collapse: collapse !important;
+    margin-bottom: 0;
+}
+
+/* En-têtes CONSUMPTION */
+.cons-header-row {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.cons-header-col {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.cons-total-header {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.cons-date-header {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 500;
+    font-size: 0.85rem;
+    min-width: 100px;
+}
+
+.cons-groupe-cell {
+    background: #f2dcfe !important;
+    font-weight: 600;
+    padding: 10px !important;
+}
+
+.cons-group-label {
+    display: flex;
+    align-items: center;
+    color: #2c3e50;
+}
+
+.cons-data-cell {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    color: #2c3e50;
+    padding: 8px 12px !important;
+}
+
+.cons-zero-value {
+    color: #6c757d;
+    font-style: italic;
+    background-color: #f8f9fa !important;
+}
+
+.cons-row-total {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    background: var(--natixis-very-light-blue) !important;
+}
+
+.cons-grand-total-row {
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
+}
+
+.cons-grand-total-label {
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
+    color: white !important;
+    font-weight: 700;
+    text-align: center;
+    font-size: 1rem;
+    padding: 12px !important;
+}
+
+.cons-grand-total-value,
+.cons-grand-total-final {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    color: white !important;
+    background: linear-gradient(135deg, var(--natixis-light-blue), var(--natixis-very-light-blue)) !important;
+    font-size: 1rem;
+}
+
+/* En-têtes RESOURCES */
+.res-header-row {
+    background: linear-gradient(135deg, var(--resources-primary), var(--resources-secondary)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.res-header-col {
+    background: linear-gradient(135deg, var(--resources-primary), var(--resources-secondary)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.res-total-header {
+    background: linear-gradient(135deg, var(--resources-primary), var(--resources-secondary)) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.res-date-header {
+    background: linear-gradient(135deg, var(--resources-primary), var(--resources-secondary)) !important;
+    color: white !important;
+    font-weight: 500;
+    font-size: 0.85rem;
+    min-width: 100px;
+}
+
+.res-groupe-cell {
+    background: #f2dcfe !important;
+    font-weight: 600;
+    padding: 10px !important;
+}
+
+.res-group-label {
+    display: flex;
+    align-items: center;
+    color: #2c3e50;
+}
+
+.res-data-cell {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    color: #2c3e50;
+    padding: 8px 12px !important;
+}
+
+.res-zero-value {
+    color: #6c757d;
+    font-style: italic;
+    background-color: #f8f9fa !important;
+}
+
+.res-row-total {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    background: var(--resources-light) !important;
+}
+
+.res-grand-total-row {
+    background: linear-gradient(135deg, var(--resources-secondary), var(--resources-light)) !important;
+}
+
+.res-grand-total-label {
+    background: linear-gradient(135deg, var(--resources-secondary), var(--resources-light)) !important;
+    color: white !important;
+    font-weight: 700;
+    text-align: center;
+    font-size: 1rem;
+    padding: 12px !important;
+}
+
+.res-grand-total-value,
+.res-grand-total-final {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    color: white !important;
+    background: linear-gradient(135deg, var(--resources-secondary), var(--resources-light)) !important;
+    font-size: 1rem;
 }
 
 /* ================================= ANALYSE IA ================================= */
@@ -979,10 +1232,6 @@ body {
     
     .metric-card {
         padding: 1.5rem;
-    }
-    
-    .buffer-tcd-table {
-        font-size: 0.8rem;
     }
     
     .tcd-variation-header {
