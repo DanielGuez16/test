@@ -860,124 +860,151 @@ function generateSummarySection(summaryData) {
 
 
 /**
- * Génère le HTML du tableau CAPPAGE avec structure TCD Excel professionnelle
+ * Génère le HTML du tableau BUFFER avec structure TCD Excel et variations
  */
-function generateCappageTableHTML(cappageData) {
-    if (!cappageData.j) {
-        return '<div class="alert alert-warning">Données insuffisantes pour le tableau CAPPAGE TCD</div>';
+function generateBufferTableHTML(bufferData) {
+    if (!bufferData || !bufferData.pivot_data) {
+        return '<div class="alert alert-warning">Données insuffisantes pour le tableau BUFFER TCD</div>';
     }
     
-    const dataJ = cappageData.j;
-    const pivotData = dataJ.pivot_data || [];
-    const dates = dataJ.dates || [];
+    const pivotData = bufferData.pivot_data || [];
     
     if (pivotData.length === 0) {
-        return '<div class="alert alert-warning">Aucune donnée CAPPAGE TCD disponible</div>';
+        return '<div class="alert alert-warning">Aucune donnée BUFFER TCD disponible</div>';
     }
     
-    // Calculer les totaux globaux par date
-    const grandTotalsByDate = {};
+    // Calculer les grands totaux
+    let grandTotal_J = 0;
+    let grandTotal_DailyVar = 0;
+    let grandTotal_MonthlyVar = 0;
     
-    dates.forEach(date => {
-        grandTotalsByDate[date] = 0;
-    });
-    
-    pivotData.forEach(siGroup => {
-        Object.keys(siGroup.si_totals_by_date).forEach(date => {
-            if (grandTotalsByDate[date] !== undefined) {
-                grandTotalsByDate[date] += siGroup.si_totals_by_date[date];
-            }
-        });
+    pivotData.forEach(sectionGroup => {
+        grandTotal_J += sectionGroup.section_total_j || 0;
+        grandTotal_DailyVar += sectionGroup.section_variation_daily || 0;
+        grandTotal_MonthlyVar += sectionGroup.section_variation_monthly || 0;
     });
     
     let html = `
-        <table class="table table-bordered cappage-tcd-table">
+        <table class="table table-bordered buffer-tcd-table">
             <thead class="table-dark">
                 <tr>
-                    <th class="align-middle tcd-header-row" style="width: 30%">SI Remettant / Commentaire</th>
-                    <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
-                </tr>
-                <tr>
-    `;
-
-    // En-têtes des dates
-    html += `<th></th>`; // Colonne vide pour aligner avec "SI Remettant / Commentaire"
-    dates.forEach(date => {
-        html += `<th class="text-center tcd-date-header">${date}</th>`;
-    });
-
-    html += `
+                    <th class="align-middle tcd-header-row" style="width: 40%">Section / Client</th>
+                    <th class="text-center tcd-header-col">D (Bn €)</th>
+                    <th class="text-center tcd-header-variation">Var. Daily (Bn €)</th>
+                    <th class="text-center tcd-header-variation">Var. Monthly (Bn €)</th>
                 </tr>
             </thead>
             <tbody>
     `;
     
-    // Génération des lignes TCD avec hiérarchie
-    pivotData.forEach((siGroup, siIndex) => {
-        const commentaireDetails = siGroup.commentaire_details || [];
+    // Génération des lignes TCD avec vraie hiérarchie Excel-like
+    pivotData.forEach((sectionGroup, sectionIndex) => {
+        const clientDetails = sectionGroup.client_details || [];
         
-        // LIGNE DE SI REMETTANT - avec totaux directement
+        // LIGNE DE SECTION - avec données directement (pas de ligne vide)
         html += `<tr class="tcd-section-row">`;
-        html += `<td class="tcd-si-cell">
+        html += `<td class="tcd-section-cell">
                     <div class="tcd-hierarchy-level-0">
-                        <strong>${siGroup.si_remettant}</strong>
+                        <strong>${sectionGroup.section}</strong>
                     </div>
-                </td>`;
+                 </td>`;
         
-        // Totaux SI Remettant pour chaque date
-        dates.forEach(date => {
-            const value = siGroup.si_totals_by_date[date] || 0;
-            html += `<td class="text-end tcd-data-cell"><strong>${value.toFixed(3)}</strong></td>`;
-        });
+        // Données DIRECTES pour la section (comme Excel)
+        html += `<td class="text-end tcd-data-cell"><strong>${(sectionGroup.section_total_j || 0).toFixed(3)}</strong></td>`;
+        
+        // Variation Daily Section
+        const sectionVarDaily = sectionGroup.section_variation_daily || 0;
+        const sectionDailyClass = sectionVarDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+        const sectionDailyIcon = sectionVarDaily >= 0 ? '▲' : '▼';
+        html += `<td class="text-end ${sectionDailyClass}">
+                    ${sectionVarDaily >= 0 ? '+' : ''}${sectionVarDaily.toFixed(3)}
+                    <span class="variation-icon">${sectionDailyIcon}</span>
+                 </td>`;
+        
+        // Variation Monthly Section
+        const sectionVarMonthly = sectionGroup.section_variation_monthly || 0;
+        const sectionMonthlyClass = sectionVarMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+        const sectionMonthlyIcon = sectionVarMonthly >= 0 ? '▲' : '▼';
+        html += `<td class="text-end ${sectionMonthlyClass}">
+                    ${sectionVarMonthly >= 0 ? '+' : ''}${sectionVarMonthly.toFixed(3)}
+                    <span class="variation-icon">${sectionMonthlyIcon}</span>
+                 </td>`;
         
         html += `</tr>`;
         
-        // LIGNES DE DÉTAIL : Commentaires indentés
-        // N'afficher les détails QUE pour SI Remettant "CAPREOS"
-        if (siGroup.si_remettant === "CAPREOS") {
-            commentaireDetails.forEach((detail, detailIndex) => {
+        // LIGNES DE DÉTAIL : Clients indentés
+        // N'afficher les détails QUE pour la section "1.1- Cash"
+        if (sectionGroup.section === "1.1- Cash") {
+            clientDetails.forEach((detail, detailIndex) => {
                 html += `<tr class="tcd-detail-row">`;
                 
-                // Commentaire indenté
-                html += `<td class="tcd-commentaire-detail">
+                // Client indenté dans la même colonne
+                html += `<td class="tcd-client-detail">
                             <div class="tcd-hierarchy-level-1">
-                                ${detail.commentaire}
+                                ${detail.client}
                             </div>
                         </td>`;
                 
-                // Valeurs par date pour ce commentaire
-                dates.forEach(date => {
-                    const value = detail.date_values[date] || 0;
-                    const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
-                    html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
-                });
+                // Valeur D (Today)
+                const valueJ = detail.value_j || 0;
+                html += `<td class="text-end tcd-data-cell">${valueJ.toFixed(3)}</td>`;
+                
+                // Variation Daily
+                const varDaily = detail.variation_daily || 0;
+                const dailyClass = varDaily >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+                const dailyIcon = varDaily >= 0 ? '▲' : '▼';
+                html += `<td class="text-end ${dailyClass}">
+                            ${varDaily >= 0 ? '+' : ''}${varDaily.toFixed(3)}
+                            <span class="variation-icon">${dailyIcon}</span>
+                        </td>`;
+                
+                // Variation Monthly
+                const varMonthly = detail.variation_monthly || 0;
+                const monthlyClass = varMonthly >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+                const monthlyIcon = varMonthly >= 0 ? '▲' : '▼';
+                html += `<td class="text-end ${monthlyClass}">
+                            ${varMonthly >= 0 ? '+' : ''}${varMonthly.toFixed(3)}
+                            <span class="variation-icon">${monthlyIcon}</span>
+                        </td>`;
                 
                 html += '</tr>';
             });
         }
-        // Pour SHORT_LCR et autres, on ne montre PAS les détails
+        // Pour toutes les autres sections, on ne montre PAS les détails clients
+        // On passe directement à la ligne de séparation
         
-        // Ligne de séparation entre les SI (sauf pour le dernier)
-        if (siIndex < pivotData.length - 1) {
-            html += `<tr class="tcd-separator"><td colspan="${dates.length + 1}"></td></tr>`;
+        // Ligne de séparation entre les sections (sauf pour la dernière)
+        if (sectionIndex < pivotData.length - 1) {
+            html += `<tr class="tcd-separator"><td colspan="4"></td></tr>`;
         }
     });
-
-    // Ligne de grand total
+    
+    // Ligne de grand total général
     html += `
         <tr class="tcd-grand-total-row">
             <td class="tcd-grand-total-label">
                 <strong>TOTAL</strong>
             </td>
+            <td class="text-end tcd-grand-total-value">${grandTotal_J.toFixed(3)}</td>
     `;
-
-    dates.forEach(date => {
-        const value = grandTotalsByDate[date] || 0;
-        html += `<td class="text-end tcd-grand-total-value">${value.toFixed(3)}</td>`;
-    });
-
-    html += '</tr>';
     
+    // Grand Total Variation Daily
+    const grandDailyClass = grandTotal_DailyVar >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+    const grandDailyIcon = grandTotal_DailyVar >= 0 ? '▲' : '▼';
+    html += `<td class="text-end tcd-grand-total-value ${grandDailyClass}">
+                ${grandTotal_DailyVar >= 0 ? '+' : ''}${grandTotal_DailyVar.toFixed(3)}
+                <span class="variation-icon">${grandDailyIcon}</span>
+             </td>`;
+    
+    // Grand Total Variation Monthly
+    const grandMonthlyClass = grandTotal_MonthlyVar >= 0 ? 'tcd-positive-var' : 'tcd-negative-var';
+    const grandMonthlyIcon = grandTotal_MonthlyVar >= 0 ? '▲' : '▼';
+    html += `<td class="text-end tcd-grand-total-value ${grandMonthlyClass}">
+                ${grandTotal_MonthlyVar >= 0 ? '+' : ''}${grandTotal_MonthlyVar.toFixed(3)}
+                <span class="variation-icon">${grandMonthlyIcon}</span>
+             </td>`;
+    
+    html += '</tr>';
     html += '</tbody></table>';
     return html;
 }
