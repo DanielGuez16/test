@@ -350,21 +350,26 @@ function initializeDateSelection() {
 }
 
 async function loadFilesByDate() {
-    console.log('🔄 loadFilesByDate() called'); // Debug 
+    console.log('🔄 loadFilesByDate() called');
     
     const dateInput = document.getElementById('analysisDate');
-    const selectedDate = dateInput.value;
+    const statusJ = document.getElementById('statusJ');
+    const statusJ1 = document.getElementById('statusJ1');
+    const statusM1 = document.getElementById('statusM1');
     
-    console.log('📅 Selected date:', selectedDate); // Debug
+    // VÉRIFICATION CRITIQUE
+    if (!statusJ || !statusJ1 || !statusM1) {
+        console.error('❌ Éléments de statut manquants:', { statusJ, statusJ1, statusM1 });
+        showNotification('Interface error: status elements missing', 'error');
+        return;
+    }
+    
+    const selectedDate = dateInput.value;
     
     if (!selectedDate) {
         showNotification('Please select a date', 'error');
         return;
     }
-    
-    const statusJ = document.getElementById('statusJ');
-    const statusJ1 = document.getElementById('statusJ1');
-    const statusM1 = document.getElementById('statusM1');
     
     try {
         // Affichage du loading
