@@ -1717,7 +1717,6 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
                 <tr>
                     <th rowspan="2" class="align-middle cons-header-row">LCR ECO Groupe Métiers</th>
                     <th colspan="${dates.length}" class="text-center cons-header-col">LCR ECO Impact by Date (Bn €)</th>
-                    <th rowspan="2" class="align-middle cons-total-header">Total (Bn €)</th>
                 </tr>
                 <tr>
     `;
@@ -1750,7 +1749,6 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
         });
         
         // Total par ligne
-        html += `<td class="text-end cons-row-total">${rowTotal.toFixed(3)}</td>`;
         html += '</tr>';
     });
     
@@ -1769,7 +1767,6 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
         html += `<td class="text-end cons-grand-total-value">${value.toFixed(3)}</td>`;
     });
     
-    html += `<td class="text-end cons-grand-total-final">${finalGrandTotal.toFixed(3)}</td>`;
     html += '</tr>';
     
     html += '</tbody></table>';
@@ -1814,7 +1811,6 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
                 <tr>
                     <th rowspan="2" class="align-middle res-header-row">LCR ECO Groupe Métiers</th>
                     <th colspan="${dates.length}" class="text-center res-header-col">LCR ECO Impact by Date (Bn €)</th>
-                    <th rowspan="2" class="align-middle res-total-header">Total (Bn €)</th>
                 </tr>
                 <tr>
     `;
@@ -1847,7 +1843,6 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
         });
         
         // Total par ligne
-        html += `<td class="text-end res-row-total">${rowTotal.toFixed(3)}</td>`;
         html += '</tr>';
     });
     
@@ -1866,7 +1861,6 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
         html += `<td class="text-end res-grand-total-value">${value.toFixed(3)}</td>`;
     });
     
-    html += `<td class="text-end res-grand-total-final">${finalGrandTotal.toFixed(3)}</td>`;
     html += '</tr>';
     
     html += '</tbody></table>';
