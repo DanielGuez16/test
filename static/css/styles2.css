@@ -168,13 +168,13 @@ body {
 .btn-load-files {
     width: 100%;
     height: 100%;
-    min-height: 120px;
-    background: linear-gradient(135deg, #76279b, #ab54d4);
+    min-height: 80px;            
+    background: linear-gradient(135deg, #76279b, #51A0A2);
     border: none;
-    border-radius: 15px;
+    border-radius: 25px;         
     color: white;
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1rem;       
     text-transform: uppercase;
     letter-spacing: 1px;
     transition: all 0.3s ease;
@@ -294,7 +294,7 @@ body {
 
 /* Forcer les styles du bouton LOAD FILES */
 .btn-load-files {
-    background: linear-gradient(135deg, #76279b, #ab54d4) !important;
+    background: linear-gradient(135deg, #76279b, #51A0A2) !important;
     color: white !important;
 }
 
