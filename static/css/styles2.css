@@ -263,6 +263,41 @@ body {
     padding: 1.5rem;
 }
 
+/* ================================= FIX CARD HEADER UPLOAD SECTION ================================= */
+
+/* Forcer les styles du card-header avec !important */
+.upload-section .card-header.bg-gradient {
+    background: linear-gradient(135deg, #76279b, #51A0A2) !important;
+    border: none !important;
+    border-radius: 15px 15px 0 0 !important;
+    padding: 1.5rem !important;
+}
+
+.upload-section .card-header.bg-gradient * {
+    color: white !important;
+}
+
+.upload-section .card-header.bg-gradient h3 {
+    font-weight: 600 !important;
+    margin-bottom: 0.25rem !important;
+}
+
+.upload-section .card-header.bg-gradient p {
+    opacity: 0.9 !important;
+    margin-bottom: 0 !important;
+    font-size: 0.9rem !important;
+}
+
+.upload-section .card-header.bg-gradient i.fa-calendar-alt {
+    font-size: 2rem !important;
+}
+
+/* Forcer les styles du bouton LOAD FILES */
+.btn-load-files {
+    background: linear-gradient(135deg, #76279b, #ab54d4) !important;
+    color: white !important;
+}
+
 /* ================================= COMPOSANTS UI ================================= */
 
 /* Upload Areas */
