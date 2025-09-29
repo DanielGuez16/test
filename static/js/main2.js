@@ -332,20 +332,30 @@ function initializeDateSelection() {
     const loadButton = document.getElementById('loadFilesBtn');
     if (loadButton) {
         loadButton.addEventListener('click', loadFilesByDate);
+        console.log('✅ Load Files button listener attached'); // Debug
+    } else {
+        console.error('❌ loadFilesBtn element not found!'); // Debug
     }
     
-    // Définir la date par défaut (hier)
+    // Définir la date par défaut
     const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setDate(yesterday.getDate());
     const dateInput = document.getElementById('analysisDate');
     if (dateInput) {
         dateInput.value = yesterday.toISOString().split('T')[0];
+        console.log('✅ Default date set:', dateInput.value); // Debug
+    } else {
+        console.error('❌ analysisDate input not found!'); // Debug
     }
 }
 
 async function loadFilesByDate() {
+    console.log('🔄 loadFilesByDate() called'); // Debug 
+    
     const dateInput = document.getElementById('analysisDate');
     const selectedDate = dateInput.value;
+    
+    console.log('📅 Selected date:', selectedDate); // Debug
     
     if (!selectedDate) {
         showNotification('Please select a date', 'error');
