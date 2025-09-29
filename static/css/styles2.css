@@ -265,11 +265,23 @@ body {
 
 /* ================================= FIX CARD HEADER UPLOAD SECTION ================================= */
 
-/* Forcer les styles du card-header avec !important */
+/* Arrondir toute la section upload */
+.upload-section .card {
+    border-radius: 20px !important;  /* Plus arrondi */
+    overflow: hidden;                /* Important pour que le header suive l'arrondi */
+}
+
+.upload-section .card-header.bg-gradient {
+    border-radius: 20px 20px 0 0 !important;  /* Arrondi seulement en haut */
+}
+
+.upload-section .card-body {
+    border-radius: 0 0 20px 20px !important;  /* Arrondi seulement en bas */
+}
+
 .upload-section .card-header.bg-gradient {
     background: linear-gradient(135deg, #76279b, #51A0A2) !important;
     border: none !important;
-    border-radius: 15px 15px 0 0 !important;
     padding: 1.5rem !important;
 }
 
@@ -458,7 +470,8 @@ body {
     background: white;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     border: 1px solid rgba(0,0,0,0.06);
-    max-width: 100%;
+    max-width: 90%;
+    margin: 0 auto;
     overflow-x: auto;
 }
 
