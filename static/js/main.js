@@ -392,10 +392,6 @@ async function analyze() {
                 <div class="card-body text-center py-5">
                     <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
                     <h4 class="text-primary">Generating analyses...</h4>
-                    <p class="text-muted">
-                        Balance Sheet + Consumption + Ressources <br>
-                        <small>ACTIF/PASSIF • LCR par métier • Top Conso = "O"</small>
-                    </p>
                     <div class="progress mt-3" style="height: 6px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
                              style="width: 100%"></div>
@@ -2581,7 +2577,7 @@ async function uploadDocument(file) {
     try {
         showNotification(`Uploading ${file.name}...`, 'info');
         
-        const response = await fetch('/api/upload-document', {
+        const response = await fetch('/api/uploaded-document', {
             method: 'POST',
             body: formData
         });
@@ -2731,7 +2727,7 @@ function escapeHtml(text) {
  */
 async function updateUploadedDocsList() {
     try {
-        const response = await fetch('/api/uploaded-documents');
+        const response = await fetch('/api/uploaded-document');
         const result = await response.json();
         
         const docsContainer = document.getElementById('uploaded-docs');

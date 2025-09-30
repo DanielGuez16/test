@@ -800,7 +800,7 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
 
-@app.post("/api/upload-document")
+@app.post("/api/uploaded-document")
 async def upload_document(file: UploadFile = File(...), session_token: Optional[str] = Cookie(None)):
     """
     Upload de documents pour le contexte du chatbot
@@ -871,7 +871,29 @@ async def upload_document(file: UploadFile = File(...), session_token: Optional[
     except Exception as e:
         logger.error(f"Erreur upload document: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/api/uploaded-documents")
+async def get_uploaded_documents(session_token: Optional[str] = Cookie(None)):
+    """Liste les documents uploadés"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
+    documents = [
+        {
+            "filename": doc["filename"],
+            "size": doc["size"],
+            "upload_time": doc["upload_time"]
+        }
+        for doc in chatbot_session["uploaded_documents"]
+    ]
+    
+    return {
+        "success": True,
+        "documents": documents,
+        "count": len(documents)
+    }
+  
 @app.get("/api/document-preview/{filename}")
 async def preview_document(filename: str, session_token: Optional[str] = Cookie(None)):
     """

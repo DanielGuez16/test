@@ -670,60 +670,7 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
 
-@app.post("/api/upload-document")
-async def upload_document(file: UploadFile = File(...), session_token: Optional[str] = Cookie(None)):
-    """
-    Upload de documents pour le contexte du chatbot
-    """
-    # Vérifier l'authentification
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
-        
-        # NOUVEAU LOG : Document uploadé pour contexte
-        log_activity(current_user["username"], "DOCUMENT_UPLOAD", f"Uploaded context document: {file.filename}")
-        
-        contents = await file.read()
-        
-        # Traiter selon le type de fichier
-        if file.filename.endswith('.txt'):
-            text_content = contents.decode('utf-8')
-        elif file.filename.endswith('.pdf'):
-            # Vous devrez installer PyPDF2 : pip install PyPDF2
-            import PyPDF2
-            from io import BytesIO
-            pdf_reader = PyPDF2.PdfReader(BytesIO(contents))
-            text_content = ""
-            for page in pdf_reader.pages:
-                text_content += page.extract_text()
-        else:
-            text_content = contents.decode('utf-8', errors='ignore')
-        
-        # Sauvegarder le document
-        doc_data = {
-            "filename": file.filename,
-            "content": text_content,
-            "upload_time": datetime.now().isoformat(),
-            "size": len(contents)
-        }
-        
-        chatbot_session["uploaded_documents"].append(doc_data)
-        
-        return {
-            "success": True,
-            "message": f"Document {file.filename} ajouté au contexte",
-            "filename": file.filename,
-            "size": len(contents)
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur upload document: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-
-@app.post("/api/upload-document")
+@app.post("/api/uploaded-document")
 async def upload_document(file: UploadFile = File(...), session_token: Optional[str] = Cookie(None)):
     """
     Upload de documents pour le contexte du chatbot
@@ -794,7 +741,29 @@ async def upload_document(file: UploadFile = File(...), session_token: Optional[
     except Exception as e:
         logger.error(f"Erreur upload document: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/api/uploaded-documents")
+async def get_uploaded_documents(session_token: Optional[str] = Cookie(None)):
+    """Liste les documents uploadés"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
+    documents = [
+        {
+            "filename": doc["filename"],
+            "size": doc["size"],
+            "upload_time": doc["upload_time"]
+        }
+        for doc in chatbot_session["uploaded_documents"]
+    ]
+    
+    return {
+        "success": True,
+        "documents": documents,
+        "count": len(documents)
+    }
+   
 @app.get("/api/document-preview/{filename}")
 async def preview_document(filename: str, session_token: Optional[str] = Cookie(None)):
     """
