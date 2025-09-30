@@ -2589,6 +2589,13 @@ async function uploadDocument(file) {
         if (response.ok) {
             const result = await response.json();
             showNotification(result.message, 'success');
+            
+            // Réinitialiser l'input
+            const fileInput = document.getElementById('doc-upload');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
             updateUploadedDocsList();
         } else {
             const error = await response.json();
@@ -2598,6 +2605,12 @@ async function uploadDocument(file) {
     } catch (error) {
         console.error('Document upload error:', error);
         showNotification(`Error uploading ${file.name}: ${error.message}`, 'error');
+        
+        // Réinitialiser l'input même en cas d'erreur
+        const fileInput = document.getElementById('doc-upload');
+        if (fileInput) {
+            fileInput.value = '';
+        }
     }
 }
 
@@ -2679,14 +2692,27 @@ async function deleteDocument(filename) {
         
         if (response.ok) {
             showNotification('Document deleted', 'success');
-            updateUploadedDocsList();
+            
             // Fermer le modal si ouvert
-            const modal = bootstrap.Modal.getInstance(document.querySelector('.modal.show'));
-            if (modal) modal.hide();
+            const modalElement = document.querySelector('.modal.show');
+            if (modalElement) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) modal.hide();
+            }
+            
+            // Réinitialiser l'input file pour permettre un nouvel upload
+            const fileInput = document.getElementById('doc-upload');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
+            // Mettre à jour la liste
+            updateUploadedDocsList();
         } else {
             throw new Error('Delete failed');
         }
     } catch (error) {
+        console.error('Error deleting document:', error);
         showNotification('Error deleting document', 'error');
     }
 }

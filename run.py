@@ -723,25 +723,78 @@ async def upload_document(file: UploadFile = File(...), session_token: Optional[
         logger.error(f"Erreur upload document: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
-@app.get("/api/uploaded-documents")
-async def get_uploaded_documents():
+@app.post("/api/upload-document")
+async def upload_document(file: UploadFile = File(...), session_token: Optional[str] = Cookie(None)):
     """
-    Récupère la liste détaillée des documents uploadés
+    Upload de documents pour le contexte du chatbot
     """
-    documents = []
-    for doc in chatbot_session.get("uploaded_documents", []):
-        documents.append({
-            "filename": doc["filename"],
-            "upload_time": doc["upload_time"],
-            "size": doc["size"]
-        })
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+        
+        log_activity(current_user["username"], "DOCUMENT_UPLOAD", f"Uploaded context document: {file.filename}")
+        
+        contents = await file.read()
+        text_content = ""
+        
+        # Traiter selon le type de fichier
+        if file.filename.endswith('.txt'):
+            text_content = contents.decode('utf-8', errors='ignore')
+        elif file.filename.endswith('.docx'):
+            # Extraction DOCX avec mammoth
+            try:
+                import mammoth
+                result = mammoth.extract_raw_text(io.BytesIO(contents))
+                text_content = result.value
+            except Exception as e:
+                logger.warning(f"Erreur extraction DOCX avec mammoth: {e}, fallback en cours...")
+                # Fallback avec python-docx
+                try:
+                    from docx import Document
+                    doc = Document(io.BytesIO(contents))
+                    text_content = "\n".join([para.text for para in doc.paragraphs])
+                except Exception as e2:
+                    logger.error(f"Erreur extraction DOCX: {e2}")
+                    text_content = "[Erreur: Impossible de lire ce fichier DOCX]"
+        elif file.filename.endswith('.pdf'):
+            try:
+                import PyPDF2
+                from io import BytesIO
+                pdf_reader = PyPDF2.PdfReader(BytesIO(contents))
+                text_content = ""
+                for page in pdf_reader.pages:
+                    text_content += page.extract_text()
+            except Exception as e:
+                logger.error(f"Erreur extraction PDF: {e}")
+                text_content = "[Erreur: Impossible de lire ce fichier PDF]"
+        else:
+            text_content = contents.decode('utf-8', errors='ignore')
+        
+        # Sauvegarder le document
+        doc_data = {
+            "filename": file.filename,
+            "content": text_content,
+            "upload_time": datetime.now().isoformat(),
+            "size": len(contents)
+        }
+        
+        chatbot_session["uploaded_documents"].append(doc_data)
+        
+        return {
+            "success": True,
+            "message": f"Document {file.filename} ajouté au contexte",
+            "filename": file.filename,
+            "size": len(contents),
+            "extracted_length": len(text_content)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur upload document: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
     
-    return {
-        "success": True,
-        "documents": documents,
-        "count": len(documents)
-    }
-
 @app.get("/api/document-preview/{filename}")
 async def preview_document(filename: str, session_token: Optional[str] = Cookie(None)):
     """
