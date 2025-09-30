@@ -872,6 +872,77 @@ async def get_uploaded_documents():
         "count": len(documents)
     }
 
+@app.get("/api/document-preview/{filename}")
+async def preview_document(filename: str, session_token: Optional[str] = Cookie(None)):
+    """
+    Récupère l'aperçu d'un document uploadé
+    """
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Chercher le document
+        doc = next((d for d in chatbot_session["uploaded_documents"] if d["filename"] == filename), None)
+        
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Limiter l'aperçu à 5000 caractères
+        preview_content = doc["content"]
+        is_truncated = len(preview_content) > 5000
+        if is_truncated:
+            preview_content = preview_content[:5000] + "\n\n... [Preview truncated]"
+        
+        return {
+            "success": True,
+            "filename": doc["filename"],
+            "preview": preview_content,
+            "size": doc["size"],
+            "upload_time": doc["upload_time"],
+            "content_type": "text",
+            "is_truncated": is_truncated
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing document: {e}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.delete("/api/delete-document/{filename}")
+async def delete_document(filename: str, session_token: Optional[str] = Cookie(None)):
+    """
+    Supprime un document uploadé
+    """
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Trouver et supprimer le document
+        initial_count = len(chatbot_session["uploaded_documents"])
+        chatbot_session["uploaded_documents"] = [
+            doc for doc in chatbot_session["uploaded_documents"] 
+            if doc["filename"] != filename
+        ]
+        
+        if len(chatbot_session["uploaded_documents"]) == initial_count:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        log_activity(current_user["username"], "DOCUMENT_DELETE", f"Deleted document: {filename}")
+        
+        return {
+            "success": True,
+            "message": f"Document {filename} deleted"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document: {e}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    
 @app.get("/api/chat-history")
 async def get_chat_history():
     """

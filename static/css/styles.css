@@ -1354,6 +1354,30 @@ body {
     font-size: 12px;
 }
 
+.document-preview pre {
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.doc-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s;
+}
+
+.doc-item:hover {
+    background-color: #f8f9fa;
+}
+
+.doc-item:last-child {
+    border-bottom: none;
+}
+
 /* ================================= GRAPHIQUES ================================= */
 
 .chart-container {

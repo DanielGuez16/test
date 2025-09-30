@@ -2758,6 +2758,105 @@ async function uploadDocument(file) {
 }
 
 /**
+ * Affiche l'aperçu d'un document
+ */
+async function previewDocument(filename) {
+    try {
+        const response = await fetch(`/api/document-preview/${encodeURIComponent(filename)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Créer un modal pour l'aperçu
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-file-alt me-2"></i>${filename}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="document-preview">
+                                ${result.content_type === 'text' ? 
+                                    `<pre class="p-3 bg-light rounded">${escapeHtml(result.preview)}</pre>` :
+                                    `<div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Preview not available for this file type
+                                    </div>`
+                                }
+                            </div>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <strong>Size:</strong> ${formatFileSize(result.size)} • 
+                                    <strong>Uploaded:</strong> ${new Date(result.upload_time).toLocaleString()}
+                                    ${result.is_truncated ? ' • <span class="text-warning">Preview truncated</span>' : ''}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-danger" onclick="deleteDocument('${filename}')">
+                                <i class="fas fa-trash me-2"></i>Delete
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            modal.addEventListener('hidden.bs.modal', () => {
+                modal.remove();
+            });
+        } else {
+            showNotification('Error loading preview', 'error');
+        }
+    } catch (error) {
+        console.error('Preview error:', error);
+        showNotification('Error displaying preview', 'error');
+    }
+}
+
+/**
+ * Supprime un document
+ */
+async function deleteDocument(filename) {
+    if (!confirm(`Delete ${filename}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/delete-document/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification('Document deleted', 'success');
+            updateUploadedDocsList();
+            // Fermer le modal si ouvert
+            const modal = bootstrap.Modal.getInstance(document.querySelector('.modal.show'));
+            if (modal) modal.hide();
+        } else {
+            throw new Error('Delete failed');
+        }
+    } catch (error) {
+        showNotification('Error deleting document', 'error');
+    }
+}
+
+/**
+ * Échappe le HTML pour affichage sécurisé
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
  * Met à jour la liste des documents uploadés
  */
 async function updateUploadedDocsList() {
@@ -2771,10 +2870,20 @@ async function updateUploadedDocsList() {
             
             result.documents.forEach(doc => {
                 docsHtml += `
-                    <div class="doc-item">
-                        <i class="fas fa-file-alt me-2"></i>
-                        <strong>${doc.filename}</strong>
-                        <br><small class="text-muted">${formatFileSize(doc.size)} - ${new Date(doc.upload_time).toLocaleTimeString()}</small>
+                    <div class="doc-item d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <i class="fas fa-file-alt me-2"></i>
+                            <strong>${doc.filename}</strong>
+                            <br><small class="text-muted">${formatFileSize(doc.size)} - ${new Date(doc.upload_time).toLocaleTimeString()}</small>
+                        </div>
+                        <div class="btn-group btn-group-sm ms-2">
+                            <button class="btn btn-outline-primary" onclick="previewDocument('${doc.filename}')" title="Preview">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteDocument('${doc.filename}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             });
