@@ -111,7 +111,7 @@ body {
 }
 
 .date-selector-container {
-    background: linear-gradient(145deg, #f8f9ff, #ffffff);
+    background: linear-gradient(145deg, #f8f9ff, #f8f9ff);
     padding: 2rem;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.08);
@@ -167,7 +167,7 @@ body {
 }
 
 .btn-load-files {
-    width: 100%;
+    width: 60%;
     height: 100%;
     min-height: 80px;            
     background: linear-gradient(135deg, var(--natixis-blue), var(--bleu-canard));
@@ -256,7 +256,7 @@ body {
     font-weight: 700;
     font-size: 1.1rem;
     padding-bottom: 0.75rem;
-    border-bottom: 2px solid var(--natixis-light-blue);
+    border-bottom: 2px solid var(--natixis-blue);
     margin-bottom: 1rem;
 }
 
@@ -281,7 +281,7 @@ body {
 }
 
 .upload-section .card-header.bg-gradient {
-    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-blue)) !important;
+    background: linear-gradient(160deg, var(--natixis-blue), var(--bleu-canard)) !important;
     border: none !important;
     padding: 1.5rem !important;
 }
@@ -352,7 +352,7 @@ body {
 
 /* Boutons */
 .btn-analyze {
-    background: linear-gradient(45deg, var(--natixis-light-blue), var(--natixis-light-blue)); 
+    background: linear-gradient(160deg, var(--natixis-blue), var(--bleu-canard)); 
     border: none; 
     color: white; 
     padding: 15px 40px; 
