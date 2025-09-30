@@ -1723,18 +1723,22 @@ function generateCappageTableHTML(cappageData) {
         html += `</tr>`;
         
         // Lignes de détail (commentaires)
-        Object.entries(siData.commentaires).forEach(([commentaire, values]) => {
-            html += `<tr class="tcd-detail-row">`;
-            html += `<td class="tcd-commentaire-detail"><div class="tcd-hierarchy-level-1">${commentaire}</div></td>`;
-            
-            dates.forEach(date => {
-                const value = values[date] || 0;
-                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
-                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        // N'afficher les détails QUE pour SI Remettant "CAPREOS"
+        if (siRemettant === "CAPREOS") {
+            Object.entries(siData.commentaires).forEach(([commentaire, values]) => {
+                html += `<tr class="tcd-detail-row">`;
+                html += `<td class="tcd-commentaire-detail"><div class="tcd-hierarchy-level-1">${commentaire}</div></td>`;
+                
+                dates.forEach(date => {
+                    const value = values[date] || 0;
+                    const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                    html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+                });
+                
+                html += `</tr>`;
             });
-            
-            html += `</tr>`;
-        });
+        }
+        // Pour SHORT_LCR et autres, on ne montre PAS les détails
         
         // Séparateur
         if (siIndex < allSiRemettants.size - 1) {
@@ -1876,17 +1880,22 @@ function generateBufferNcoBufferTableHTML(bufferData) {
         });
         html += `</tr>`;
         
-        Object.entries(sectionData.clients).forEach(([client, values]) => {
-            html += `<tr class="tcd-detail-row">`;
-            html += `<td class="tcd-client-detail"><div class="tcd-hierarchy-level-1">${client}</div></td>`;
-            
-            dates.forEach(date => {
-                const value = values[date] || 0;
-                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
-                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        // LIGNES DE DÉTAIL : Clients indentés
+        // N'afficher les détails QUE pour la section "1.1- Cash"
+        if (section === "1.1- Cash") {
+            Object.entries(sectionData.clients).forEach(([client, values]) => {
+                html += `<tr class="tcd-detail-row">`;
+                html += `<td class="tcd-client-detail"><div class="tcd-hierarchy-level-1">${client}</div></td>`;
+                
+                dates.forEach(date => {
+                    const value = values[date] || 0;
+                    const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                    html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+                });
+                html += `</tr>`;
             });
-            html += `</tr>`;
-        });
+        }
+        // Pour toutes les autres sections, on ne montre PAS les détails clients
         
         if (idx < allSections.size - 1) {
             html += `<tr class="tcd-separator"><td colspan="${dates.length + 1}"></td></tr>`;
