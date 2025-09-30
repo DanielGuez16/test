@@ -29,6 +29,7 @@ import secrets
 from llm_connector import LLMConnector
 from report_generator import ReportGenerator
 from sharepoint_connector import SharePointClient
+from data_persistence import init_database, save_table_result, get_historical_data
 
 # Initialiser le connecteur LLM
 llm_connector = LLMConnector()
@@ -62,6 +63,9 @@ required_cols = ["Top Conso", "LCR_Catégorie", "LCR_Template Section 1", "Libel
 
 # Création de l'application FastAPI
 app = FastAPI(title="Steering ALM Metrics", version="2.0.0")
+
+# Initialiser la base de données historique
+init_database()
 
 # Configuration CORS
 app.add_middleware(
@@ -602,6 +606,36 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
             }
         }
 
+        # ========= SAUVEGARDE HISTORIQUE =========
+        try:
+            # Extraire la date d'arrêté du fichier J
+            analysis_date = None
+            if "j" in file_session["files"]:
+                df_j = file_session["files"]["j"]["dataframe"]
+                if "Date d'arrêté" in df_j.columns:
+                    # Prendre la première date d'arrêté
+                    analysis_date = str(df_j["Date d'arrêté"].iloc[0])
+            
+            if analysis_date:
+                # Sauvegarder uniquement les 5 tableaux concernés
+                save_table_result(analysis_date, "cappage", cappage_results)
+                save_table_result(analysis_date, "buffer_nco_buffer", 
+                                buffer_nco_results.get("data", {}).get("j", {}).get("buffer_pivot_data", []))
+                save_table_result(analysis_date, "buffer_nco_nco",
+                                buffer_nco_results.get("data", {}).get("j", {}).get("nco_pivot_data", []))
+                save_table_result(analysis_date, "consumption_resources_consumption",
+                                consumption_resources_results.get("data", {}).get("j", {}).get("consumption_data", []))
+                save_table_result(analysis_date, "consumption_resources_resources",
+                                consumption_resources_results.get("data", {}).get("j", {}).get("resources_data", []))
+                
+                logger.info(f"✅ Historique sauvegardé pour {analysis_date}")
+            else:
+                logger.warning("⚠️ Impossible de trouver la date d'arrêté")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur sauvegarde historique: {e}")
+        # =========================================     
+
         return {
             "success": True,
             "message": "Analyses terminées avec nouveaux tableaux",
@@ -624,6 +658,39 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
         logger.error(f"Erreur analyse: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse: {str(e)}")
 
+@app.get("/api/analyze-historical/{table_name}")
+async def get_table_historical(table_name: str, days_back: int = 10, session_token: Optional[str] = Cookie(None)):
+    """Récupère l'historique d'un tableau spécifique"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Récupérer l'historique depuis la DB
+        historical_data = get_historical_data(table_name, days_back)
+        
+        if not historical_data:
+            return {
+                "success": False,
+                "message": f"Aucun historique trouvé pour {table_name}"
+            }
+        
+        # Transformer en format utilisable par le frontend
+        dates = [item[0] for item in historical_data]
+        data_by_date = {item[0]: item[1] for item in historical_data}
+        
+        return {
+            "success": True,
+            "table_name": table_name,
+            "dates": dates,
+            "data_by_date": data_by_date,
+            "total_days": len(dates)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur récupération historique {table_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.post("/api/analyze-consumption-resources")
 async def analyze_consumption_resources(request: Request, session_token: Optional[str] = Cookie(None)):
     """

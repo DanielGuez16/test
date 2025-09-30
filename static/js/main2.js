@@ -715,7 +715,7 @@ function displayCompleteResults(analysisResults) {
             html += '<div class="analysis-section fade-in-up">';
             html += '<div class="row">';
             html += '<div class="col-12">';
-            html += generateCappageSection(analysisResults.cappage);
+            html += '<div id="cappage-container">Chargement de l\'historique...</div>';
             html += '</div>';
             html += '</div>';
             html += '</div>';
@@ -726,10 +726,14 @@ function displayCompleteResults(analysisResults) {
             html += '<div class="analysis-section fade-in-up">';
             html += '<div class="row">';
             html += '<div class="col-12">';
-            html += generateBufferNcoSection(analysisResults.buffer_nco);
+            html += '<div class="card border-0">';
+            html += '<div class="card-header no-background">';
+            html += '<h3 style="color: #76279b;">BUFFER & NCO - TCD Analysis</h3>';
             html += '</div>';
-            html += '</div>';
-            html += '</div>';
+            html += '<div class="card-body p-0">';
+            html += '<div id="buffer-nco-buffer-container">Chargement...</div>';
+            html += '<div id="buffer-nco-nco-container">Chargement...</div>';
+            html += '</div></div></div></div></div>';
         }
 
         // Tableaux CONSUMPTION & RESOURCES empilés
@@ -737,10 +741,14 @@ function displayCompleteResults(analysisResults) {
             html += '<div class="analysis-section fade-in-up">';
             html += '<div class="row">';
             html += '<div class="col-12">';
-            html += generateConsumptionResourcesSection(analysisResults.consumption_resources);
+            html += '<div class="card border-0">';
+            html += '<div class="card-header no-background">';
+            html += '<h3 style="color: #76279b;">CONSUMPTION & RESOURCES</h3>';
             html += '</div>';
-            html += '</div>';
-            html += '</div>';
+            html += '<div class="card-body p-0">';
+            html += '<div id="consumption-container">Chargement...</div>';
+            html += '<div id="resources-container">Chargement...</div>';
+            html += '</div></div></div></div></div>';
         }
 
         // Bouton export PDF
@@ -759,11 +767,90 @@ function displayCompleteResults(analysisResults) {
         `;
         
         document.getElementById('results').innerHTML = html;
-        
+
+        // Attendre que le DOM soit à jour avant de charger l'historique
         setTimeout(() => {
             resolve();
-        }, 500);
+        }, 100);
+
+        // Charger l'historique après un délai plus long
+        setTimeout(() => {
+            loadHistoricalTables();
+        }, 800);
     });
+}
+
+async function loadHistoricalTables() {
+    try {
+        // 1. CAPPAGE
+        const cappageResp = await fetch('/api/analyze-historical/cappage?days_back=10');
+        const cappageRes = await cappageResp.json();
+        if (cappageRes.success) {
+            document.getElementById('cappage-container').innerHTML = `
+                <div class="card border-0">
+                    <div class="card-header no-background">
+                        <h3 style="color: #76279b;">CAPPAGE - Historique (${cappageRes.total_days} jours)</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            ${generateCappageTableHTML({historical: cappageRes})}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 2. BUFFER (Buffer & NCO)
+        const bufferResp = await fetch('/api/analyze-historical/buffer_nco_buffer?days_back=10');
+        const bufferRes = await bufferResp.json();
+        if (bufferRes.success) {
+            document.getElementById('buffer-nco-buffer-container').innerHTML = `
+                <h5 class="text-primary mb-3 px-3 pt-3">1. BUFFER - Historique (${bufferRes.total_days} jours)</h5>
+                <div class="table-container mb-4">
+                    ${generateBufferNcoBufferTableHTML({historical: bufferRes})}
+                </div>
+            `;
+        }
+        
+        // 3. NCO (Buffer & NCO)
+        const ncoResp = await fetch('/api/analyze-historical/buffer_nco_nco?days_back=10');
+        const ncoRes = await ncoResp.json();
+        if (ncoRes.success) {
+            document.getElementById('buffer-nco-nco-container').innerHTML = `
+                <h5 class="text-primary mb-3 px-3">2. NCO - Historique (${ncoRes.total_days} jours)</h5>
+                <div class="table-container">
+                    ${generateBufferNcoNcoTableHTML({historical: ncoRes})}
+                </div>
+            `;
+        }
+        
+        // 4. CONSUMPTION
+        const consResp = await fetch('/api/analyze-historical/consumption_resources_consumption?days_back=10');
+        const consRes = await consResp.json();
+        if (consRes.success) {
+            document.getElementById('consumption-container').innerHTML = `
+                <h5 class="text-primary mb-3 px-3 pt-3">1. CONSUMPTION - Historique (${consRes.total_days} jours)</h5>
+                <div class="table-container mb-4">
+                    ${generateConsumptionResourcesConsumptionTableHTML({historical: consRes})}
+                </div>
+            `;
+        }
+        
+        // 5. RESOURCES
+        const resResp = await fetch('/api/analyze-historical/consumption_resources_resources?days_back=10');
+        const resRes = await resResp.json();
+        if (resRes.success) {
+            document.getElementById('resources-container').innerHTML = `
+                <h5 class="text-primary mb-3 px-3">2. RESOURCES - Historique (${resRes.total_days} jours)</h5>
+                <div class="table-container">
+                    ${generateConsumptionResourcesResourcesTableHTML({historical: resRes})}
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Erreur chargement historique:', error);
+    }
 }
 
 // ================================= GÉNÉRATION BUFFER & CONSUMPTION & RESOURCES & CAPPAGE SECTION & BUFFER&NCO =================================
@@ -1435,9 +1522,9 @@ function generateCappageSection(cappageData) {
 }
 
 /**
- * Génère le HTML du tableau CAPPAGE avec structure TCD Excel professionnelle
+ * Version fallback pour affichage single-day (ancien format)
  */
-function generateCappageTableHTML(cappageData) {
+function generateCappageSingleDayHTML(cappageData) {
     if (!cappageData.j) {
         return '<div class="alert alert-warning">Données insuffisantes pour le tableau CAPPAGE TCD</div>';
     }
@@ -1508,25 +1595,29 @@ function generateCappageTableHTML(cappageData) {
         html += `</tr>`;
         
         // LIGNES DE DÉTAIL : Commentaires indentés
-        commentaireDetails.forEach((detail, detailIndex) => {
-            html += `<tr class="tcd-detail-row">`;
-            
-            // Commentaire indenté
-            html += `<td class="tcd-commentaire-detail">
-                        <div class="tcd-hierarchy-level-1">
-                            ${detail.commentaire}
-                        </div>
-                    </td>`;
-            
-            // Valeurs par date pour ce commentaire
-            dates.forEach(date => {
-                const value = detail.date_values[date] || 0;
-                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
-                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        // N'afficher les détails QUE pour SI Remettant "CAPREOS"
+        if (siGroup.si_remettant === "CAPREOS") {
+            commentaireDetails.forEach((detail, detailIndex) => {
+                html += `<tr class="tcd-detail-row">`;
+                
+                // Commentaire indenté
+                html += `<td class="tcd-commentaire-detail">
+                            <div class="tcd-hierarchy-level-1">
+                                ${detail.commentaire}
+                            </div>
+                        </td>`;
+                
+                // Valeurs par date pour ce commentaire
+                dates.forEach(date => {
+                    const value = detail.date_values[date] || 0;
+                    const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                    html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+                });
+                
+                html += '</tr>';
             });
-            
-            html += '</tr>';
-        });
+        }
+        // Pour SHORT_LCR et autres, on ne montre PAS les détails
         
         // Ligne de séparation entre les SI (sauf pour le dernier)
         if (siIndex < pivotData.length - 1) {
@@ -1550,6 +1641,119 @@ function generateCappageTableHTML(cappageData) {
     html += '</tr>';
     
     html += '</tbody></table>';
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau CAPPAGE avec historique multi-colonnes
+ */
+function generateCappageTableHTML(cappageData) {
+    // Si pas de données historiques, afficher en mode classique
+    if (!cappageData.historical || !cappageData.historical.dates) {
+        return generateCappageSingleDayHTML(cappageData);
+    }
+    
+    const dates = cappageData.historical.dates; // ["2025-09-10", "2025-09-09", ...]
+    const dataByDate = cappageData.historical.data_by_date;
+    
+    // Construire la structure des lignes avec toutes les dates
+    const allSiRemettants = new Set();
+    const rowsData = {};
+    
+    // Collecter tous les SI Remettants et Commentaires
+    dates.forEach(date => {
+        const dayData = dataByDate[date];
+        if (dayData && dayData.data && dayData.data.j && dayData.data.j.pivot_data) {
+            dayData.data.j.pivot_data.forEach(siGroup => {
+                allSiRemettants.add(siGroup.si_remettant);
+                
+                if (!rowsData[siGroup.si_remettant]) {
+                    rowsData[siGroup.si_remettant] = {
+                        commentaires: {},
+                        totals: {}
+                    };
+                }
+                
+                // Stocker le total SI pour cette date
+                rowsData[siGroup.si_remettant].totals[date] = siGroup.grand_total || 0;
+                
+                // Stocker les commentaires
+                siGroup.commentaire_details.forEach(detail => {
+                    if (!rowsData[siGroup.si_remettant].commentaires[detail.commentaire]) {
+                        rowsData[siGroup.si_remettant].commentaires[detail.commentaire] = {};
+                    }
+                    rowsData[siGroup.si_remettant].commentaires[detail.commentaire][date] = detail.total || 0;
+                });
+            });
+        }
+    });
+    
+    // Générer le HTML
+    let html = `
+        <table class="table table-bordered cappage-tcd-table">
+            <thead class="table-dark">
+                <tr>
+                    <th class="align-middle tcd-header-row" style="width: 30%">SI Remettant / Commentaire</th>
+                    <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
+                </tr>
+                <tr>
+                    <th></th>
+    `;
+    
+    // En-têtes des dates
+    dates.forEach(date => {
+        html += `<th class="text-center tcd-date-header">${date}</th>`;
+    });
+    
+    html += `</tr></thead><tbody>`;
+    
+    // Générer les lignes
+    Array.from(allSiRemettants).forEach((siRemettant, siIndex) => {
+        const siData = rowsData[siRemettant];
+        
+        // Ligne SI Remettant
+        html += `<tr class="tcd-section-row">`;
+        html += `<td class="tcd-si-cell"><div class="tcd-hierarchy-level-0"><strong>${siRemettant}</strong></div></td>`;
+        
+        dates.forEach(date => {
+            const value = siData.totals[date] || 0;
+            html += `<td class="text-end tcd-data-cell"><strong>${value.toFixed(3)}</strong></td>`;
+        });
+        
+        html += `</tr>`;
+        
+        // Lignes de détail (commentaires)
+        Object.entries(siData.commentaires).forEach(([commentaire, values]) => {
+            html += `<tr class="tcd-detail-row">`;
+            html += `<td class="tcd-commentaire-detail"><div class="tcd-hierarchy-level-1">${commentaire}</div></td>`;
+            
+            dates.forEach(date => {
+                const value = values[date] || 0;
+                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+            });
+            
+            html += `</tr>`;
+        });
+        
+        // Séparateur
+        if (siIndex < allSiRemettants.size - 1) {
+            html += `<tr class="tcd-separator"><td colspan="${dates.length + 1}"></td></tr>`;
+        }
+    });
+    
+    // Ligne de grand total
+    html += `<tr class="tcd-grand-total-row"><td class="tcd-grand-total-label"><strong>TOTAL</strong></td>`;
+    
+    dates.forEach(date => {
+        let grandTotal = 0;
+        Object.values(rowsData).forEach(siData => {
+            grandTotal += siData.totals[date] || 0;
+        });
+        html += `<td class="text-end tcd-grand-total-value">${grandTotal.toFixed(3)}</td>`;
+    });
+    
+    html += `</tr></tbody></table>`;
     return html;
 }
 
@@ -1604,7 +1808,105 @@ function generateBufferNcoSection(bufferNcoData) {
 /**
  * Génère le HTML du tableau BUFFER avec structure TCD Excel hiérarchique
  */
-function generateBufferNcoBufferTableHTML(bufferNcoData) {
+function generateBufferNcoBufferTableHTML(bufferData) {
+    // Si pas de données historiques
+    if (!bufferData.historical || !bufferData.historical.dates) {
+        return generateBufferNcoBufferSingleDayHTML(bufferData);
+    }
+    
+    const dates = bufferData.historical.dates;
+    const dataByDate = bufferData.historical.data_by_date;
+    
+    // Structure : section -> client -> {date: value}
+    const allSections = new Set();
+    const rowsData = {};
+    
+    dates.forEach(date => {
+        const dayData = dataByDate[date];
+        if (Array.isArray(dayData)) {
+            dayData.forEach(sectionGroup => {
+                allSections.add(sectionGroup.section);
+                
+                if (!rowsData[sectionGroup.section]) {
+                    rowsData[sectionGroup.section] = {
+                        clients: {},
+                        totals: {}
+                    };
+                }
+                
+                rowsData[sectionGroup.section].totals[date] = 
+                    Object.values(sectionGroup.section_totals_by_date || {}).reduce((a, b) => a + b, 0);
+                
+                (sectionGroup.client_details || []).forEach(detail => {
+                    if (!rowsData[sectionGroup.section].clients[detail.client]) {
+                        rowsData[sectionGroup.section].clients[detail.client] = {};
+                    }
+                    const clientTotal = Object.values(detail.date_values || {}).reduce((a, b) => a + b, 0);
+                    rowsData[sectionGroup.section].clients[detail.client][date] = clientTotal;
+                });
+            });
+        }
+    });
+    
+    let html = `
+        <table class="table table-bordered buffer-nco-tcd-table">
+            <thead class="table-dark">
+                <tr>
+                    <th class="align-middle tcd-header-row" style="width: 35%">Section / Client</th>
+                    <th colspan="${dates.length}" class="text-center tcd-header-col">LCR Assiette Pondérée par Date (Bn €)</th>
+                </tr>
+                <tr><th></th>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center tcd-date-header">${date}</th>`;
+    });
+    
+    html += `</tr></thead><tbody>`;
+    
+    Array.from(allSections).forEach((section, idx) => {
+        const sectionData = rowsData[section];
+        
+        html += `<tr class="tcd-section-row">`;
+        html += `<td class="tcd-section-cell"><div class="tcd-hierarchy-level-0"><strong>${section}</strong></div></td>`;
+        
+        dates.forEach(date => {
+            const value = sectionData.totals[date] || 0;
+            html += `<td class="text-end tcd-data-cell"><strong>${value.toFixed(3)}</strong></td>`;
+        });
+        html += `</tr>`;
+        
+        Object.entries(sectionData.clients).forEach(([client, values]) => {
+            html += `<tr class="tcd-detail-row">`;
+            html += `<td class="tcd-client-detail"><div class="tcd-hierarchy-level-1">${client}</div></td>`;
+            
+            dates.forEach(date => {
+                const value = values[date] || 0;
+                const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell';
+                html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+            });
+            html += `</tr>`;
+        });
+        
+        if (idx < allSections.size - 1) {
+            html += `<tr class="tcd-separator"><td colspan="${dates.length + 1}"></td></tr>`;
+        }
+    });
+    
+    html += `<tr class="tcd-grand-total-row"><td class="tcd-grand-total-label"><strong>TOTAL BUFFER</strong></td>`;
+    dates.forEach(date => {
+        let grandTotal = 0;
+        Object.values(rowsData).forEach(s => grandTotal += s.totals[date] || 0);
+        html += `<td class="text-end tcd-grand-total-value">${grandTotal.toFixed(3)}</td>`;
+    });
+    html += `</tr></tbody></table>`;
+    return html;
+}
+
+/**
+ * Génère le HTML du tableau BUFFER avec structure TCD Excel hiérarchique (ancien pour fallback)
+ */
+function generateBufferNcoBufferSingleDayHTML(bufferNcoData) {
     if (!bufferNcoData.j) {
         return '<div class="alert alert-warning">Données BUFFER insuffisantes</div>';
     }
@@ -1725,7 +2027,7 @@ function generateBufferNcoBufferTableHTML(bufferNcoData) {
 /**
  * Génère le HTML du tableau NCO avec structure TCD simple
  */
-function generateBufferNcoNcoTableHTML(bufferNcoData) {
+function generateBufferNcoNcoSingleDayHTML(bufferNcoData) {
     if (!bufferNcoData.j) {
         return '<div class="alert alert-warning">Données NCO insuffisantes</div>';
     }
@@ -1808,6 +2110,71 @@ function generateBufferNcoNcoTableHTML(bufferNcoData) {
     return html;
 }
 
+function generateBufferNcoNcoTableHTML(ncoData) {
+    if (!ncoData.historical || !ncoData.historical.dates) {
+        return generateBufferNcoNcoSingleDayHTML(ncoData);
+    }
+    
+    const dates = ncoData.historical.dates;
+    const dataByDate = ncoData.historical.data_by_date;
+    
+    const allCategories = new Set();
+    const rowsData = {};
+    
+    dates.forEach(date => {
+        const dayData = dataByDate[date];
+        if (Array.isArray(dayData)) {
+            dayData.forEach(catGroup => {
+                allCategories.add(catGroup.categorie);
+                
+                if (!rowsData[catGroup.categorie]) {
+                    rowsData[catGroup.categorie] = {};
+                }
+                
+                const catTotal = Object.values(catGroup.date_values || {}).reduce((a, b) => a + b, 0);
+                rowsData[catGroup.categorie][date] = catTotal;
+            });
+        }
+    });
+    
+    let html = `
+        <table class="table table-bordered buffer-nco-tcd-table nco-table">
+            <thead class="table-success">
+                <tr>
+                    <th rowspan="2" class="align-middle tcd-header-row-nco">LCR Catégorie</th>
+                    <th colspan="${dates.length}" class="text-center tcd-header-col-nco">LCR Assiette Pondérée par Date (Bn €)</th>
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center tcd-date-header-nco">${date}</th>`;
+    });
+    
+    html += `</tr></thead><tbody>`;
+    
+    Array.from(allCategories).forEach(categorie => {
+        html += `<tr class="tcd-nco-row">`;
+        html += `<td class="tcd-categorie-cell"><strong>${categorie}</strong></td>`;
+        
+        dates.forEach(date => {
+            const value = rowsData[categorie][date] || 0;
+            const cellClass = value === 0 ? 'tcd-zero-value' : 'tcd-data-cell-nco';
+            html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        });
+        html += `</tr>`;
+    });
+    
+    html += `<tr class="tcd-grand-total-row-nco"><td class="tcd-grand-total-label-nco"><strong>TOTAL NCO</strong></td>`;
+    dates.forEach(date => {
+        let grandTotal = 0;
+        Object.values(rowsData).forEach(values => grandTotal += values[date] || 0);
+        html += `<td class="text-end tcd-grand-total-value-nco">${grandTotal.toFixed(3)}</td>`;
+    });
+    html += `</tr></tbody></table>`;
+    return html;
+}
+
 /**
  * Génère la section CONSUMPTION & RESOURCES (deux tableaux empilés)
  */
@@ -1848,7 +2215,7 @@ function generateConsumptionResourcesSection(consumptionResourcesData) {
 /**
  * Génère le HTML du tableau CONSUMPTION avec style Excel professionnel
  */
-function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesData) {
+function generateConsumptionSingleDayHTML(consumptionResourcesData) {
     if (!consumptionResourcesData.j) {
         return '<div class="alert alert-warning">Données CONSUMPTION insuffisantes</div>';
     }
@@ -1939,10 +2306,75 @@ function generateConsumptionResourcesConsumptionTableHTML(consumptionResourcesDa
     return html;
 }
 
+function generateConsumptionResourcesConsumptionTableHTML(consumptionData) {
+    if (!consumptionData.historical || !consumptionData.historical.dates) {
+        return generateConsumptionSingleDayHTML(consumptionData);
+    }
+    
+    const dates = consumptionData.historical.dates;
+    const dataByDate = consumptionData.historical.data_by_date;
+    
+    const allGroupes = new Set();
+    const rowsData = {};
+    
+    dates.forEach(date => {
+        const dayData = dataByDate[date];
+        if (Array.isArray(dayData)) {
+            dayData.forEach(item => {
+                allGroupes.add(item.lcr_eco_groupe_metiers);
+                
+                if (!rowsData[item.lcr_eco_groupe_metiers]) {
+                    rowsData[item.lcr_eco_groupe_metiers] = {};
+                }
+                
+                const total = Object.values(item.dates || {}).reduce((a, b) => a + b, 0);
+                rowsData[item.lcr_eco_groupe_metiers][date] = total;
+            });
+        }
+    });
+    
+    let html = `
+        <table class="table table-bordered consumption-excel-table">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2" class="align-middle cons-header-row">LCR ECO Groupe Métiers</th>
+                    <th colspan="${dates.length}" class="text-center cons-header-col">LCR ECO Impact by Date (Bn €)</th>
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center cons-date-header">${date}</th>`;
+    });
+    
+    html += `</tr></thead><tbody>`;
+    
+    Array.from(allGroupes).forEach(groupe => {
+        html += `<tr class="cons-data-row">`;
+        html += `<td class="cons-groupe-cell"><div class="cons-group-label"><strong>${groupe}</strong></div></td>`;
+        
+        dates.forEach(date => {
+            const value = rowsData[groupe][date] || 0;
+            const cellClass = value === 0 ? 'cons-zero-value' : 'cons-data-cell';
+            html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        });
+        html += `</tr>`;
+    });
+    
+    html += `<tr class="cons-grand-total-row"><td class="cons-grand-total-label"><strong>TOTAL CONSUMPTION</strong></td>`;
+    dates.forEach(date => {
+        let grandTotal = 0;
+        Object.values(rowsData).forEach(values => grandTotal += values[date] || 0);
+        html += `<td class="text-end cons-grand-total-value">${grandTotal.toFixed(3)}</td>`;
+    });
+    html += `</tr></tbody></table>`;
+    return html;
+}
+
 /**
  * Génère le HTML du tableau RESOURCES avec style Excel professionnel
  */
-function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData) {
+function generateResourcesSingleDayHTML(consumptionResourcesData) {
     if (!consumptionResourcesData.j) {
         return '<div class="alert alert-warning">Données RESOURCES insuffisantes</div>';
     }
@@ -2033,6 +2465,70 @@ function generateConsumptionResourcesResourcesTableHTML(consumptionResourcesData
     return html;
 }
 
+function generateConsumptionResourcesResourcesTableHTML(resourcesData) {
+    if (!resourcesData.historical || !resourcesData.historical.dates) {
+        return generateResourcesSingleDayHTML(resourcesData);
+    }
+    
+    const dates = resourcesData.historical.dates;
+    const dataByDate = resourcesData.historical.data_by_date;
+    
+    const allGroupes = new Set();
+    const rowsData = {};
+    
+    dates.forEach(date => {
+        const dayData = dataByDate[date];
+        if (Array.isArray(dayData)) {
+            dayData.forEach(item => {
+                allGroupes.add(item.lcr_eco_groupe_metiers);
+                
+                if (!rowsData[item.lcr_eco_groupe_metiers]) {
+                    rowsData[item.lcr_eco_groupe_metiers] = {};
+                }
+                
+                const total = Object.values(item.dates || {}).reduce((a, b) => a + b, 0);
+                rowsData[item.lcr_eco_groupe_metiers][date] = total;
+            });
+        }
+    });
+    
+    let html = `
+        <table class="table table-bordered resources-excel-table">
+            <thead class="table-success">
+                <tr>
+                    <th rowspan="2" class="align-middle res-header-row">LCR ECO Groupe Métiers</th>
+                    <th colspan="${dates.length}" class="text-center res-header-col">LCR ECO Impact by Date (Bn €)</th>
+                </tr>
+                <tr>
+    `;
+    
+    dates.forEach(date => {
+        html += `<th class="text-center res-date-header">${date}</th>`;
+    });
+    
+    html += `</tr></thead><tbody>`;
+    
+    Array.from(allGroupes).forEach(groupe => {
+        html += `<tr class="res-data-row">`;
+        html += `<td class="res-groupe-cell"><div class="res-group-label"><strong>${groupe}</strong></div></td>`;
+        
+        dates.forEach(date => {
+            const value = rowsData[groupe][date] || 0;
+            const cellClass = value === 0 ? 'res-zero-value' : 'res-data-cell';
+            html += `<td class="text-end ${cellClass}">${value.toFixed(3)}</td>`;
+        });
+        html += `</tr>`;
+    });
+    
+    html += `<tr class="res-grand-total-row"><td class="res-grand-total-label"><strong>TOTAL RESOURCES</strong></td>`;
+    dates.forEach(date => {
+        let grandTotal = 0;
+        Object.values(rowsData).forEach(values => grandTotal += values[date] || 0);
+        html += `<td class="text-end res-grand-total-value">${grandTotal.toFixed(3)}</td>`;
+    });
+    html += `</tr></tbody></table>`;
+    return html;
+}
 
 // ================================= CHATBOT =================================
 
