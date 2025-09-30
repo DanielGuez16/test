@@ -1852,131 +1852,174 @@ def prepare_analysis_context() -> str:
         context_parts.append(f"\nANALYSIS PERFORMED ON: {data.get('analysis_timestamp', 'Unknown')}")
         
         # BUFFER Table Analysis
-        if data.get("buffer") and not data["buffer"].get("error"):
-            buffer = data["buffer"]
+        buffer = data.get("buffer")
+        if buffer and isinstance(buffer, dict) and not buffer.get("error"):
             context_parts.append("\n=== BUFFER TABLE ANALYSIS ===")
             context_parts.append(f"Title: {buffer.get('title', 'BUFFER')}")
             context_parts.append("Filter: LCR_Catégorie = '1- Buffer', Top Conso = 'O'")
             
-            if buffer.get("data"):
-                context_parts.append("Key Buffer sections by file:")
-                for file_type, buffer_data in buffer["data"].items():
-                    if buffer_data:
-                        context_parts.append(f"\n{file_type.upper()} file - Buffer data:")
-                        for item in buffer_data[:5]:  # First 5 entries
-                            context_parts.append(f"- {item.get('section', 'N/A')} > {item.get('client', 'N/A')}: {item.get('total', 0):.3f} Bn €")
+            buffer_data = buffer.get("data")
+            if buffer_data and isinstance(buffer_data, dict):
+                context_parts.append("Key Buffer sections with variations:")
+                pivot_data = buffer_data.get("pivot_data", [])
+                if pivot_data and isinstance(pivot_data, list):
+                    for section_group in pivot_data[:3]:  # First 3 sections
+                        if isinstance(section_group, dict):
+                            section = section_group.get('section', 'N/A')
+                            total_j = section_group.get('section_total_j', 0)
+                            var_daily = section_group.get('section_variation_daily', 0)
+                            var_monthly = section_group.get('section_variation_monthly', 0)
+                            context_parts.append(f"- {section}: D={total_j:.3f} Bn €, Daily Var={var_daily:+.3f}, Monthly Var={var_monthly:+.3f}")
         
         # SUMMARY Table Analysis  
-        if data.get("summary") and not data["summary"].get("error"):
-            summary = data["summary"]
+        summary = data.get("summary")
+        if summary and isinstance(summary, dict) and not summary.get("error"):
             context_parts.append("\n=== SUMMARY TABLE ANALYSIS ===")
             context_parts.append("Comparison of LCR Assiette Pondérée vs LCR ECO Impact")
             
-            if summary.get("data"):
-                for file_type, summary_data in summary["data"].items():
-                    if summary_data:
+            summary_data = summary.get("data")
+            if summary_data and isinstance(summary_data, dict):
+                for file_type, file_data in summary_data.items():
+                    if file_data and isinstance(file_data, list):
                         context_parts.append(f"\n{file_type.upper()} summary:")
-                        for item in summary_data[:2]:  # First 2 dates
-                            context_parts.append(f"- Date {item.get('date', 'N/A')}: Assiette={item.get('sum_assiette', 0):.3f}, Impact={item.get('sum_impact', 0):.3f}, Diff={item.get('sum_difference', 0):.3f} Bn €")
+                        for item in file_data[:2]:  # First 2 dates
+                            if isinstance(item, dict):
+                                date = item.get('date', 'N/A')
+                                assiette = item.get('sum_assiette', 0)
+                                impact = item.get('sum_impact', 0)
+                                diff = item.get('sum_difference', 0)
+                                context_parts.append(f"- Date {date}: Assiette={assiette:.3f}, Impact={impact:.3f}, Diff={diff:.3f} Bn €")
         
         # CONSUMPTION Table Analysis
-        if data.get("consumption") and not data["consumption"].get("error"):
-            consumption = data["consumption"]
+        consumption = data.get("consumption")
+        if consumption and isinstance(consumption, dict) and not consumption.get("error"):
             context_parts.append("\n=== CONSUMPTION TABLE ANALYSIS ===")
             context_parts.append("Filtered business groups: A&WM & Insurance, CIB Financing, CIB Markets, GLOBAL TRADE, Other Consumption")
             
-            if consumption.get("data"):
-                for file_type, cons_data in consumption["data"].items():
-                    if cons_data:
+            consumption_data = consumption.get("data")
+            if consumption_data and isinstance(consumption_data, dict):
+                for file_type, file_data in consumption_data.items():
+                    if file_data and isinstance(file_data, list):
                         context_parts.append(f"\n{file_type.upper()} consumption by business group:")
-                        for item in cons_data:
-                            context_parts.append(f"- {item.get('LCR_ECO_GROUPE_METIERS', 'N/A')}: {item.get('LCR_ECO_IMPACT_LCR_Bn', 0):.3f} Bn €")
+                        for item in file_data:
+                            if isinstance(item, dict):
+                                groupe = item.get('LCR_ECO_GROUPE_METIERS', 'N/A')
+                                impact = item.get('LCR_ECO_IMPACT_LCR_Bn', 0)
+                                context_parts.append(f"- {groupe}: {impact:.3f} Bn €")
         
         # RESOURCES Table Analysis
-        if data.get("resources") and not data["resources"].get("error"):
-            resources = data["resources"]
+        resources = data.get("resources")
+        if resources and isinstance(resources, dict) and not resources.get("error"):
             context_parts.append("\n=== RESOURCES TABLE ANALYSIS ===")
             context_parts.append("Filtered business groups: GLOBAL TRADE, Other Contribution, Treasury")
             
-            if resources.get("data"):
-                for file_type, res_data in resources["data"].items():
-                    if res_data:
+            resources_data = resources.get("data")
+            if resources_data and isinstance(resources_data, dict):
+                for file_type, file_data in resources_data.items():
+                    if file_data and isinstance(file_data, list):
                         context_parts.append(f"\n{file_type.upper()} resources by business group:")
-                        for item in res_data:
-                            context_parts.append(f"- {item.get('LCR_ECO_GROUPE_METIERS', 'N/A')}: {item.get('LCR_ECO_IMPACT_LCR_Bn', 0):.3f} Bn €")
+                        for item in file_data:
+                            if isinstance(item, dict):
+                                groupe = item.get('LCR_ECO_GROUPE_METIERS', 'N/A')
+                                impact = item.get('LCR_ECO_IMPACT_LCR_Bn', 0)
+                                context_parts.append(f"- {groupe}: {impact:.3f} Bn €")
         
         # CAPPAGE Table Analysis
-        if data.get("cappage") and not data["cappage"].get("error"):
-            cappage = data["cappage"]
+        cappage = data.get("cappage")
+        if cappage and isinstance(cappage, dict) and not cappage.get("error"):
             context_parts.append("\n=== CAPPAGE & SHORT_LCR TCD ANALYSIS ===")
             context_parts.append("Pivot Table: SI Remettant (SHORT_LCR, CAPREOS) × Commentaire × Date d'arrêté")
             
-            if cappage.get("data"):
-                for file_type, cappage_data in cappage["data"].items():
-                    if cappage_data.get("pivot_data"):
+            cappage_data = cappage.get("data")
+            if cappage_data and isinstance(cappage_data, dict):
+                for file_type, file_data in cappage_data.items():
+                    pivot_data = file_data.get("pivot_data") if isinstance(file_data, dict) else None
+                    if pivot_data and isinstance(pivot_data, list):
                         context_parts.append(f"\n{file_type.upper()} CAPPAGE pivot data:")
-                        for si_group in cappage_data["pivot_data"]:
-                            si_name = si_group.get("si_remettant", "N/A")
-                            total_by_date = si_group.get("si_totals_by_date", {})
-                            context_parts.append(f"- {si_name} totals by date: {', '.join([f'{date}={total:.3f}' for date, total in total_by_date.items()])}")
+                        for si_group in pivot_data[:2]:  # First 2 SI groups
+                            if isinstance(si_group, dict):
+                                si_name = si_group.get("si_remettant", "N/A")
+                                totals = si_group.get("si_totals_by_date", {})
+                                if isinstance(totals, dict):
+                                    total_str = ', '.join([f'{date}={val:.3f}' for date, val in list(totals.items())[:3]])
+                                    context_parts.append(f"- {si_name}: {total_str}")
         
         # BUFFER & NCO Table Analysis
-        if data.get("buffer_nco") and not data["buffer_nco"].get("error"):
-            buffer_nco = data["buffer_nco"]
+        buffer_nco = data.get("buffer_nco")
+        if buffer_nco and isinstance(buffer_nco, dict) and not buffer_nco.get("error"):
             context_parts.append("\n=== BUFFER & NCO TCD ANALYSIS ===")
             context_parts.append("Two pivot tables: 1) BUFFER filtered by LCR_Catégorie='1- Buffer', 2) NCO all categories")
             
-            if buffer_nco.get("data"):
-                for file_type, bnco_data in buffer_nco["data"].items():
-                    context_parts.append(f"\n{file_type.upper()} Buffer & NCO:")
-                    
-                    # Buffer data
-                    if bnco_data.get("buffer_pivot_data"):
-                        context_parts.append("Buffer sections:")
-                        for section_group in bnco_data["buffer_pivot_data"][:3]:  # First 3 sections
-                            section_name = section_group.get("section", "N/A")
-                            context_parts.append(f"- {section_name} with {len(section_group.get('client_details', []))} clients")
-                    
-                    # NCO data
-                    if bnco_data.get("nco_pivot_data"):
-                        context_parts.append("NCO categories:")
-                        for category in bnco_data["nco_pivot_data"][:3]:  # First 3 categories
-                            cat_name = category.get("categorie", "N/A")
-                            context_parts.append(f"- {cat_name}")
+            bnco_data = buffer_nco.get("data")
+            if bnco_data and isinstance(bnco_data, dict):
+                for file_type, file_data in bnco_data.items():
+                    if isinstance(file_data, dict):
+                        context_parts.append(f"\n{file_type.upper()} Buffer & NCO:")
+                        
+                        # Buffer data
+                        buffer_pivot = file_data.get("buffer_pivot_data")
+                        if buffer_pivot and isinstance(buffer_pivot, list):
+                            context_parts.append("Buffer sections:")
+                            for section_group in buffer_pivot[:3]:  # First 3 sections
+                                if isinstance(section_group, dict):
+                                    section_name = section_group.get("section", "N/A")
+                                    client_count = len(section_group.get('client_details', []))
+                                    context_parts.append(f"- {section_name} with {client_count} clients")
+                        
+                        # NCO data
+                        nco_pivot = file_data.get("nco_pivot_data")
+                        if nco_pivot and isinstance(nco_pivot, list):
+                            context_parts.append("NCO categories:")
+                            for category in nco_pivot[:3]:  # First 3 categories
+                                if isinstance(category, dict):
+                                    cat_name = category.get("categorie", "N/A")
+                                    context_parts.append(f"- {cat_name}")
         
         # CONSUMPTION & RESOURCES Table Analysis
-        if data.get("consumption_resources") and not data["consumption_resources"].get("error"):
-            cons_res = data["consumption_resources"]
+        cons_res = data.get("consumption_resources")
+        if cons_res and isinstance(cons_res, dict) and not cons_res.get("error"):
             context_parts.append("\n=== CONSUMPTION & RESOURCES TCD ANALYSIS ===")
             context_parts.append("Two pivot tables with date columns: Consumption (filtered groups) + Resources (filtered groups)")
             
-            if cons_res.get("data"):
-                for file_type, cr_data in cons_res["data"].items():
-                    context_parts.append(f"\n{file_type.upper()} Consumption & Resources by date:")
-                    
-                    dates = cr_data.get("dates", [])
-                    context_parts.append(f"Available dates: {', '.join(dates)}")
-                    
-                    # Consumption data summary
-                    if cr_data.get("consumption_data"):
-                        context_parts.append("Consumption groups:")
-                        for cons_item in cr_data["consumption_data"]:
-                            group_name = cons_item.get("lcr_eco_groupe_metiers", "N/A")
-                            context_parts.append(f"- {group_name}")
-                    
-                    # Resources data summary
-                    if cr_data.get("resources_data"):
-                        context_parts.append("Resources groups:")
-                        for res_item in cr_data["resources_data"]:
-                            group_name = res_item.get("lcr_eco_groupe_metiers", "N/A")
-                            context_parts.append(f"- {group_name}")
+            cr_data = cons_res.get("data")
+            if cr_data and isinstance(cr_data, dict):
+                for file_type, file_data in cr_data.items():
+                    if isinstance(file_data, dict):
+                        context_parts.append(f"\n{file_type.upper()} Consumption & Resources by date:")
+                        
+                        dates = file_data.get("dates", [])
+                        if dates and isinstance(dates, list):
+                            context_parts.append(f"Available dates: {', '.join(dates[:5])}...")  # First 5 dates
+                        
+                        # Consumption data summary
+                        cons_data = file_data.get("consumption_data")
+                        if cons_data and isinstance(cons_data, list):
+                            context_parts.append("Consumption groups:")
+                            for cons_item in cons_data:
+                                if isinstance(cons_item, dict):
+                                    group_name = cons_item.get("lcr_eco_groupe_metiers", "N/A")
+                                    context_parts.append(f"- {group_name}")
+                        
+                        # Resources data summary
+                        res_data = file_data.get("resources_data")
+                        if res_data and isinstance(res_data, list):
+                            context_parts.append("Resources groups:")
+                            for res_item in res_data:
+                                if isinstance(res_item, dict):
+                                    group_name = res_item.get("lcr_eco_groupe_metiers", "N/A")
+                                    context_parts.append(f"- {group_name}")
         
         # Source files information
-        if data.get("raw_dataframes_info"):
+        raw_df_info = data.get("raw_dataframes_info")
+        if raw_df_info and isinstance(raw_df_info, dict):
             context_parts.append("\n=== SOURCE FILES INFORMATION ===")
-            for file_type, info in data["raw_dataframes_info"].items():
-                context_parts.append(f"File {file_type}: {info['shape'][0]} rows, {info['shape'][1]} columns")
-                context_parts.append(f"Key columns: {', '.join(info['columns'][:10])}...")  # First 10 columns
+            for file_type, info in raw_df_info.items():
+                if isinstance(info, dict):
+                    shape = info.get('shape', [0, 0])
+                    cols = info.get('columns', [])
+                    context_parts.append(f"File {file_type}: {shape[0]} rows, {shape[1]} columns")
+                    if cols and isinstance(cols, list):
+                        context_parts.append(f"Key columns: {', '.join(cols[:10])}...")  # First 10 columns
     
     else:
         context_parts.append("\nNo analysis available - analyses must be run first.")
