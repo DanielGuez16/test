@@ -311,6 +311,47 @@ body {
     color: white !important;
 }
 
+#dateInfoIcon {
+    position: relative;
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
+#dateInfoIcon::after {
+    content: 'Example: Select 15/09/2025 to load D_PA_20250915 (J-1) and D_PA_20250916 (J)';
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    font-size: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 1000;
+}
+
+#dateInfoIcon::before {
+    content: '';
+    position: absolute;
+    bottom: 115%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #333;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#dateInfoIcon:hover::after,
+#dateInfoIcon:hover::before {
+    opacity: 1;
+}
+
 /* ================================= COMPOSANTS UI ================================= */
 
 /* Upload Areas */

@@ -2727,7 +2727,7 @@ function escapeHtml(text) {
  */
 async function updateUploadedDocsList() {
     try {
-        const response = await fetch('/api/uploaded-document');
+        const response = await fetch('/api/uploaded-documents');
         const result = await response.json();
         
         const docsContainer = document.getElementById('uploaded-docs');
