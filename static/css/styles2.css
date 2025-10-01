@@ -115,6 +115,7 @@ body {
     padding: 2rem;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    overflow: visible;
 }
 
 .date-label {
@@ -125,6 +126,8 @@ body {
     margin-bottom: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    position: relative;  
+    overflow: visible;   
 }
 
 .date-input-wrapper {
@@ -323,10 +326,10 @@ body {
     content: 'Example: Select 15/09/2025 to load D_PA_20250915 (J-1) and D_PA_20250916 (J)';
     position: absolute;
     bottom: 150%;
-    left: 50%;
+    left: 100px;
     transform: translateX(-50%);
-    background-color: #333;
-    color: white;
+    background-color: #E2C3F1;
+    color: var(--natixis-blue);
     padding: 10px 15px;
     border-radius: 6px;
     white-space: nowrap;
