@@ -313,38 +313,42 @@ body {
 
 #dateInfoIcon {
     position: relative;
-    color: #6c757d;
+    color: var(--natixis-blue);
     font-size: 0.9em;
+    cursor: help;
+    z-index: 10;
 }
 
 #dateInfoIcon::after {
     content: 'Example: Select 15/09/2025 to load D_PA_20250915 (J-1) and D_PA_20250916 (J)';
     position: absolute;
-    bottom: 125%;
+    bottom: 150%;
     left: 50%;
     transform: translateX(-50%);
     background-color: #333;
     color: white;
-    padding: 8px 12px;
+    padding: 10px 15px;
     border-radius: 6px;
     white-space: nowrap;
     font-size: 12px;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s;
-    z-index: 1000;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 #dateInfoIcon::before {
     content: '';
     position: absolute;
-    bottom: 115%;
+    bottom: 140%;
     left: 50%;
     transform: translateX(-50%);
-    border: 6px solid transparent;
+    border: 8px solid transparent;
     border-top-color: #333;
     opacity: 0;
     transition: opacity 0.3s;
+    z-index: 9999;
 }
 
 #dateInfoIcon:hover::after,
