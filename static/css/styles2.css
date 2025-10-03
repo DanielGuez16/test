@@ -641,6 +641,145 @@ body {
     color: #DC2626;
 }
 
+/* ================================= TABLEAU TOTAUX SIMPLES ================================= */
+
+.simple-totals-table {
+    font-size: 1.1rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.simple-totals-table .totals-header {
+    background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)) !important;
+    color: white !important;
+    font-weight: 600;
+    padding: 1.5rem 1rem;
+    font-size: 1rem;
+}
+
+.simple-totals-table .totals-row {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+}
+
+.simple-totals-table .totals-value {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--natixis-blue);
+    padding: 1.5rem 1rem;
+}
+
+.simple-totals-table .totals-value:hover {
+    background: var(--natixis-very-light-blue);
+    transform: scale(1.02);
+    transition: all 0.2s ease;
+}
+
+
+/* ================================= BARRE SI REMETTANT ================================= */
+
+.si-bar-container {
+    padding: 2rem 1rem;
+}
+
+.si-horizontal-bar {
+    display: flex;
+    width: 100%;
+    height: 60px;
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    margin-bottom: 2rem;
+}
+
+.si-bar-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.si-bar-segment:hover {
+    filter: brightness(1.1);
+    transform: scale(1.02);
+    z-index: 10;
+}
+
+.si-bar-label {
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.si-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: center;
+}
+
+.si-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.si-legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.si-legend-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.si-legend-value {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--natixis-blue);
+}
+
+.si-filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.si-color-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 4px;
+}
+
+.form-check-inline {
+    margin-right: 1rem;
+}
+
+@media (max-width: 768px) {
+    .si-horizontal-bar {
+        height: 40px;
+    }
+    
+    .si-bar-label {
+        font-size: 0.75rem;
+    }
+    
+    .si-legend {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 /* ================================= TABLEAUX BUFFER ================================= */
 
 .buffer-table th { 

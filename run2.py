@@ -582,18 +582,22 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
         cappage_results = create_cappage_table(dataframes)
         buffer_nco_results = create_buffer_nco_table(dataframes)
         consumption_resources_results = create_consumption_resources_table(dataframes)
+        simple_totals_results = create_simple_totals_table(dataframes) 
+        si_remettant_results = create_si_remettant_bar(dataframes)
         
         logger.info("Analyses terminées (nouveaux tableaux)")
 
         # SAUVEGARDER LE CONTEXTE CHATBOT
         chatbot_session["context_data"] = {
             "buffer": buffer_results,
-            "summary": summary_results,  # NOUVEAU
+            "summary": summary_results,  
             "consumption": consumption_results,
             "resources": resources_results,
             "cappage": cappage_results,
             "buffer_nco": buffer_nco_results,
             "consumption_resources": consumption_resources_results,
+            "simple_totals": simple_totals_results, 
+            "si_remettant": si_remettant_results,
             "analysis_timestamp": datetime.now().isoformat(),
             "raw_dataframes_info": {
                 file_type: {
@@ -648,7 +652,9 @@ async def analyze_files(session_token: Optional[str] = Cookie(None)):
                 "resources": resources_results,
                 "cappage": cappage_results,
                 "buffer_nco": buffer_nco_results,
-                "consumption_resources": consumption_resources_results
+                "consumption_resources": consumption_resources_results,
+                "simple_totals": simple_totals_results,
+                "si_remettant": si_remettant_results
             }
         }
         
@@ -2080,6 +2086,120 @@ def create_consumption_resources_table(dataframes):
         logger.error(f"❌ Erreur création tableaux CONSUMPTION & RESOURCES: {e}")
         return {
             "title": "CONSUMPTION & RESOURCES - Erreur",
+            "error": str(e)
+        }
+    
+
+# ========================== FONCTIONS TOTAUX LCR_Assiette Pondérée ===========================
+
+
+def create_simple_totals_table(dataframes):
+    """
+    Crée un tableau simple avec juste les totaux LCR_Assiette Pondérée par fichier
+    Pas de filtre, pas de ligne - juste 3 colonnes avec les totaux
+    """
+    try:
+        logger.info("📊 Création du tableau des totaux simples")
+        
+        totals_results = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Calcul total pour {file_type}")
+            
+            # Vérification colonne requise
+            if "LCR_Assiette Pondérée" not in df.columns:
+                logger.warning(f"⚠️ Colonne LCR_Assiette Pondérée manquante pour {file_type}")
+                continue
+            
+            # Conversion en numérique
+            df_copy = df.copy()
+            df_copy["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_copy["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            # Calcul du total (en milliards)
+            total = float(df_copy["LCR_Assiette Pondérée"].sum()) / 1_000_000_000
+            
+            totals_results[file_type] = total
+            logger.info(f"✅ Total {file_type}: {total:.3f} Bn €")
+        
+        return {
+            "title": "Global LCR Totals",
+            "data": totals_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "unit": "Bn €",
+                "note": "No filters applied - raw totals from uploaded files"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création tableau totaux: {e}")
+        return {
+            "title": "Global LCR Totals - Error",
+            "error": str(e)
+        }
+
+def create_si_remettant_bar(dataframes):
+    """
+    Crée les données pour le graphique en barre horizontale des SI Remettant
+    Filtre: SI Remettant IN ('AJUST AJUSTGAP', 'AJUST SUMMIT', 'AJUST SUMMIT_TITRES')
+    """
+    try:
+        logger.info("📊 Création des données SI Remettant Bar")
+        
+        si_results = {}
+        
+        for file_type, df in dataframes.items():
+            logger.info(f"📄 Traitement SI Remettant pour {file_type}")
+            
+            if "SI Remettant" not in df.columns or "LCR_Assiette Pondérée" not in df.columns:
+                logger.warning(f"⚠️ Colonnes manquantes pour {file_type}")
+                continue
+            
+            # Filtrage
+            df_filtered = df[df["Top Conso"] == "O"].copy()
+            allowed_si = ['AJUST AJUSTGAP', 'AJUST SUMMIT', 'AJUST SUMMIT_TITRES']
+            df_filtered = df_filtered[df_filtered["SI Remettant"].isin(allowed_si)].copy()
+            
+            logger.info(f"📋 Après filtrage SI Remettant: {len(df_filtered)} lignes")
+            
+            if len(df_filtered) == 0:
+                continue
+            
+            # Conversion numérique
+            df_filtered["LCR_Assiette Pondérée"] = pd.to_numeric(
+                df_filtered["LCR_Assiette Pondérée"], errors='coerce'
+            ).fillna(0)
+            
+            # Grouper par SI Remettant
+            grouped = df_filtered.groupby("SI Remettant")["LCR_Assiette Pondérée"].sum().reset_index()
+            grouped["LCR_Assiette_Bn"] = (grouped["LCR_Assiette Pondérée"] / 1_000_000_000).round(3)
+            
+            si_results[file_type] = [
+                {
+                    "si_remettant": str(row["SI Remettant"]),
+                    "value": float(row["LCR_Assiette_Bn"])
+                }
+                for _, row in grouped.iterrows()
+            ]
+            
+            logger.info(f"✅ SI Remettant {file_type}: {len(grouped)} valeurs")
+        
+        return {
+            "title": "SI Remettant Distribution",
+            "data": si_results,
+            "metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "allowed_values": allowed_si,
+                "unit": "Bn €"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création SI Remettant bar: {e}")
+        return {
+            "title": "SI Remettant Distribution - Error",
             "error": str(e)
         }
     

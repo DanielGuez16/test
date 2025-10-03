@@ -678,6 +678,27 @@ function displayCompleteResults(analysisResults) {
         }
         
         let html = '';
+
+        if (analysisResults.simple_totals) {
+            html += '<div class="analysis-section fade-in-up">';
+            html += '<div class="row">';
+            html += '<div class="col-12">';
+            html += generateSimpleTotalsSection(analysisResults.simple_totals);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        }
+
+        // Section SI Remettant Bar juste après les totaux
+        if (analysisResults.si_remettant) {
+            html += '<div class="analysis-section fade-in-up">';
+            html += '<div class="row">';
+            html += '<div class="col-12">';
+            html += generateSiRemettantBar(analysisResults.si_remettant);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        }
         
         // Section avec BUFFER/Summary à gauche et Consumption & Resources à droite
         html += '<div class="analysis-section fade-in-up">';
@@ -848,6 +869,180 @@ async function loadHistoricalTables() {
         console.error('Erreur chargement historique:', error);
     }
 }
+
+// ================================= GÉNÉRATION TOTAUX LCR DU DÉBUT =================================
+
+
+/**
+ * Génère le tableau simple des totaux LCR
+ */
+function generateSimpleTotalsSection(totalsData) {
+    if (totalsData.error) {
+        return `<div class="alert alert-danger">Erreur totaux: ${totalsData.error}</div>`;
+    }
+    
+    const data = totalsData.data;
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <h3 style="color: #76279b;">${totalsData.title}</h3>
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    ${totalsData.metadata.note}
+                </small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-bordered simple-totals-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="text-center totals-header">File D (Today)</th>
+                                <th class="text-center totals-header">File D-1 (Yesterday)</th>
+                                <th class="text-center totals-header">File M-1 (Last Month)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="totals-row">
+                                <td class="text-end totals-value">${(data.j || 0).toFixed(3)} Bn €</td>
+                                <td class="text-end totals-value">${(data.jMinus1 || 0).toFixed(3)} Bn €</td>
+                                <td class="text-end totals-value">${(data.mMinus1 || 0).toFixed(3)} Bn €</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+/**
+ * Génère le visuel de la barre horizontale SI Remettant
+ */
+function generateSiRemettantBar(siData) {
+    if (siData.error) {
+        return `<div class="alert alert-danger">Erreur SI Remettant: ${siData.error}</div>`;
+    }
+    
+    const data = siData.data.j || [];  // Données du fichier J (aujourd'hui)
+    const colors = ['#6B218D', '#666666', '#805BED', '#51A0A2', '#987001', '#D46EA7'];
+    
+    // Calculer le total pour les pourcentages
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    
+    let html = `
+        <div class="card border-0">
+            <div class="card-header no-background">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 style="color: #76279b;">${siData.title}</h3>
+                    <div class="si-filter-controls">
+                        <small class="text-muted me-2">Filtres:</small>
+    `;
+    
+    // Checkboxes pour filtrer
+    siData.metadata.allowed_values.forEach((val, idx) => {
+        html += `
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="si-${idx}" value="${val}" checked onchange="updateSiBar()">
+                <label class="form-check-label" for="si-${idx}">
+                    <span class="si-color-indicator" style="background-color: ${colors[idx % colors.length]}"></span>
+                    ${val}
+                </label>
+            </div>
+        `;
+    });
+    
+    html += `
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div id="si-remettant-container" class="si-bar-container">
+    `;
+    
+    // Générer la barre horizontale
+    html += '<div class="si-horizontal-bar">';
+    
+    data.forEach((item, idx) => {
+        const percentage = ((item.value / total) * 100).toFixed(2);
+        const color = colors[idx % colors.length];
+        
+        html += `
+            <div class="si-bar-segment" 
+                 data-si="${item.si_remettant}"
+                 style="width: ${percentage}%; background-color: ${color};"
+                 title="${item.si_remettant}: ${item.value.toFixed(3)} Bn € (${percentage}%)">
+                <span class="si-bar-label">${percentage}%</span>
+            </div>
+        `;
+    });
+    
+    html += '</div>';  // Fin si-horizontal-bar
+    
+    // Légende
+    html += '<div class="si-legend mt-4">';
+    data.forEach((item, idx) => {
+        const color = colors[idx % colors.length];
+        html += `
+            <div class="si-legend-item">
+                <span class="si-legend-color" style="background-color: ${color}"></span>
+                <span class="si-legend-label">${item.si_remettant}</span>
+                <span class="si-legend-value">${item.value.toFixed(3)} Bn €</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    html += `
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Stocker les données globalement pour les filtres
+    html += `<script>window.siRemettantData = ${JSON.stringify(data)}; window.siColors = ${JSON.stringify(colors)};</script>`;
+    
+    return html;
+}
+
+/**
+ * Met à jour la barre SI Remettant selon les filtres
+ */
+function updateSiBar() {
+    const checkboxes = document.querySelectorAll('[id^="si-"]');
+    const activeValues = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    
+    // Filtrer les données
+    const filteredData = window.siRemettantData.filter(item => 
+        activeValues.includes(item.si_remettant)
+    );
+    
+    const total = filteredData.reduce((sum, item) => sum + item.value, 0);
+    
+    // Regénérer la barre
+    let barHtml = '';
+    filteredData.forEach((item, idx) => {
+        const percentage = ((item.value / total) * 100).toFixed(2);
+        const originalIdx = window.siRemettantData.indexOf(item);
+        const color = window.siColors[originalIdx % window.siColors.length];
+        
+        barHtml += `
+            <div class="si-bar-segment" 
+                 data-si="${item.si_remettant}"
+                 style="width: ${percentage}%; background-color: ${color};"
+                 title="${item.si_remettant}: ${item.value.toFixed(3)} Bn € (${percentage}%)">
+                <span class="si-bar-label">${percentage}%</span>
+            </div>
+        `;
+    });
+    
+    document.querySelector('.si-horizontal-bar').innerHTML = barHtml;
+}
+
 
 // ================================= GÉNÉRATION BUFFER & CONSUMPTION & RESOURCES & CAPPAGE SECTION & BUFFER&NCO =================================
 
