@@ -8,6 +8,7 @@
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     
     <!-- Styles personnalisés -->
     <style>
@@ -723,6 +724,84 @@
             border-radius: 0 0 20px 20px !important;  /* Arrondi seulement en bas */
         }
 
+        /* Tooltip pour l'icône d'info */
+        #dateInfoIcon {
+            position: relative;
+            color: var(--natixis-blue);
+            font-size: 0.9em;
+            cursor: help;
+            z-index: 10;
+        }
+
+        #dateInfoIcon::after {
+            content: 'Example: Select 15/09/2025 to load D_PA_20250915 (J-1) and D_PA_20250916 (J)';
+            position: absolute;
+            bottom: 150%;
+            left: 100px;
+            transform: translateX(-50%);
+            background-color: #E2C3F1;
+            color: var(--natixis-blue);
+            padding: 10px 15px;
+            border-radius: 6px;
+            white-space: nowrap;
+            font-size: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        #dateInfoIcon::before {
+            content: '';
+            position: absolute;
+            bottom: 140%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #333;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 9999;
+        }
+
+        #dateInfoIcon:hover::after,
+        #dateInfoIcon:hover::before {
+            opacity: 1;
+        }
+
+        /* Styles pour les cartes upload */
+        .upload-cards .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .upload-cards .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .upload-cards .card-title {
+            color: var(--natixis-blue);
+            font-weight: 700;
+            font-size: 1.1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--natixis-blue);
+            margin-bottom: 1rem;
+        }
+
+        /* Arrondir la section upload */
+        .upload-section .card {
+            border-radius: 20px !important;
+            overflow: hidden;
+        }
+
+        .upload-section .card-header.bg-gradient {
+            border-radius: 20px 20px 0 0 !important;
+        }
+
 
 
     </style>
@@ -752,7 +831,7 @@
     </div>
     
     <!-- Contenu principal -->
-    <div class="container">
+    <div class="container-xl">
         <div class="main-container p-4">
             <div class="text-center mb-5 fade-in-up">
                 <h1 class="display-5 text-primary fw-bold mb-3">
@@ -779,21 +858,16 @@
                                 <div class="date-selector-container">
                                     <label class="date-label">
                                         Select Analysis Date
-                                        <span id=""dateInfoIcon">
-                                           <i class="fas fa-info-circle ms-1"></i>
+                                        <span id="dateInfoIcon">
+                                            <i class="fas fa-info-circle ms-1"></i>
+                                        </span>
                                     </label>
                                     <div class="date-input-wrapper">
                                         <input type="date" class="form-control date-input" id="analysisDate">
                                     </div>
-                                    <div class="date-explanation mt-2">
-                                        <small class="text-muted">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Example: Select <strong>15/09/2025</strong> to load data of the previous day (J-1) 14/09/2025 and the current day (J) 15/09/2025
-                                        </small>
-                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-2">
                                 <button id="loadFilesBtn" class="btn btn-load-files">
                                     <div class="btn-content">
                                         <i class="fas fa-cloud-download-alt btn-icon"></i>
