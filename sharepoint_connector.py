@@ -838,7 +838,6 @@
                     Daily LCR Analysis Tool
                 </h1>
             </div>
-            </div>
             
             <!-- SECTION UPLOAD -->
             <div class="upload-section mb-5">
