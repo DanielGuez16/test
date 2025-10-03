@@ -9,7 +9,7 @@ pour séparer la logique métier de la présentation.
 """
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Cookie
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -227,6 +227,62 @@ async def root(request: Request):
         "user": current_user
     })
 
+@app.get("/select-project", response_class=HTMLResponse)
+async def select_project(request: Request):
+    """Page de sélection de projet"""
+    session_token = request.cookies.get("session_token")
+    current_user = get_current_user_from_session(session_token)
+    
+    if not current_user:
+        # Non connecté → retour au login
+        return RedirectResponse(url="/")
+    
+    log_activity(current_user["username"], "ACCESS", "Accessed project selector")
+    
+    return templates.TemplateResponse("project_selector.html", {
+        "request": request,
+        "title": "Select Project - Steering ALM Metrics",
+        "user": current_user
+    })
+
+@app.get("/project/lcr", response_class=HTMLResponse)
+async def project_lcr(request: Request):
+    """Projet LCR Analysis"""
+    session_token = request.cookies.get("session_token")
+    current_user = get_current_user_from_session(session_token)
+    
+    if not current_user:
+        return RedirectResponse(url="/")
+    
+    log_activity(current_user["username"], "ACCESS", "Accessed LCR project")
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "title": "LCR Analysis - Steering ALM Metrics",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "user": current_user
+    })
+
+@app.get("/project/autre", response_class=HTMLResponse)
+async def project_autre(request: Request):
+    """Deuxième projet"""
+    session_token = request.cookies.get("session_token")
+    current_user = get_current_user_from_session(session_token)
+    
+    if not current_user:
+        return RedirectResponse(url="/")
+    
+    log_activity(current_user["username"], "ACCESS", "Accessed Project 2")
+    
+    return templates.TemplateResponse("index_project2.html", {
+        "request": request,
+        "title": "Project 2 - Steering ALM Metrics",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "user": current_user
+    })
+
 @app.post("/api/login")
 async def login(request: Request):
     """Authentification utilisateur"""
@@ -248,7 +304,7 @@ async def login(request: Request):
         response = JSONResponse({
             "success": True,
             "message": f"Welcome {user['full_name']}!",
-            "redirect": "/"
+            "redirect": "/select-project"
         })
         
         # Définir le cookie de session
