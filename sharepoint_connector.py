@@ -900,9 +900,6 @@
                 </div>
             </div>
 
-            <!-- Espace avant le bouton d'analyse -->
-            <div style="margin-top: 10px;"></div>
-
             <!-- Bouton d'analyse -->
             <div class="text-center mb-4 fade-in-up" style="animation-delay: 0.4s;">
                 <button id="analyzeBtn" class="btn btn-analyze btn-lg" onclick="analyze()" disabled>
